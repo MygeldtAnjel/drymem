@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/home/mygeldtanjel/.nvm/versions/node/v22.21.1/bin/node -p \"process.versions.modules + '' / node: '' + process.version\")",
+      "Bash(/home/mygeldtanjel/.nvm/versions/node/v22.21.1/bin/npm rebuild:*)",
+      "Bash(/home/mygeldtanjel/.nvm/versions/node/v22.21.1/bin/node -p \"process.release\")",
+      "Bash(node -p \"process.versions.modules\")",
+      "Bash(/usr/bin/node /home/mygeldtanjel/personal-projects/drymem/node_modules/tsx/dist/cli.mjs /home/mygeldtanjel/personal-projects/drymem/src/delivery/mcp/server.ts)",
+      "mcp__drymem__mem_search",
+      "mcp__drymem__mem_finalize_session",
+      "mcp__drymem__mem_context"
+    ]
+  }
+}

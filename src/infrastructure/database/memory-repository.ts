@@ -11,34 +11,26 @@ export interface MemoryRecord {
 }
 
 export class MemoryRepository {
-  /**
-   * Saves or updates a memory record. Performs an upsert by incrementing the revision.
-   * FTS5 is reliably synchronized for both INSERT and UPDATE operations.
-   */
   static save(data: MemoryRecord): { success: true; id: number } | { success: false; error: string } {
     try {
       const stmt = db.prepare(`
         INSERT INTO memories (topic_key, project_path, scope, query_input, proposed_code, content, status)
         VALUES (@topic_key, @project_path, @scope, @query_input, @proposed_code, @content, @status)
-        ON CONFLICT(topic_key, project_path, scope) 
-        DO UPDATE SET 
+        ON CONFLICT(topic_key, project_path, scope)
+        DO UPDATE SET
           query_input = @query_input, proposed_code = @proposed_code, content = @content, status = @status,
           revision_count = revision_count + 1, updated_at = datetime('now', 'localtime'), deleted_at = NULL
       `);
       
-      const info = stmt.run(data);
+      stmt.run(data);
       
-      // Get the actual ID, whether new or updated
       const row = db.prepare(`SELECT id FROM memories WHERE topic_key = ? AND project_path = ? AND scope = ?`).get(
-        data.topic_key, 
-        data.project_path, 
+        data.topic_key,
+        data.project_path,
         data.scope
       ) as { id: number } | undefined;
 
-      // Sync FTS5 reliably for both INSERT and UPDATE operations
-      // FTS5 must always reflect the current state of the memories table
       if (row) {
-        // Always delete first to ensure clean state, then insert
         db.prepare(`DELETE FROM memories_fts WHERE rowid = ?`).run(row.id);
         db.prepare(`INSERT INTO memories_fts(rowid, topic_key, query_input, proposed_code, content) VALUES (?, ?, ?, ?, ?)`)
           .run(row.id, data.topic_key, data.query_input, data.proposed_code, data.content);
@@ -46,41 +38,31 @@ export class MemoryRepository {
       
       return { success: true, id: row!.id };
     } catch (error: any) {
-      console.error("❌ Internal SQLite error:", error.message);
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Searches memories using hybrid search: FTS5 first, then LIKE fallback.
-   * This enables finding related topics (e.g., "load testing" vs "stress test").
-   */
   static search(keyword: string, project_path: string): any[] {
     try {
-      // First, try FTS5 full-text search
       const ftsResults = db.prepare(`
         SELECT m.id, m.topic_key, m.scope, m.content, m.status, m.revision_count, m.updated_at, 0 as search_type
-        FROM memories m 
-        JOIN memories_fts fts ON m.id = fts.rowid 
-        WHERE memories_fts MATCH ? 
-        AND m.deleted_at IS NULL 
-        AND (m.project_path = ? OR m.scope = 'personal') 
-        ORDER BY rank 
+        FROM memories m
+        WHERE m.project_path = ?
+        AND m.id IN (SELECT rowid FROM memories_fts WHERE memories_fts MATCH ?)
+        AND m.deleted_at IS NULL
         LIMIT 10
-      `).all(keyword, project_path);
+      `).all(project_path, keyword);
 
-      // If FTS5 returns results, return them
       if (ftsResults.length > 0) {
         return ftsResults;
       }
 
-      // Fallback to LIKE search for partial/pattern matching
       const likeResults = db.prepare(`
         SELECT m.id, m.topic_key, m.scope, m.content, m.status, m.revision_count, m.updated_at, 1 as search_type
-        FROM memories m 
-        WHERE (m.topic_key LIKE ? OR m.content LIKE ?) 
-        AND m.deleted_at IS NULL 
-        AND (m.project_path = ? OR m.scope = 'personal') 
+        FROM memories m
+        WHERE (m.topic_key LIKE ? OR m.content LIKE ?)
+        AND m.deleted_at IS NULL
+        AND m.project_path = ?
         ORDER BY m.updated_at DESC
         LIMIT 10
       `).all(`%${keyword}%`, `%${keyword}%`, project_path);
@@ -91,16 +73,13 @@ export class MemoryRepository {
     }
   }
 
-  /**
-   * Retrieves recent context for a specific project.
-   */
   static getContext(project_path: string): any[] {
     try {
       return db.prepare(`
-        SELECT topic_key, content, status, updated_at 
-        FROM memories 
-        WHERE project_path = ? AND deleted_at IS NULL 
-        ORDER BY updated_at DESC 
+        SELECT topic_key, content, status, updated_at
+        FROM memories
+        WHERE project_path = ? AND deleted_at IS NULL
+        ORDER BY updated_at DESC
         LIMIT 5
       `).all(project_path);
     } catch (error) {
@@ -108,19 +87,15 @@ export class MemoryRepository {
     }
   }
 
-  /**
-   * Soft-deletes a memory record.
-   */
   static delete(topic_key: string, project_path: string): boolean {
     try {
       const result = db.prepare(`
-        UPDATE memories 
-        SET deleted_at = datetime('now', 'localtime') 
+        UPDATE memories
+        SET deleted_at = datetime('now', 'localtime')
         WHERE topic_key = ? AND project_path = ?
       `).run(topic_key, project_path);
       return result.changes > 0;
     } catch (error) {
-      console.error("❌ Delete error:", error);
       return false;
     }
   }

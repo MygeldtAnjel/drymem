@@ -17,10 +17,7 @@ export function runMigrations(): void {
     fs.mkdirSync(migrationsDir);
   }
 
-  const files = fs.readdirSync(migrationsDir)
-    .filter(file => file.endsWith(".sql"))
-    .sort();
-
+  const files = fs.readdirSync(migrationsDir).filter(file => file.endsWith(".sql")).sort();
   let migrationsApplied = 0;
 
   const executeTransaction = db.transaction((version: number, sql: string) => {
@@ -36,16 +33,9 @@ export function runMigrations(): void {
     const version = parseInt(versionStr, 10);
 
     if (version > currentVersion) {
-      console.error(`⏳ Applying migration v${version}: ${file}...`);
       const sqlContent = fs.readFileSync(path.join(migrationsDir, file), "utf8");
       executeTransaction(version, sqlContent);
       migrationsApplied++;
     }
-  }
-
-  if (migrationsApplied === 0) {
-    console.error("✅ Database is already up to date.");
-  } else {
-    console.error(`🚀 ${migrationsApplied} migration(s) applied successfully.`);
   }
 }

@@ -1,12 +1,9 @@
-// src/database.ts
-// Legacy exports for backward compatibility - re-exports from the new infrastructure layer
 import { runMigrations } from "./infrastructure/database/migrations.js";
 import { MemoryRepository } from "./infrastructure/database/memory-repository.js";
 
 export { runMigrations };
 export { MemoryRepository as dbRepository };
 
-// Re-export the old function names for backward compatibility
 export function memSave(data: { topic_key: string; project_path: string; scope: string; query_input: string; proposed_code: string; content: string; status: string; }): string {
   const result = MemoryRepository.save(data);
   if (result.success) {
