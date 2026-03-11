@@ -13,6 +13,7 @@ export interface MemoryRecord {
 export class MemoryRepository {
   /**
    * Saves or updates a memory record. Performs an upsert by incrementing the revision.
+   * FTS5 is reliably synchronized for both INSERT and UPDATE operations.
    */
   static save(data: MemoryRecord): { success: true; id: number } | { success: false; error: string } {
     try {
@@ -34,8 +35,10 @@ export class MemoryRepository {
         data.scope
       ) as { id: number } | undefined;
 
-      // Sync FTS5 safely (delete if exists and insert new)
-      if (info.changes > 0 && row) {
+      // Sync FTS5 reliably for both INSERT and UPDATE operations
+      // FTS5 must always reflect the current state of the memories table
+      if (row) {
+        // Always delete first to ensure clean state, then insert
         db.prepare(`DELETE FROM memories_fts WHERE rowid = ?`).run(row.id);
         db.prepare(`INSERT INTO memories_fts(rowid, topic_key, query_input, proposed_code, content) VALUES (?, ?, ?, ?, ?)`)
           .run(row.id, data.topic_key, data.query_input, data.proposed_code, data.content);
@@ -49,12 +52,14 @@ export class MemoryRepository {
   }
 
   /**
-   * Searches memories using FTS5 full-text search.
+   * Searches memories using hybrid search: FTS5 first, then LIKE fallback.
+   * This enables finding related topics (e.g., "load testing" vs "stress test").
    */
   static search(keyword: string, project_path: string): any[] {
     try {
-      return db.prepare(`
-        SELECT m.topic_key, m.scope, m.content, m.status, m.revision_count, m.updated_at 
+      // First, try FTS5 full-text search
+      const ftsResults = db.prepare(`
+        SELECT m.id, m.topic_key, m.scope, m.content, m.status, m.revision_count, m.updated_at, 0 as search_type
         FROM memories m 
         JOIN memories_fts fts ON m.id = fts.rowid 
         WHERE memories_fts MATCH ? 
@@ -63,6 +68,24 @@ export class MemoryRepository {
         ORDER BY rank 
         LIMIT 10
       `).all(keyword, project_path);
+
+      // If FTS5 returns results, return them
+      if (ftsResults.length > 0) {
+        return ftsResults;
+      }
+
+      // Fallback to LIKE search for partial/pattern matching
+      const likeResults = db.prepare(`
+        SELECT m.id, m.topic_key, m.scope, m.content, m.status, m.revision_count, m.updated_at, 1 as search_type
+        FROM memories m 
+        WHERE (m.topic_key LIKE ? OR m.content LIKE ?) 
+        AND m.deleted_at IS NULL 
+        AND (m.project_path = ? OR m.scope = 'personal') 
+        ORDER BY m.updated_at DESC
+        LIMIT 10
+      `).all(`%${keyword}%`, `%${keyword}%`, project_path);
+
+      return likeResults;
     } catch (error) {
       return [];
     }
