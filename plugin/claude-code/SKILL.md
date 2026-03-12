@@ -8,7 +8,7 @@
 |---|---|
 | `mem_context` | At session start — load recent project memory |
 | `mem_search` | Before any task — find relevant past decisions |
-| `mem_finalize_session` | Only when user explicitly asks to save |
+| `mem_finalize_session` | After completing significant work, and always at session end |
 | `mem_delete` | When user asks to remove a memory |
 
 ---
@@ -24,19 +24,15 @@ The session-start hook has already loaded context above. You do not need to call
 
 ---
 
-## During Work
+## During Work (proactive saving)
 
-- Apply past context you find to the current task
-- Do NOT call `mem_finalize_session` proactively
-- Do NOT announce that you are searching or loading memory
+Save proactively — do NOT wait for the user to ask. Call `mem_finalize_session` silently when:
+- You finish a meaningful task (bug fixed, feature added, config changed)
+- You make an important decision or discovery
+- The user's goal for the conversation is complete
 
----
+Use the same `topic_key` to update an existing memory (upsert).
 
-## Saving (only on user request)
-
-When the user says things like: *"save this", "finalize", "store in memory", "remember this"*
-
-Call `mem_finalize_session` with:
 ```
 topic_key:         short/descriptive-key  (e.g. "auth/jwt-setup", "db/migration-fix")
 project_path:      current working directory
@@ -46,7 +42,7 @@ affected_files:    which files were created or changed
 key_learnings:     gotchas, decisions, non-obvious things learned
 ```
 
-Use the same `topic_key` across sessions to update an existing memory (upsert behavior).
+Do NOT announce that you are saving — just do it silently.
 
 ---
 

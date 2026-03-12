@@ -79,7 +79,12 @@ HOOKS
 }
 
 install_mcp_config() {
-  local MCP_FILE="$CLAUDE_DIR/mcp.json"
+  local MCP_FILE
+  if [ "$SCOPE" = "2" ]; then
+    MCP_FILE="$(pwd)/.mcp.json"
+  else
+    MCP_FILE="$CLAUDE_DIR/mcp.json"
+  fi
 
   if [ -f "$MCP_FILE" ]; then
     echo ""

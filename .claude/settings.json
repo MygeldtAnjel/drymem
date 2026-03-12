@@ -3,7 +3,29 @@
     "allow": [
       "Bash(chmod +x /home/mygeldtanjel/personal-projects/drymem/plugin/claude-code/scripts/*.sh /home/mygeldtanjel/personal-projects/drymem/plugin/claude-code/scripts/query.mjs)",
       "Bash(echo \"2:*)",
-      "Bash(bash setup.sh)"
+      "Bash(bash setup.sh)",
+      "Bash(npm rebuild:*)",
+      "Bash(echo \"PATH: $PATH\")",
+      "Bash(~/.nvm/versions/node/v22.21.1/bin/npm --version)",
+      "Bash(~/.nvm/versions/node/v22.21.1/bin/node --version)",
+      "Bash(~/.nvm/versions/node/v22.21.1/bin/npm rebuild:*)",
+      "Bash(/usr/bin/node --version)",
+      "Bash(ls /home/mygeldtanjel/personal-projects/drymem/.mcp*)",
+      "Bash(/usr/bin/node -e \":*)",
+      "WebFetch(domain:github.com)",
+      "Read(//usr/**)",
+      "Read(//usr/lib/**)",
+      "Bash(ls /usr/share/doc/nodejs*)",
+      "Bash(pacman -Ql nodejs)",
+      "Bash(/usr/bin/node node_modules/tsx/dist/cli.mjs src/delivery/mcp/server.ts)",
+      "Bash(npm --version)",
+      "mcp__drymem__mem_finalize_session",
+      "Bash(cp /home/mygeldtanjel/personal-projects/drymem/plugin/claude-code/SKILL.md ~/.claude/commands/drymem-memory.md)",
+      "Bash(cp /home/mygeldtanjel/personal-projects/drymem/plugin/claude-code/SKILL.md /home/mygeldtanjel/personal-projects/drymem/.claude/commands/drymem-memory.md)",
+      "Bash(cp /home/mygeldtanjel/personal-projects/drymem/plugin/claude-code/SKILL.md /home/mygeldtanjel/.claude/commands/drymem-memory.md)"
+    ],
+    "additionalDirectories": [
+      "/home/mygeldtanjel/personal-projects/drymem/.claude"
     ]
   }
 }

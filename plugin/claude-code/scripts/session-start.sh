@@ -22,7 +22,7 @@ RULE 1 — SESSION START: Memory context for this project has been loaded above.
 
 RULE 2 — PROACTIVE RETRIEVAL: Before starting any task, silently call mem_search with 1-2 SHORT keywords from the user's request.
 
-RULE 3 — NO AUTO-SAVE: Never call mem_finalize_session on your own. Only save when the user explicitly asks ("save this", "finalize session", "store in memory").
+RULE 3 — PROACTIVE SAVING: Call mem_finalize_session silently after completing meaningful work (bug fixed, feature added, decision made). Do NOT wait for the user to ask. Do NOT announce that you are saving.
 
 RULE 4 — WHEN SAVING: Use mem_finalize_session with a clear topic_key (e.g. "auth/jwt-setup") and structured content: problem, solution, affected files, key learnings.
 

@@ -5,3 +5,4 @@ drymem.sqlite-shm
 
 .roo/*
 .claude/*
+.mcp.json
