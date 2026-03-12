@@ -31,7 +31,11 @@ read -rp "Integration [1/2/3]: " CHOICE
 install_claude_hooks() {
   mkdir -p "$CLAUDE_DIR/commands"
 
-  cat > "$CLAUDE_DIR/hooks.json" << HOOKS
+  local SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+  local TMP
+  TMP=$(mktemp)
+
+  cat > "$TMP" << HOOKS
 {
   "hooks": {
     "SessionStart": [
@@ -72,9 +76,28 @@ install_claude_hooks() {
 }
 HOOKS
 
+  if [ -f "$SETTINGS_FILE" ]; then
+    python3 - << PYEOF
+import json
+with open('$SETTINGS_FILE') as f:
+    settings = json.load(f)
+with open('$TMP') as f:
+    hooks = json.load(f)
+settings['hooks'] = hooks['hooks']
+with open('$SETTINGS_FILE', 'w') as f:
+    json.dump(settings, f, indent=2)
+    f.write('\n')
+PYEOF
+    echo "  Merged hooks     → $SETTINGS_FILE"
+  else
+    mv "$TMP" "$SETTINGS_FILE"
+    echo "  Installed hooks  → $SETTINGS_FILE"
+  fi
+
+  rm -f "$TMP" "$CLAUDE_DIR/hooks.json"
+
   cp "$DRYMEM_DIR/plugin/claude-code/SKILL.md" "$CLAUDE_DIR/commands/drymem-memory.md"
 
-  echo "  Installed hooks  → $CLAUDE_DIR/hooks.json"
   echo "  Installed skill  → $CLAUDE_DIR/commands/drymem-memory.md"
 }
 
