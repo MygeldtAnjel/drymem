@@ -1,4 +1,4 @@
-import { runMigrations } from "./database.ts";
+import { runMigrations } from "./infrastructure/database/migrations.js";
 
 try {
   runMigrations();

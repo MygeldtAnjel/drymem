@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "drymem": {
+      "command": "/usr/bin/node",
+      "args": [
+        "/home/mygeldtanjel/personal-projects/drymem/node_modules/tsx/dist/cli.mjs",
+        "/home/mygeldtanjel/personal-projects/drymem/src/delivery/mcp/server.ts"
+      ],
+      "env": {
+        "DRYMEM_DB_PATH": "/home/mygeldtanjel/personal-projects/drymem/drymem.sqlite"
+      },
+      "alwaysAllow": [
+        "mem_context",
+        "mem_search",
+        "mem_delete",
+        "mem_finalize_session"
+      ]
+    }
+  }
+}

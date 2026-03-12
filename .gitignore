@@ -2,3 +2,6 @@ node_modules/
 drymem.sqlite
 drymem.sqlite-wal
 drymem.sqlite-shm
+
+.roo/*
+.claude/*
