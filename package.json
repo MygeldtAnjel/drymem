@@ -6,7 +6,7 @@
     "dev": "tsx src/index.ts",
     "dev:watch": "tsx watch src/index.ts",
     "db:migrate": "tsx src/migrate.ts",
-    "db:reset": "tsx src/reset.ts",
+    "db:wipe": "tsx src/reset.ts",
     "test": "node_modules/.bin/tsx test/mcp-functional-tests.ts",
     "cli": "/usr/bin/node node_modules/tsx/dist/cli.mjs src/cli.ts"
   },

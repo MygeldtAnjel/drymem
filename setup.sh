@@ -60,6 +60,18 @@ install_claude_hooks() {
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $SCRIPTS_DIR/session-stop.sh",
+            "timeout": 5000,
+            "async": true
+          }
+        ]
+      }
+    ],
     "SubagentStop": [
       {
         "hooks": [
