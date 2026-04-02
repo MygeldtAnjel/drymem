@@ -22,6 +22,11 @@ RULE 5 — WHEN SAVING: Use mem_finalize_session with:
   - summary: structured markdown with problem, solution, affected files, key learnings
   - Use the SAME topic_key across sessions to link related work
 
+RULE 5b — WHEN UPDATING: If you are returning to a topic that was already saved (same topic_key), use mem_update instead of mem_finalize_session:
+  - topic_key: same key used originally
+  - update_summary: what changed, bug found, fix applied
+  - replace=False to append (default), replace=True to overwrite the old entry
+
 RULE 6 — SEARCH KEYWORD GUIDE:
   Good: "test", "auth", "migration", "deploy"
   Bad: "test structure testing", "authentication middleware"

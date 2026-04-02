@@ -19,7 +19,8 @@
         "mem_context",
         "mem_search",
         "mem_delete",
-        "mem_finalize_session"
+        "mem_finalize_session",
+        "mem_update"
       ]
     }
   }

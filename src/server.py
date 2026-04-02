@@ -6,6 +6,7 @@ Tools:
   mem_search            — Search the knowledge graph for relevant memories
   mem_context           — Retrieve recent episodes for a project
   mem_delete            — Remove an episode from the graph
+  mem_update            — Update an existing episode by topic_key (append or replace)
 """
 
 from __future__ import annotations
@@ -69,8 +70,8 @@ async def mem_finalize_session(
         group_id=group_id,
     )
 
-    entity_count = len(result.entity_nodes) if result.entity_nodes else 0
-    edge_count = len(result.entity_edges) if result.entity_edges else 0
+    entity_count = len(result.nodes) if result.nodes else 0
+    edge_count = len(result.edges) if result.edges else 0
 
     return (
         f"Session finalized: '{episode_name}'\n"
@@ -176,6 +177,72 @@ async def mem_delete(
         return f"Episode {episode_id} deleted."
     except Exception as e:
         return f"Failed to delete episode {episode_id}: {e}"
+
+
+# ---------------------------------------------------------------------------
+# Tool 5: mem_update
+# ---------------------------------------------------------------------------
+@mcp.tool()
+async def mem_update(
+    project_path: str,
+    topic_key: str,
+    update_summary: str,
+    replace: bool = False,
+) -> str:
+    """Update an existing memory episode by topic_key.
+
+    By default appends new information as a linked update episode — Graphiti
+    reconciles contradicting facts in the graph automatically. Pass replace=True
+    to delete the old episode(s) first and save a clean single entry.
+
+    Args:
+        project_path: Absolute path of the project (used for isolation).
+        topic_key: The stable key used when the episode was originally saved (e.g. 'auth/jwt-setup').
+        update_summary: New information — include what changed, bug found, fix applied.
+        replace: If True, deletes old episode(s) before saving. Default False (append).
+    """
+    graphiti = await get_graphiti()
+    group_id = _sanitize_group_id(project_path)
+
+    # Find existing episodes with this topic_key (search up to 50 recent ones)
+    episodes = await graphiti.retrieve_episodes(
+        reference_time=datetime.now(timezone.utc),
+        last_n=50,
+        group_ids=[group_id],
+    )
+
+    matching = [ep for ep in episodes if ep.name == topic_key or ep.name.startswith(f"{topic_key}/update-")]
+
+    if replace and matching:
+        for ep in matching:
+            try:
+                await graphiti.remove_episode(ep.uuid)
+            except Exception:
+                pass
+
+    # In replace mode reuse the original topic_key; in append mode suffix with a timestamp
+    episode_name = topic_key if replace else f"{topic_key}/update-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+
+    result = await graphiti.add_episode(
+        name=episode_name,
+        episode_body=update_summary,
+        source_description=f"drymem session update for {project_path}",
+        reference_time=datetime.now(timezone.utc),
+        group_id=group_id,
+    )
+
+    entity_count = len(result.nodes) if result.nodes else 0
+    edge_count = len(result.edges) if result.edges else 0
+    action = "replaced" if (replace and matching) else "appended"
+
+    return (
+        f"Memory updated ({action}): '{episode_name}'\n"
+        f"  group: {group_id}\n"
+        f"  previous episodes found: {len(matching)}\n"
+        f"  entities extracted: {entity_count}\n"
+        f"  relationships extracted: {edge_count}\n"
+        f"  episode_id: {result.episode.uuid}"
+    )
 
 
 # ---------------------------------------------------------------------------
