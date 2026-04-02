@@ -19,7 +19,6 @@ The session-start hook has already loaded context above. You do not need to call
 
 **Before starting any task**, silently call `mem_search` with 1-2 keywords from the user's request:
 - Use SHORT keywords: `"auth"` not `"authentication system design"`
-- Avoid hyphens: `"sqlite"` not `"better-sqlite3"`
 - Do not announce the search — just use the results
 
 ---
@@ -31,15 +30,12 @@ Save proactively — do NOT wait for the user to ask. Call `mem_finalize_session
 - You make an important decision or discovery
 - The user's goal for the conversation is complete
 
-Use the same `topic_key` to update an existing memory (upsert).
+Use a consistent `topic_key` to link related sessions.
 
 ```
-topic_key:         short/descriptive-key  (e.g. "auth/jwt-setup", "db/migration-fix")
-project_path:      current working directory
-problem_statement: what was the problem or goal
-solution_summary:  what was done and how
-affected_files:    which files were created or changed
-key_learnings:     gotchas, decisions, non-obvious things learned
+project_path:  current working directory
+topic_key:     short/descriptive-key  (e.g. "auth/jwt-setup", "db/migration-fix")
+summary:       structured markdown — include problem, solution, affected files, key learnings
 ```
 
 Do NOT announce that you are saving — just do it silently.
@@ -62,4 +58,3 @@ If the context was compacted, immediately:
 | `"test"` | `"test structure testing"` |
 | `"auth"` | `"authentication middleware setup"` |
 | `"migration"` | `"database-migration-fix"` |
-| `"sqlite"` | `"better-sqlite3"` |

@@ -1,7 +1,8 @@
-node_modules/
-drymem.sqlite
-drymem.sqlite-wal
-drymem.sqlite-shm
+__pycache__/
+*.pyc
+.venv/
+.env
+*.sqlite*
 
 .roo/*
 .claude/*

@@ -6,13 +6,11 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DRYMEM_DIR="$(cd "$SCRIPTS_DIR/../../.." && pwd)"
 
 INPUT=$(cat)
-CWD=$(echo "$INPUT" | /usr/bin/node -e \
-  "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
-   process.stdout.write(d.cwd||'')" 2>/dev/null <<< "$INPUT" || echo "")
+CWD=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('cwd',''))" 2>/dev/null || echo "")
 
 PROJECT="${CWD:-$(pwd)}"
 
-CONTEXT=$(/usr/bin/node "$SCRIPTS_DIR/query.mjs" "$PROJECT" context 2>/dev/null || echo "")
+CONTEXT=$(uv --directory "$DRYMEM_DIR" run python "$SCRIPTS_DIR/query.py" "$PROJECT" context 2>/dev/null || echo "")
 
 cat << 'PROTOCOL'
 <drymem-memory-protocol>
@@ -26,7 +24,7 @@ RULE 3 — PROACTIVE SAVING: Call mem_finalize_session silently after completing
 
 RULE 4 — WHEN SAVING: Use mem_finalize_session with a clear topic_key (e.g. "auth/jwt-setup") and structured content: problem, solution, affected files, key learnings.
 
-RULE 5 — SEARCH TIPS: Use single short keywords. "test" not "test structure testing". Hyphens break search — use "auth" not "jwt-auth".
+RULE 5 — SEARCH TIPS: Use single short keywords. "test" not "test structure testing".
 
 RULE 6 — AFTER COMPACTION: Immediately call mem_context to recover recent session history, then continue.
 </drymem-memory-protocol>

@@ -11,7 +11,7 @@ You have access to drymem MCP tools for persistent memory. These rules are ALWAY
 
 RULE 1 — SESSION START: At the start of EVERY conversation, silently call mem_context to load recent project memory. Do not announce this. Use the results to inform your work.
 
-RULE 2 — PROACTIVE SEARCH: Before starting any task, silently call mem_search with 1-2 SHORT keywords from the user's request. Examples: use "auth" not "authentication system", use "test" not "test structure setup". Never use hyphenated keywords — they break search.
+RULE 2 — PROACTIVE SEARCH: Before starting any task, silently call mem_search with 1-2 SHORT keywords from the user's request. Examples: use "auth" not "authentication system", use "test" not "test structure setup".
 
 RULE 3 — USE WHAT YOU FIND: Apply past context silently. Do not say "I found a memory about X". Just use it.
 
@@ -19,12 +19,12 @@ RULE 4 — NO AUTO-SAVE: Never call mem_finalize_session on your own. Only save 
 
 RULE 5 — WHEN SAVING: Use mem_finalize_session with:
   - topic_key: short descriptive key like "auth/jwt-setup" or "db/migration-fix"
-  - Use the SAME topic_key across sessions to update existing memory
-  - Fill in: problem_statement, solution_summary, affected_files, key_learnings
+  - summary: structured markdown with problem, solution, affected files, key learnings
+  - Use the SAME topic_key across sessions to link related work
 
 RULE 6 — SEARCH KEYWORD GUIDE:
-  Good: "test", "auth", "migration", "sqlite"
-  Bad: "test structure testing", "authentication middleware", "better-sqlite3"
+  Good: "test", "auth", "migration", "deploy"
+  Bad: "test structure testing", "authentication middleware"
 ```
 
 ---

@@ -6,13 +6,11 @@ SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export DRYMEM_DIR="$(cd "$SCRIPTS_DIR/../../.." && pwd)"
 
 INPUT=$(cat)
-CWD=$(echo "$INPUT" | /usr/bin/node -e \
-  "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
-   process.stdout.write(d.cwd||'')" 2>/dev/null <<< "$INPUT" || echo "")
+CWD=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('cwd',''))" 2>/dev/null || echo "")
 
 PROJECT="${CWD:-$(pwd)}"
 
-CONTEXT=$(/usr/bin/node "$SCRIPTS_DIR/query.mjs" "$PROJECT" context 2>/dev/null || echo "")
+CONTEXT=$(uv --directory "$DRYMEM_DIR" run python "$SCRIPTS_DIR/query.py" "$PROJECT" context 2>/dev/null || echo "")
 
 cat << 'PROTOCOL'
 <drymem-post-compaction>

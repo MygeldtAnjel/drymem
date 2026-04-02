@@ -4,9 +4,7 @@ set -euo pipefail
 
 INPUT=$(cat)
 
-STDOUT=$(echo "$INPUT" | /usr/bin/node -e \
-  "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')); \
-   process.stdout.write(d.stdout||'')" 2>/dev/null <<< "$INPUT" || echo "")
+STDOUT=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stdout',''))" 2>/dev/null || echo "")
 
 if echo "$STDOUT" | grep -q "## Key Learnings"; then
   echo "[drymem] Subagent produced Key Learnings. Consider calling mem_finalize_session to persist them." >&2

@@ -1,13 +1,42 @@
 #!/usr/bin/env bash
-# drymem setup script
+# drymem v2 setup script
 set -euo pipefail
 
 DRYMEM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$DRYMEM_DIR/plugin/claude-code/scripts"
 
-echo "drymem setup"
-echo "============"
+echo "drymem v2 setup"
+echo "==============="
 echo ""
+
+# ── 1. Install Python dependencies ──────────────────────────────────────────
+echo "Installing Python dependencies with uv..."
+if ! command -v uv &>/dev/null; then
+  echo "ERROR: uv is not installed. Install it first: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  exit 1
+fi
+
+cd "$DRYMEM_DIR"
+uv sync
+echo "  Dependencies installed."
+echo ""
+
+# ── 2. Docker check ────────────────────────────────────────────────────────
+echo "Checking Neo4j..."
+if command -v docker &>/dev/null && docker compose version &>/dev/null; then
+  if ! docker ps --format '{{.Names}}' | grep -q drymem-neo4j; then
+    echo "  Starting Neo4j container..."
+    docker compose -f "$DRYMEM_DIR/docker-compose.yml" up -d
+    echo "  Neo4j started (bolt://localhost:7687, UI at http://localhost:7474)"
+  else
+    echo "  Neo4j already running."
+  fi
+else
+  echo "  WARNING: docker/docker-compose not found. Start Neo4j manually."
+fi
+echo ""
+
+# ── 3. Scope & integration selection ───────────────────────────────────────
 echo "Select scope:"
 echo "  1) Global  — works in ALL your projects (installs to ~/.claude/)"
 echo "  2) Project — works only in the current directory (installs to ./.claude/)"
@@ -109,7 +138,6 @@ PYEOF
   rm -f "$TMP" "$CLAUDE_DIR/hooks.json"
 
   cp "$DRYMEM_DIR/plugin/claude-code/SKILL.md" "$CLAUDE_DIR/commands/drymem-memory.md"
-
   echo "  Installed skill  → $CLAUDE_DIR/commands/drymem-memory.md"
 }
 
@@ -129,13 +157,19 @@ install_mcp_config() {
 {
   "mcpServers": {
     "drymem": {
-      "command": "/usr/bin/node",
+      "command": "uv",
       "args": [
-        "$DRYMEM_DIR/node_modules/tsx/dist/cli.mjs",
-        "$DRYMEM_DIR/src/delivery/mcp/server.ts"
+        "--directory", "$DRYMEM_DIR",
+        "run", "python", "-m", "src.server"
       ],
       "env": {
-        "DRYMEM_DB_PATH": "$DRYMEM_DIR/drymem.sqlite"
+        "NEO4J_URI": "bolt://localhost:7687",
+        "NEO4J_USER": "neo4j",
+        "NEO4J_PASSWORD": "drymem_pass",
+        "LOCAL_LLM_URL": "http://localhost:1234/v1",
+        "LOCAL_LLM_MODEL": "qwen3-32b",
+        "EMBEDDING_MODEL": "text-embedding-nomic-embed-text-v1.5",
+        "EMBEDDING_DIM": "768"
       }
     }
   }
@@ -161,7 +195,6 @@ setup_roo_code() {
   echo ""
 
   if [ "$SCOPE" = "2" ]; then
-    # Per-project: create .roo/mcp.json in current directory
     local ROO_DIR="$(pwd)/.roo"
     local MCP_FILE="$ROO_DIR/mcp.json"
     mkdir -p "$ROO_DIR"
@@ -175,13 +208,19 @@ setup_roo_code() {
 {
   "mcpServers": {
     "drymem": {
-      "command": "/usr/bin/node",
+      "command": "uv",
       "args": [
-        "$DRYMEM_DIR/node_modules/tsx/dist/cli.mjs",
-        "$DRYMEM_DIR/src/delivery/mcp/server.ts"
+        "--directory", "$DRYMEM_DIR",
+        "run", "python", "-m", "src.server"
       ],
       "env": {
-        "DRYMEM_DB_PATH": "$DRYMEM_DIR/drymem.sqlite"
+        "NEO4J_URI": "bolt://localhost:7687",
+        "NEO4J_USER": "neo4j",
+        "NEO4J_PASSWORD": "drymem_pass",
+        "LOCAL_LLM_URL": "http://localhost:1234/v1",
+        "LOCAL_LLM_MODEL": "qwen3-32b",
+        "EMBEDDING_MODEL": "text-embedding-nomic-embed-text-v1.5",
+        "EMBEDDING_DIM": "768"
       },
       "alwaysAllow": [
         "mem_context",
@@ -196,7 +235,6 @@ MCP
       echo "  Installed MCP    → $MCP_FILE"
     fi
   else
-    # Global: Roo Code manages mcp_settings.json via its own UI
     echo "  For global Roo Code MCP config, add the server via:"
     echo "  Roo Code → MCP Servers → Edit Global MCP (opens mcp_settings.json)"
     echo ""
@@ -219,4 +257,4 @@ case "$CHOICE" in
 esac
 
 echo ""
-echo "Done."
+echo "Done. Make sure Neo4j is running and your local LLM is serving at \$LOCAL_LLM_URL."

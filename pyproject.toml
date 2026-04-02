@@ -1,0 +1,19 @@
+[project]
+name = "drymem"
+version = "2.0.0"
+description = "Persistent memory MCP server for AI coding assistants — backed by Graphiti knowledge graph"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.9.0",
+    "graphiti-core>=0.14.0",
+    "neo4j>=5.0.0",
+    "python-dotenv>=1.0.0",
+    "openai>=1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
