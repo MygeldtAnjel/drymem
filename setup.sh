@@ -166,9 +166,9 @@ install_mcp_config() {
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "drymem_pass",
-        "LOCAL_LLM_URL": "http://localhost:1234/v1",
-        "LOCAL_LLM_MODEL": "qwen3-32b",
-        "EMBEDDING_MODEL": "text-embedding-nomic-embed-text-v1.5",
+        "LOCAL_LLM_URL": "http://localhost:11434/v1",
+        "LOCAL_LLM_MODEL": "qwen3.5:35b",
+        "EMBEDDING_MODEL": "nomic-embed-text",
         "EMBEDDING_DIM": "768"
       }
     }
@@ -217,9 +217,9 @@ setup_roo_code() {
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "drymem_pass",
-        "LOCAL_LLM_URL": "http://localhost:1234/v1",
-        "LOCAL_LLM_MODEL": "qwen3-32b",
-        "EMBEDDING_MODEL": "text-embedding-nomic-embed-text-v1.5",
+        "LOCAL_LLM_URL": "http://localhost:11434/v1",
+        "LOCAL_LLM_MODEL": "qwen3.5:35b",
+        "EMBEDDING_MODEL": "nomic-embed-text",
         "EMBEDDING_DIM": "768"
       },
       "alwaysAllow": [

@@ -5,8 +5,8 @@ Reads configuration from environment variables:
   NEO4J_URI          bolt://localhost:7687
   NEO4J_USER         neo4j
   NEO4J_PASSWORD     drymem_pass
-  LOCAL_LLM_URL      http://localhost:1234/v1
-  LOCAL_LLM_MODEL    qwen3-32b
+  LOCAL_LLM_URL      http://localhost:11434/v1
+  LOCAL_LLM_MODEL    qwen3.5:35b
   EMBEDDING_MODEL    text-embedding-nomic-embed-text-v1.5  (or whatever your local server exposes)
   EMBEDDING_DIM      768
 """
@@ -33,9 +33,9 @@ async def get_graphiti() -> Graphiti:
     neo4j_user = os.getenv("NEO4J_USER", "neo4j")
     neo4j_password = os.getenv("NEO4J_PASSWORD", "drymem_pass")
 
-    llm_url = os.getenv("LOCAL_LLM_URL", "http://localhost:1234/v1")
-    llm_model = os.getenv("LOCAL_LLM_MODEL", "qwen3-32b")
-    embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+    llm_url = os.getenv("LOCAL_LLM_URL", "http://localhost:11434/v1")
+    llm_model = os.getenv("LOCAL_LLM_MODEL", "qwen3.5:35b")
+    embedding_model = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "768"))
 
     llm_client = OpenAIGenericClient(

@@ -28,7 +28,7 @@ IDE (Claude Code / Roo Code)
 
 - **Transport:** stdio MCP — zero network overhead, works locally
 - **Storage:** Neo4j graph database via Graphiti — entities, relationships, and episodes
-- **LLM Extraction:** Local OpenAI-compatible LLM (e.g. Qwen 35B on LM Studio) — no paid API keys
+- **LLM Extraction:** Local OpenAI-compatible LLM via Ollama (e.g. Qwen 35B) — no paid API keys
 - **Scope:** per-project isolation via `group_id` derived from `project_path`
 
 ---
@@ -51,7 +51,7 @@ IDE (Claude Code / Roo Code)
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/) (package manager)
 - Docker (for Neo4j)
-- A local LLM serving an OpenAI-compatible API (e.g. LM Studio, Ollama)
+- [Ollama](https://ollama.ai/) with a chat model and an embedding model pulled
 
 ### 1. Start Neo4j
 
@@ -69,9 +69,9 @@ Copy `.env.example` or create `.env`:
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=drymem_pass
-LOCAL_LLM_URL=http://localhost:1234/v1
-LOCAL_LLM_MODEL=qwen3-32b
-EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5
+LOCAL_LLM_URL=http://localhost:11434/v1
+LOCAL_LLM_MODEL=qwen3.5:35b
+EMBEDDING_MODEL=nomic-embed-text
 EMBEDDING_DIM=768
 ```
 
@@ -108,9 +108,9 @@ Claude Code supports **lifecycle hooks** that fire automatically on session even
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "drymem_pass",
-        "LOCAL_LLM_URL": "http://localhost:1234/v1",
-        "LOCAL_LLM_MODEL": "qwen3-32b",
-        "EMBEDDING_MODEL": "text-embedding-nomic-embed-text-v1.5",
+        "LOCAL_LLM_URL": "http://localhost:11434/v1",
+        "LOCAL_LLM_MODEL": "qwen3.5:35b",
+        "EMBEDDING_MODEL": "nomic-embed-text",
         "EMBEDDING_DIM": "768"
       }
     }
@@ -134,7 +134,7 @@ Roo Code does not have hooks, so setup is manual:
 - **Runtime:** Python 3.10+ via uv
 - **Graph Engine:** Graphiti (knowledge graph with LLM-powered entity extraction)
 - **Database:** Neo4j 5 Community
-- **LLM:** Any OpenAI-compatible local model
+- **LLM:** Ollama (OpenAI-compatible API on port 11434)
 - **Protocol:** MCP (Model Context Protocol) over stdio
 
 ---
