@@ -70,7 +70,7 @@ NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=drymem_pass
 LOCAL_LLM_URL=http://localhost:11434/v1
-LOCAL_LLM_MODEL=qwen3.5:35b
+LOCAL_LLM_MODEL=qwen3.6:35b-a3b
 EMBEDDING_MODEL=nomic-embed-text
 EMBEDDING_DIM=768
 ```
@@ -109,7 +109,7 @@ Claude Code supports **lifecycle hooks** that fire automatically on session even
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "drymem_pass",
         "LOCAL_LLM_URL": "http://localhost:11434/v1",
-        "LOCAL_LLM_MODEL": "qwen3.5:35b",
+        "LOCAL_LLM_MODEL": "qwen3.6:35b-a3b",
         "EMBEDDING_MODEL": "nomic-embed-text",
         "EMBEDDING_DIM": "768"
       }

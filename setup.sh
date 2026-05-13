@@ -164,7 +164,7 @@ install_mcp_config() {
       --env NEO4J_USER=neo4j \
       --env NEO4J_PASSWORD=drymem_pass \
       --env LOCAL_LLM_URL=http://localhost:11434/v1 \
-      --env LOCAL_LLM_MODEL=qwen3.5:35b \
+      --env LOCAL_LLM_MODEL=qwen3.6:35b-a3b \
       --env EMBEDDING_MODEL=nomic-embed-text \
       --env EMBEDDING_DIM=768 \
       -- uv --directory "$DRYMEM_DIR" run python -m src.server
@@ -208,7 +208,7 @@ setup_roo_code() {
         "NEO4J_USER": "neo4j",
         "NEO4J_PASSWORD": "drymem_pass",
         "LOCAL_LLM_URL": "http://localhost:11434/v1",
-        "LOCAL_LLM_MODEL": "qwen3.5:35b",
+        "LOCAL_LLM_MODEL": "qwen3.6:35b-a3b",
         "EMBEDDING_MODEL": "nomic-embed-text",
         "EMBEDDING_DIM": "768"
       },
