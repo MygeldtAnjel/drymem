@@ -3,7 +3,7 @@
 set -euo pipefail
 
 DRYMEM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="$DRYMEM_DIR/plugin/claude-code/scripts"
+SCRIPTS_DIR="$DRYMEM_DIR/apps/cli/hooks"
 TARGET_DIR="$(pwd)"
 
 echo "drymem v2 setup"
@@ -17,7 +17,7 @@ if ! command -v uv &>/dev/null; then
   exit 1
 fi
 
-cd "$DRYMEM_DIR"
+cd "$DRYMEM_DIR/apps/server"
 uv sync
 echo "  Dependencies installed."
 echo ""
@@ -49,14 +49,6 @@ case "$SCOPE" in
   2) CLAUDE_DIR="$TARGET_DIR/.claude" ;;
   *) echo "Invalid choice."; exit 1 ;;
 esac
-
-echo ""
-echo "Select integration:"
-echo "  1) Claude Code (hooks — automatic context injection)"
-echo "  2) Roo Code    (shows manual setup instructions)"
-echo "  3) Both"
-echo ""
-read -rp "Integration [1/2/3]: " CHOICE
 
 install_claude_hooks() {
   mkdir -p "$CLAUDE_DIR/commands"
@@ -138,7 +130,7 @@ PYEOF
 
   rm -f "$TMP" "$CLAUDE_DIR/hooks.json"
 
-  cp "$DRYMEM_DIR/plugin/claude-code/SKILL.md" "$CLAUDE_DIR/commands/drymem-memory.md"
+  cp "$DRYMEM_DIR/packages/skills/general/drymem-memory/SKILL.md" "$CLAUDE_DIR/commands/drymem-memory.md"
   echo "  Installed skill  → $CLAUDE_DIR/commands/drymem-memory.md"
 }
 
@@ -167,7 +159,7 @@ install_mcp_config() {
       --env LOCAL_LLM_MODEL=qwen3.6:35b-a3b \
       --env EMBEDDING_MODEL=nomic-embed-text \
       --env EMBEDDING_DIM=768 \
-      -- uv --directory "$DRYMEM_DIR" run python -m src.server
+      -- uv --directory "$DRYMEM_DIR/apps/server" run python -m drymem_server.server
   echo "  Registered MCP   → drymem (via claude mcp add)"
 }
 
@@ -180,71 +172,7 @@ setup_claude_code() {
   echo "Done. Hooks fire automatically on session start and after compaction."
 }
 
-setup_roo_code() {
-  echo ""
-  echo "Roo Code setup"
-  echo "--------------"
-  echo ""
-
-  if [ "$SCOPE" = "2" ]; then
-    local ROO_DIR="$TARGET_DIR/.roo"
-    local MCP_FILE="$ROO_DIR/mcp.json"
-    mkdir -p "$ROO_DIR"
-
-    if [ -f "$MCP_FILE" ]; then
-      echo "  Overwriting existing $MCP_FILE with v2 config..."
-    fi
-      cat > "$MCP_FILE" << MCP
-{
-  "mcpServers": {
-    "drymem": {
-      "command": "uv",
-      "args": [
-        "--directory", "$DRYMEM_DIR",
-        "run", "python", "-m", "src.server"
-      ],
-      "env": {
-        "NEO4J_URI": "bolt://localhost:7687",
-        "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "drymem_pass",
-        "LOCAL_LLM_URL": "http://localhost:11434/v1",
-        "LOCAL_LLM_MODEL": "qwen3.6:35b-a3b",
-        "EMBEDDING_MODEL": "nomic-embed-text",
-        "EMBEDDING_DIM": "768"
-      },
-      "alwaysAllow": [
-        "mem_context",
-        "mem_search",
-        "mem_delete",
-        "mem_finalize_session",
-        "mem_update"
-      ]
-    }
-  }
-}
-MCP
-      echo "  Installed MCP    → $MCP_FILE"
-  else
-    echo "  For global Roo Code MCP config, add the server via:"
-    echo "  Roo Code → MCP Servers → Edit Global MCP (opens mcp_settings.json)"
-    echo ""
-    echo "  Paste this into the mcpServers block:"
-    echo ""
-    cat "$DRYMEM_DIR/plugin/roo-code/mcp-config.json"
-  fi
-
-  echo ""
-  echo "  Memory protocol — add to Roo Code Custom Instructions (global)"
-  echo "  or create .roorules in your project root."
-  echo "  Content to use: $DRYMEM_DIR/plugin/roo-code/MEMORY_PROTOCOL.md"
-}
-
-case "$CHOICE" in
-  1) setup_claude_code ;;
-  2) setup_roo_code ;;
-  3) setup_claude_code; setup_roo_code ;;
-  *) echo "Invalid choice."; exit 1 ;;
-esac
+setup_claude_code
 
 echo ""
 echo "Done. Make sure Neo4j is running and your local LLM is serving at \$LOCAL_LLM_URL."

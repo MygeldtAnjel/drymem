@@ -28,8 +28,8 @@ DRYMEM_DIR = os.environ.get(
 )
 load_dotenv(os.path.join(DRYMEM_DIR, ".env"))
 
-# Add src to path so we can import graph module
-sys.path.insert(0, DRYMEM_DIR)
+# Import the server package directly; it lives in the sibling app, not on the path.
+sys.path.insert(0, os.path.join(DRYMEM_DIR, "apps", "server"))
 
 
 def sanitize_group_id(project_path: str) -> str:
@@ -110,7 +110,7 @@ async def autosave(project_path: str, transcript_path: str, session_id: str):
         return
 
     try:
-        from src.graph import get_graphiti
+        from drymem_server.graph import get_graphiti
 
         graphiti = await get_graphiti()
         group_id = sanitize_group_id(project_path)

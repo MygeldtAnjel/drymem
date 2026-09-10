@@ -14,13 +14,15 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-from src.graph import get_graphiti
+from drymem_server.graph import get_graphiti
 
-load_dotenv()
+# .env lives at the monorepo root, two levels above this package's project dir.
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 mcp = FastMCP(
     "drymem",
@@ -112,11 +114,9 @@ async def mem_search(
 
     lines: list[str] = []
     for edge in edges:
-        source = edge.source_node_name or "?"
-        target = edge.target_node_name or "?"
         fact = edge.fact or edge.name or ""
         created = edge.created_at.strftime("%Y-%m-%d %H:%M") if edge.created_at else "?"
-        lines.append(f"- [{source}] --({edge.name})--> [{target}]  {fact}  (created: {created})")
+        lines.append(f"- ({edge.name}) {fact}  (created: {created})")
 
     return f"Found {len(edges)} result(s):\n" + "\n".join(lines)
 

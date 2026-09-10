@@ -10,7 +10,7 @@ CWD=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).ge
 
 PROJECT="${CWD:-$(pwd)}"
 
-CONTEXT=$(uv --directory "$DRYMEM_DIR" run python "$SCRIPTS_DIR/query.py" "$PROJECT" context 2>/dev/null || echo "")
+CONTEXT=$(uv --directory "$DRYMEM_DIR/apps/server" run python "$SCRIPTS_DIR/query.py" "$PROJECT" context 2>/dev/null || echo "")
 
 cat << 'PROTOCOL'
 <drymem-post-compaction>

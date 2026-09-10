@@ -120,15 +120,6 @@ Claude Code supports **lifecycle hooks** that fire automatically on session even
 
 ---
 
-## Roo Code Integration
-
-Roo Code does not have hooks, so setup is manual:
-
-1. Add the MCP server via Roo Code settings or `.roo/mcp.json`
-2. Paste the memory protocol from `plugin/roo-code/MEMORY_PROTOCOL.md` into Custom Instructions
-
----
-
 ## Tech Stack
 
 - **Runtime:** Python 3.10+ via uv
@@ -143,22 +134,17 @@ Roo Code does not have hooks, so setup is manual:
 
 ```
 drymem/
-├── src/
-│   ├── server.py              # FastMCP server (4 tools)
-│   └── graph.py               # Graphiti client singleton
-├── plugin/
-│   ├── claude-code/
-│   │   ├── SKILL.md           # Memory protocol (copied to .claude/commands/)
-│   │   └── scripts/
-│   │       ├── query.py       # Neo4j query helper for hooks
-│   │       ├── session-start.sh
-│   │       ├── post-compaction.sh
-│   │       ├── session-stop.sh
-│   │       └── subagent-stop.sh
-│   └── roo-code/
-│       ├── MEMORY_PROTOCOL.md
-│       └── mcp-config.json
-├── docker-compose.yml         # Neo4j container
-├── pyproject.toml             # Python project config
-└── setup.sh                   # Installation script
+├── apps/
+│   ├── server/            Python · uv · the MCP server today, FastAPI from step 2A
+│   │   └── drymem_server/     server.py (5 tools) · graph.py (Graphiti client)
+│   └── cli/               the `drymem` npm package from step 2A
+│       └── hooks/             session-start · post-compaction · session-stop · subagent-stop
+├── packages/
+│   └── skills/            base agent skill set, bundled into the CLI
+├── deploy/                docker-compose · Caddyfile                      (step 4)
+├── docs/                  architecture.md · specs/
+└── PLAN.md                what we are building and in what order
 ```
+
+See [PLAN.md](PLAN.md) for the roadmap and [docs/architecture.md](docs/architecture.md)
+for how the pieces fit.

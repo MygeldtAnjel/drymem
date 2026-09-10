@@ -25,6 +25,6 @@ if [ ! -f "$TRANSCRIPT" ]; then
 fi
 
 # Run autosave in background so it never blocks Claude Code
-uv --directory "$DRYMEM_DIR" run python "$SCRIPTS_DIR/autosave.py" "$CWD" "$TRANSCRIPT" "$SESSION_ID" &
+uv --directory "$DRYMEM_DIR/apps/server" run python "$SCRIPTS_DIR/autosave.py" "$CWD" "$TRANSCRIPT" "$SESSION_ID" &
 
 exit 0
