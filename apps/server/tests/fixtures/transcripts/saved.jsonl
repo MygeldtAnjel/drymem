@@ -1,0 +1,6 @@
+{"type":"last-prompt","prompt":"ignored entry kind"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"fix the auth bug"}]}}
+{"type":"attachment","attachment":{"kind":"file"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Looking at the auth module."},{"type":"tool_use","name":"Read","input":{"file_path":"/app/auth.py"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"..."}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Fixed the token refresh."},{"type":"tool_use","name":"mcp__drymem__mem_finalize_session","input":{"topic_key":"auth/token-refresh"}}]}}

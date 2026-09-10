@@ -1,0 +1,2 @@
+{"type":"tool_use","name":"mem_finalize_session"}
+{"role":"assistant","content":"a top-level string, which real transcripts never use"}

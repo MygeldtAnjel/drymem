@@ -1,30 +1,36 @@
 #!/usr/bin/env python3
 """
-drymem query helper for hook scripts.
-Queries Neo4j directly (bypasses MCP) for fast context loading at session start.
+drymem query helper for the session-start and post-compaction hooks.
+
+Talks to Neo4j directly rather than going through MCP: session start is on the
+critical path of every session, and a Cypher read is milliseconds where booting
+the Graphiti client is seconds.
 
 Usage: query.py <project_path> context
 """
 
-import hashlib
+from __future__ import annotations
+
 import os
-import re
 import sys
-from datetime import datetime, timezone
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-DRYMEM_DIR = os.environ.get("DRYMEM_DIR", os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+DRYMEM_DIR = os.environ.get(
+    "DRYMEM_DIR",
+    str(Path(__file__).resolve().parents[3]),
+)
 load_dotenv(os.path.join(DRYMEM_DIR, ".env"))
 
+# The server package is a sibling app, not on the path.
+sys.path.insert(0, os.path.join(DRYMEM_DIR, "apps", "server"))
 
-def sanitize_group_id(project_path: str) -> str:
-    slug = re.sub(r"[^a-z0-9]", "-", project_path.lower().strip("/"))
-    slug = re.sub(r"-+", "-", slug).strip("-")
-    if len(slug) > 60:
-        suffix = hashlib.sha1(project_path.encode()).hexdigest()[:8]
-        slug = slug[:51] + "-" + suffix
-    return slug
+from drymem_server.identity import group_id_for
+from drymem_server.memory_store import Metadata
+
+RECENT_LIMIT = 5
+PREVIEW = 300
 
 
 def get_context(project_path: str) -> str:
@@ -36,35 +42,38 @@ def get_context(project_path: str) -> str:
     uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     user = os.getenv("NEO4J_USER", "neo4j")
     password = os.getenv("NEO4J_PASSWORD", "drymem_pass")
-    group_id = sanitize_group_id(project_path)
 
     try:
         driver = GraphDatabase.driver(uri, auth=(user, password))
         with driver.session() as session:
-            result = session.run(
-                """
-                MATCH (e:Episodic)
-                WHERE e.group_id = $group_id
-                RETURN e.name AS name, e.content AS content, e.created_at AS created_at
-                ORDER BY e.created_at DESC
-                LIMIT 5
-                """,
-                group_id=group_id,
+            records = list(
+                session.run(
+                    """
+                    MATCH (e:Episodic)
+                    WHERE e.group_id = $group_id
+                    RETURN e.name AS name,
+                           e.content AS content,
+                           e.created_at AS created_at,
+                           e.source_description AS source_description
+                    ORDER BY e.created_at DESC
+                    LIMIT $limit
+                    """,
+                    group_id=group_id_for(project_path),
+                    limit=RECENT_LIMIT,
+                )
             )
-            records = list(result)
         driver.close()
-    except Exception:
-        return ""
-
-    if not records:
+    except Exception:  # noqa: BLE001 - a cold database must not block session start
         return ""
 
     lines = []
-    for r in records:
-        name = r["name"] or "untitled"
-        content = (r["content"] or "")[:300]
-        ts = r["created_at"] or ""
-        lines.append(f"### {name} ({ts})\n{content}\n")
+    for record in records:
+        name = record["name"] or "untitled"
+        content = (record["content"] or "")[:PREVIEW]
+        created = record["created_at"] or ""
+        metadata = Metadata.decode(record["source_description"])
+        who = f" · {metadata.author}" if metadata and metadata.author else ""
+        lines.append(f"### {name} ({created}{who})\n{content}\n")
 
     return "\n".join(lines)
 
@@ -73,10 +82,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         sys.exit(0)
 
-    project_path = sys.argv[1]
-    command = sys.argv[2]
-
-    if command == "context":
-        output = get_context(project_path)
+    if sys.argv[2] == "context":
+        output = get_context(sys.argv[1])
         if output:
             print(output)

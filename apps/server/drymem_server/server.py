@@ -1,25 +1,35 @@
 """
-Drymem V2 — Persistent memory MCP server backed by Graphiti knowledge graph.
+drymem — persistent memory MCP server backed by a Graphiti knowledge graph.
 
 Tools:
   mem_finalize_session  — Save a structured session summary as a graph episode
   mem_search            — Search the knowledge graph for relevant memories
   mem_context           — Retrieve recent episodes for a project
+  mem_update            — Update an existing episode by topic_key
   mem_delete            — Remove an episode from the graph
-  mem_update            — Update an existing episode by topic_key (append or replace)
+
+The tools are deliberately thin: identity lives in `identity.py`, storage behind
+`MemoryStore`. In step 2A these bodies become HTTP calls to the server, and the
+logic they wrap does not move.
 """
 
 from __future__ import annotations
 
-import hashlib
-import re
-from datetime import datetime, timezone
+import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-from drymem_server.graph import get_graphiti
+from drymem_server.identity import group_id_for, resolve_author, resolve_project_key
+from drymem_server.memory_store import (
+    Episode,
+    Fact,
+    GraphitiMemoryStore,
+    MemoryStore,
+    Metadata,
+)
 
 # .env lives at the monorepo root, two levels above this package's project dir.
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
@@ -32,15 +42,32 @@ mcp = FastMCP(
     ),
 )
 
+store: MemoryStore = GraphitiMemoryStore()
 
-def _sanitize_group_id(project_path: str) -> str:
-    """Convert an arbitrary filesystem path into a stable, Neo4j-safe group_id."""
-    slug = re.sub(r"[^a-z0-9]", "-", project_path.lower().strip("/"))
-    slug = re.sub(r"-+", "-", slug).strip("-")
-    if len(slug) > 60:
-        suffix = hashlib.sha1(project_path.encode()).hexdigest()[:8]
-        slug = slug[:51] + "-" + suffix
-    return slug
+_PREVIEW = 300
+
+
+def _timestamp() -> str:
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+
+
+def _metadata_for(project_path: str) -> Metadata:
+    return Metadata(
+        project_key=resolve_project_key(project_path),
+        author=resolve_author(project_path),
+    )
+
+
+def _format_fact(fact: Fact) -> str:
+    when = fact.created_at.strftime("%Y-%m-%d %H:%M") if fact.created_at else "?"
+    stale = " [superseded]" if fact.superseded else ""
+    return f"- ({fact.name}) {fact.fact}  ({when}){stale}"
+
+
+def _format_episode(episode: Episode) -> str:
+    when = episode.created_at.strftime("%Y-%m-%d %H:%M") if episode.created_at else "?"
+    who = f" · {episode.metadata.author}" if episode.metadata else ""
+    return f"### {episode.name} ({when}{who})\n{episode.content[:_PREVIEW]}\n"
 
 
 # ---------------------------------------------------------------------------
@@ -59,28 +86,23 @@ async def mem_finalize_session(
         summary: Markdown body — include problem, solution, affected files, learnings.
         topic_key: Optional stable key like 'auth/jwt-setup' for cross-session linking.
     """
-    graphiti = await get_graphiti()
-    group_id = _sanitize_group_id(project_path)
+    metadata = _metadata_for(project_path)
+    name = topic_key or f"session-{_timestamp()}"
 
-    episode_name = topic_key if topic_key else f"session-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
-
-    result = await graphiti.add_episode(
-        name=episode_name,
-        episode_body=summary,
-        source_description=f"drymem session summary for {project_path}",
-        reference_time=datetime.now(timezone.utc),
-        group_id=group_id,
+    result = await store.save(
+        name=name,
+        body=summary,
+        group_id=group_id_for(project_path),
+        metadata=metadata,
     )
 
-    entity_count = len(result.nodes) if result.nodes else 0
-    edge_count = len(result.edges) if result.edges else 0
-
     return (
-        f"Session finalized: '{episode_name}'\n"
-        f"  group: {group_id}\n"
-        f"  entities extracted: {entity_count}\n"
-        f"  relationships extracted: {edge_count}\n"
-        f"  episode_id: {result.episode.uuid}"
+        f"Session finalized: '{name}'\n"
+        f"  project: {metadata.project_key}\n"
+        f"  author: {metadata.author}\n"
+        f"  entities extracted: {result.entity_count}\n"
+        f"  relationships extracted: {result.edge_count}\n"
+        f"  episode_id: {result.uuid}"
     )
 
 
@@ -100,25 +122,16 @@ async def mem_search(
         query: Short keyword or phrase to search for.
         num_results: Max results to return (default 10).
     """
-    graphiti = await get_graphiti()
-    group_id = _sanitize_group_id(project_path)
-
-    edges = await graphiti.search(
+    facts = await store.search(
         query=query,
-        group_ids=[group_id],
-        num_results=num_results,
+        group_ids=[group_id_for(project_path)],
+        limit=num_results,
     )
-
-    if not edges:
+    if not facts:
         return "No memories found."
 
-    lines: list[str] = []
-    for edge in edges:
-        fact = edge.fact or edge.name or ""
-        created = edge.created_at.strftime("%Y-%m-%d %H:%M") if edge.created_at else "?"
-        lines.append(f"- ({edge.name}) {fact}  (created: {created})")
-
-    return f"Found {len(edges)} result(s):\n" + "\n".join(lines)
+    lines = [_format_fact(fact) for fact in facts]
+    return f"Found {len(facts)} result(s):\n" + "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -135,52 +148,19 @@ async def mem_context(
         project_path: Absolute path of the project (used for isolation).
         last_n: Number of recent episodes to retrieve (default 10).
     """
-    graphiti = await get_graphiti()
-    group_id = _sanitize_group_id(project_path)
-
-    episodes = await graphiti.retrieve_episodes(
-        reference_time=datetime.now(timezone.utc),
-        last_n=last_n,
-        group_ids=[group_id],
+    episodes = await store.recent(
+        group_ids=[group_id_for(project_path)],
+        limit=last_n,
     )
-
     if not episodes:
         return "No recent context."
 
-    lines: list[str] = []
-    for ep in episodes:
-        ts = ep.created_at.strftime("%Y-%m-%d %H:%M") if ep.created_at else "?"
-        body_preview = (ep.content or ep.name or "")[:300]
-        lines.append(f"### {ep.name} ({ts})\n{body_preview}\n")
-
+    lines = [_format_episode(episode) for episode in episodes]
     return f"Recent context ({len(episodes)} episodes):\n\n" + "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
-# Tool 4: mem_delete
-# ---------------------------------------------------------------------------
-@mcp.tool()
-async def mem_delete(
-    project_path: str,
-    episode_id: str,
-) -> str:
-    """Delete an episode from the knowledge graph.
-
-    Args:
-        project_path: Absolute path of the project (used for isolation).
-        episode_id: UUID of the episode to delete.
-    """
-    graphiti = await get_graphiti()
-
-    try:
-        await graphiti.remove_episode(episode_id)
-        return f"Episode {episode_id} deleted."
-    except Exception as e:
-        return f"Failed to delete episode {episode_id}: {e}"
-
-
-# ---------------------------------------------------------------------------
-# Tool 5: mem_update
+# Tool 4: mem_update
 # ---------------------------------------------------------------------------
 @mcp.tool()
 async def mem_update(
@@ -197,58 +177,71 @@ async def mem_update(
 
     Args:
         project_path: Absolute path of the project (used for isolation).
-        topic_key: The stable key used when the episode was originally saved (e.g. 'auth/jwt-setup').
-        update_summary: New information — include what changed, bug found, fix applied.
-        replace: If True, deletes old episode(s) before saving. Default False (append).
+        topic_key: The stable key used when the episode was originally saved.
+        update_summary: New information — what changed, bug found, fix applied.
+        replace: If True, deletes old episode(s) before saving. Default False.
     """
-    graphiti = await get_graphiti()
-    group_id = _sanitize_group_id(project_path)
+    group_id = group_id_for(project_path)
+    metadata = _metadata_for(project_path)
 
-    # Find existing episodes with this topic_key (search up to 50 recent ones)
-    episodes = await graphiti.retrieve_episodes(
-        reference_time=datetime.now(timezone.utc),
-        last_n=50,
-        group_ids=[group_id],
-    )
+    recent = await store.recent(group_ids=[group_id], limit=50)
+    matching = [
+        ep for ep in recent if ep.name == topic_key or ep.name.startswith(f"{topic_key}/update-")
+    ]
 
-    matching = [ep for ep in episodes if ep.name == topic_key or ep.name.startswith(f"{topic_key}/update-")]
-
-    if replace and matching:
-        for ep in matching:
+    if replace:
+        for episode in matching:
             try:
-                await graphiti.remove_episode(ep.uuid)
-            except Exception:
-                pass
+                await store.delete(episode.uuid)
+            except Exception as exc:  # noqa: BLE001 - a stale uuid must not block the write
+                print(f"drymem: could not delete {episode.uuid}: {exc}", file=sys.stderr)
 
-    # In replace mode reuse the original topic_key; in append mode suffix with a timestamp
-    episode_name = topic_key if replace else f"{topic_key}/update-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}"
+    # Replacing reuses the topic key; appending suffixes so both survive.
+    name = topic_key if replace else f"{topic_key}/update-{_timestamp()}"
 
-    result = await graphiti.add_episode(
-        name=episode_name,
-        episode_body=update_summary,
-        source_description=f"drymem session update for {project_path}",
-        reference_time=datetime.now(timezone.utc),
+    result = await store.save(
+        name=name,
+        body=update_summary,
         group_id=group_id,
+        metadata=metadata,
     )
-
-    entity_count = len(result.nodes) if result.nodes else 0
-    edge_count = len(result.edges) if result.edges else 0
     action = "replaced" if (replace and matching) else "appended"
 
     return (
-        f"Memory updated ({action}): '{episode_name}'\n"
-        f"  group: {group_id}\n"
+        f"Memory updated ({action}): '{name}'\n"
+        f"  project: {metadata.project_key}\n"
         f"  previous episodes found: {len(matching)}\n"
-        f"  entities extracted: {entity_count}\n"
-        f"  relationships extracted: {edge_count}\n"
-        f"  episode_id: {result.episode.uuid}"
+        f"  entities extracted: {result.entity_count}\n"
+        f"  relationships extracted: {result.edge_count}\n"
+        f"  episode_id: {result.uuid}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Tool 5: mem_delete
+# ---------------------------------------------------------------------------
+@mcp.tool()
+async def mem_delete(
+    project_path: str,
+    episode_id: str,
+) -> str:
+    """Delete an episode from the knowledge graph.
+
+    Args:
+        project_path: Absolute path of the project (used for isolation).
+        episode_id: UUID of the episode to delete.
+    """
+    try:
+        await store.delete(episode_id)
+    except Exception as exc:  # noqa: BLE001 - surfaced to the agent, not raised
+        return f"Failed to delete episode {episode_id}: {exc}"
+    return f"Episode {episode_id} deleted."
 
 
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
-def main():
+def main() -> None:
     mcp.run(transport="stdio")
 
 

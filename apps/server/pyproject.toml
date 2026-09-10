@@ -1,14 +1,24 @@
 [project]
 name = "drymem"
-version = "2.0.0"
-description = "Persistent memory MCP server for AI coding assistants — backed by Graphiti knowledge graph"
+version = "2.1.0"
+description = "Persistent memory MCP server for AI coding assistants — backed by a Graphiti knowledge graph"
 requires-python = ">=3.12"
 dependencies = [
     "mcp[cli]>=1.9.0",
-    "graphiti-core>=0.14.0",
+    # Pinned exactly: Graphiti removes model fields between minor versions
+    # (EntityEdge lost source_node_name and broke mem_search). Upgrades are a
+    # deliberate change to memory_store.py, never a passive one.
+    "graphiti-core==0.28.2",
     "neo4j>=5.0.0",
     "python-dotenv>=1.0.0",
     "openai>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -17,3 +27,14 @@ packages = ["drymem_server"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: needs a running Neo4j (deselect with -m 'not integration')",
+    "e2e: needs Neo4j and a real extraction model (deselect with -m 'not e2e')",
+]
+
+[tool.ruff]
+line-length = 100

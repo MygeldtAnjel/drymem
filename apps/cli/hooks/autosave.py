@@ -1,151 +1,114 @@
 #!/usr/bin/env python3
 """
-drymem autosave — runs as a Stop hook after every Claude Code agent turn.
+drymem autosave — the Stop hook's safety net.
 
-Parses the session transcript (.jsonl), checks if mem_finalize_session was
-already called. If not, extracts a summary from assistant messages and saves
-it directly to Neo4j via Graphiti (bypassing MCP).
+If the agent already called mem_finalize_session this session, do nothing.
+Otherwise save what it last said, so a session's work is not lost because the
+agent forgot to save it.
 
-Usage: autosave.py <project_path> <transcript_path> <session_id>
+Reads the hook payload as JSON on stdin: `last_assistant_message` is the summary
+material, `transcript_path` tells us whether a save already happened. Both are
+provided by Claude Code — neither needs to be reconstructed.
+
+Usage: autosave.py  (hook JSON on stdin)
 """
 
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import os
-import re
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 DRYMEM_DIR = os.environ.get(
     "DRYMEM_DIR",
-    str(Path(__file__).resolve().parent.parent.parent.parent),
+    str(Path(__file__).resolve().parents[3]),
 )
 load_dotenv(os.path.join(DRYMEM_DIR, ".env"))
 
-# Import the server package directly; it lives in the sibling app, not on the path.
+# The server package is a sibling app, not on the path.
 sys.path.insert(0, os.path.join(DRYMEM_DIR, "apps", "server"))
 
+from drymem_server.identity import group_id_for, resolve_author
+from drymem_server.memory_store import GraphitiMemoryStore, Metadata
+from drymem_server.transcript import assistant_texts, was_called
 
-def sanitize_group_id(project_path: str) -> str:
-    slug = re.sub(r"[^a-z0-9]", "-", project_path.lower().strip("/"))
-    slug = re.sub(r"-+", "-", slug).strip("-")
-    if len(slug) > 60:
-        suffix = hashlib.sha1(project_path.encode()).hexdigest()[:8]
-        slug = slug[:51] + "-" + suffix
-    return slug
-
-
-def parse_transcript(transcript_path: str) -> dict:
-    """Parse the JSONL transcript and extract useful info."""
-    already_saved = False
-    assistant_messages: list[str] = []
-    tool_calls: list[str] = []
-
-    try:
-        with open(transcript_path, "r") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                # Check if mem_finalize_session was called
-                if entry.get("type") == "tool_use":
-                    tool_name = entry.get("name", "")
-                    if tool_name == "mem_finalize_session":
-                        already_saved = True
-                    tool_calls.append(tool_name)
-
-                # Also check nested content blocks
-                for block in entry.get("content", []):
-                    if isinstance(block, dict):
-                        if block.get("type") == "tool_use":
-                            if block.get("name") == "mem_finalize_session":
-                                already_saved = True
-                            tool_calls.append(block.get("name", ""))
-                        elif block.get("type") == "text":
-                            text = block.get("text", "")
-                            if text and entry.get("role") == "assistant":
-                                assistant_messages.append(text)
-
-                # Top-level assistant text
-                if entry.get("role") == "assistant" and isinstance(entry.get("content"), str):
-                    assistant_messages.append(entry["content"])
-
-    except (FileNotFoundError, PermissionError):
-        return {"already_saved": True, "summary": ""}
-
-    # Build a summary from the last few assistant messages
-    recent = assistant_messages[-5:] if assistant_messages else []
-    summary = "\n\n".join(recent)
-
-    # Truncate to reasonable length
-    if len(summary) > 3000:
-        summary = summary[:3000] + "\n...(truncated)"
-
-    return {
-        "already_saved": already_saved,
-        "summary": summary,
-        "tool_calls": tool_calls,
-    }
+SAVE_TOOL = "mem_finalize_session"
+MIN_SUMMARY = 50
+MAX_SUMMARY = 3000
 
 
-async def autosave(project_path: str, transcript_path: str, session_id: str):
-    parsed = parse_transcript(transcript_path)
+def build_summary(payload: dict) -> str:
+    """The text worth saving, preferring the payload over the transcript."""
+    last = payload.get("last_assistant_message")
+    if isinstance(last, str) and last.strip():
+        return last.strip()
 
-    if parsed["already_saved"]:
-        return
+    transcript = payload.get("transcript_path")
+    if not transcript:
+        return ""
+    texts = assistant_texts(transcript)
+    return "\n\n".join(texts[-5:]).strip()
 
-    summary = parsed["summary"]
-    if not summary or len(summary.strip()) < 50:
-        return
 
-    try:
-        from drymem_server.graph import get_graphiti
+async def autosave(payload: dict) -> str:
+    cwd = payload.get("cwd") or os.getcwd()
+    session_id = payload.get("session_id") or "unknown"
+    transcript = payload.get("transcript_path")
 
-        graphiti = await get_graphiti()
-        group_id = sanitize_group_id(project_path)
+    if transcript and was_called(transcript, SAVE_TOOL):
+        return "skipped: agent already saved"
 
-        episode_name = f"autosave-{session_id[:8]}"
-        episode_body = (
-            f"## Auto-saved session summary\n\n"
-            f"**Session:** {session_id}\n"
-            f"**Project:** {project_path}\n\n"
-            f"### Assistant activity\n\n{summary}"
+    summary = build_summary(payload)
+    if len(summary) < MIN_SUMMARY:
+        return "skipped: nothing substantial to save"
+    if len(summary) > MAX_SUMMARY:
+        summary = summary[:MAX_SUMMARY] + "\n...(truncated)"
+
+    store = GraphitiMemoryStore()
+    metadata = Metadata(
+        project_key=payload.get("project_key") or "",
+        author=resolve_author(cwd),
+        scope="private",
+    )
+    if not metadata.project_key:
+        from drymem_server.identity import resolve_project_key
+
+        metadata = Metadata(
+            project_key=resolve_project_key(cwd),
+            author=metadata.author,
+            scope="private",
         )
 
-        if parsed["tool_calls"]:
-            tools_used = ", ".join(set(parsed["tool_calls"]))
-            episode_body += f"\n\n### Tools used\n{tools_used}"
+    body = (
+        f"## Auto-saved session summary\n\n"
+        f"The agent did not call `{SAVE_TOOL}`, so this is what it last said.\n\n"
+        f"{summary}"
+    )
+    result = await store.save(
+        name=f"autosave-{session_id[:8]}",
+        body=body,
+        group_id=group_id_for(cwd),
+        metadata=metadata,
+    )
+    return f"saved {result.uuid}"
 
-        await graphiti.add_episode(
-            name=episode_name,
-            episode_body=episode_body,
-            source_description=f"drymem autosave for {project_path}",
-            reference_time=datetime.now(timezone.utc),
-            group_id=group_id,
-        )
 
-    except Exception:
-        # Autosave is best-effort — never crash the hook
-        pass
+def main() -> None:
+    try:
+        payload = json.load(sys.stdin)
+    except (ValueError, OSError):
+        return
+    if not isinstance(payload, dict):
+        return
+    try:
+        print(asyncio.run(autosave(payload)), file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - a safety net must never break the session
+        print(f"drymem autosave failed: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        sys.exit(0)
-
-    project_path = sys.argv[1]
-    transcript_path = sys.argv[2]
-    session_id = sys.argv[3]
-
-    asyncio.run(autosave(project_path, transcript_path, session_id))
+    main()

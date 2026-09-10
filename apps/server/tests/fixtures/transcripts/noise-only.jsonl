@@ -1,0 +1,5 @@
+{"type":"attachment","attachment":{"kind":"file"}}
+{"type":"queue-operation","op":"enqueue"}
+{"type":"file-history-snapshot","files":[]}
+{"type":"ai-title","title":"a session"}
+{"type":"atis-latch","v":1}
