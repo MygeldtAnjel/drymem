@@ -66,7 +66,11 @@ export function SignIn({ onDone }: { onDone: () => void }) {
         </form>
 
         <p className="front__help">
-          Don’t have one? Whoever runs the server issues it with
+          Already set up the CLI? Run <code>drymem token</code> — it prints the one
+          this machine is using.
+          <br />
+          <br />
+          Nothing set up yet? Whoever runs the server issues you one with
           <code> drymem-admin token-create &lt;your-email&gt;</code>. It is shown once.
         </p>
       </div>

@@ -30,6 +30,7 @@ Usage
   npx drymem projects             List the projects you can see
   npx drymem ui                   Browse, search and rate memories in a terminal UI
   npx drymem whoami               Show the resolved project and server
+  npx drymem token                Print this machine's token (for the web UI)
   npx drymem mcp                  Run the MCP server over stdio (used by Claude Code)
   npx drymem hook <event>         Run a session hook (used by Claude Code)
 `;
@@ -90,6 +91,14 @@ async function main(argv: string[]): Promise<number> {
   const projectKey = needsServer ? resolveProjectKey(process.cwd()) : "";
 
   switch (command) {
+    case "token": {
+      // The web UI needs the token this machine is already using. Without this
+      // the only advice was `token-create`, which mints a *new* one — the
+      // wrong answer to "how do I sign in?".
+      console.log(requireConfig().token);
+      return 0;
+    }
+
     case "whoami": {
       const config = requireConfig();
       console.log(`project: ${projectKey}`);
