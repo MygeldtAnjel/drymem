@@ -10,13 +10,18 @@ dev: db-up          ## Start Neo4j + Postgres, then the server in reload mode
 
 test:               ## Python tests, then TypeScript tests
 	uv --directory $(SERVER) run pytest
-	@[ -f pnpm-lock.yaml ] && pnpm -r test || echo "(no TS packages yet)"
+	pnpm --filter drymem run test
 
 types:              ## Regenerate packages/api-types from the server's OpenAPI schema
-	@echo "not yet — arrives with the FastAPI server in step 2A"
+	@DRYMEM_EXTRACTOR=fake uv --directory $(SERVER) run python -c \
+	  "import json; from drymem_server.api.app import create_app; print(json.dumps(create_app().openapi(), indent=2))" \
+	  > packages/api-types/openapi.json
+	@pnpm --filter @drymem/api-types run generate
+	@git diff --quiet packages/api-types || \
+	  (echo "api-types changed — commit the regenerated schema"; exit 1)
 
 build:              ## Bundle the CLI (base skills included)
-	@echo "not yet — arrives with the TypeScript client in step 2A"
+	pnpm --filter drymem run build
 
 fmt:                ## Format everything
 	uv --directory $(SERVER) run ruff format .

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -17,38 +18,44 @@ from drymem_server.identity import (
 
 CANONICAL = "github.com/acme/drymem"
 
+# Shared with the TypeScript client's suite. Two implementations of project
+# identity that drift would silently split a team into two projects, so the
+# cases live in one file neither side can change alone.
+FIXTURES = json.loads(
+    (
+        Path(__file__).resolve().parents[3]
+        / "packages"
+        / "api-types"
+        / "fixtures"
+        / "remotes.json"
+    ).read_text()
+)
+
 
 @pytest.mark.parametrize(
-    "url",
-    [
-        "git@github.com:acme/drymem.git",
-        "git@github.com:acme/drymem",
-        "https://github.com/acme/drymem.git",
-        "https://github.com/acme/drymem",
-        "https://github.com/Acme/drymem",
-        "ssh://git@github.com/acme/drymem.git",
-        "ssh://git@github.com:22/acme/drymem.git",
-        "https://user:token@github.com/acme/drymem.git",
-        "https://github.com/acme/drymem/",
-        "  git@GitHub.com:Acme/DryMem.git  ",
-    ],
+    "case", FIXTURES["canonical"], ids=[c["url"].strip() for c in FIXTURES["canonical"]]
 )
-def test_every_remote_form_is_one_project(url):
-    assert normalize_remote(url) == CANONICAL
+def test_shared_fixture_remotes(case, monkeypatch):
+    """Every remote form in the shared fixture normalises to its expected key."""
+    import drymem_server.identity as ident
+
+    # The fixture's ssh cases assume `github-personal`-style aliases resolve to
+    # the literal host; real resolution is covered by TestSshAliases.
+    monkeypatch.setattr(ident, "resolve_ssh_host", lambda host: host)
+
+    assert ident.normalize_remote(case["url"]) == case["key"]
 
 
-@pytest.mark.parametrize("url", ["", "   ", "not a url", "https://"])
-def test_unusable_remotes_are_rejected(url):
+@pytest.mark.parametrize("url", FIXTURES["rejected"])
+def test_shared_fixture_rejects(url):
     assert normalize_remote(url) is None
 
 
-def test_other_hosts_keep_their_host():
-    assert normalize_remote("git@gitlab.com:acme/drymem.git") == "gitlab.com/acme/drymem"
-    assert normalize_remote("git@bitbucket.org:acme/drymem.git") == "bitbucket.org/acme/drymem"
-
-
-def test_nested_groups_are_preserved():
-    assert normalize_remote("git@gitlab.com:acme/team/drymem.git") == "gitlab.com/acme/team/drymem"
+@pytest.mark.parametrize(
+    "case", FIXTURES["groupIds"], ids=[c["key"] for c in FIXTURES["groupIds"]]
+)
+def test_shared_fixture_group_ids(case):
+    assert sanitize_group_id(case["key"]) == case["groupId"]
 
 
 def _init_repo(path: Path, remote: str | None) -> Path:

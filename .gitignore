@@ -10,3 +10,5 @@ __pycache__/
 
 # uv creates a venv per project dir
 apps/server/.venv/
+node_modules/
+apps/cli/dist/
