@@ -37,10 +37,21 @@ def denylist() -> list[str]:
 
 
 def _title_from(name: str, body: str) -> str:
-    """A human-readable label for the index, so listing memories needs no graph."""
-    for line in body.splitlines():
-        stripped = line.strip().lstrip("#").strip()
-        if stripped:
+    """A human-readable label for the index, so listing memories needs no graph.
+
+    Skips YAML frontmatter. An imported memory file starts with `---`, and
+    taking the first non-empty line gave every one of them the title "---".
+    """
+    lines = body.splitlines()
+    start = 0
+    if lines and lines[0].strip() == "---":
+        closing = next((i for i, line in enumerate(lines[1:], 1) if line.strip() == "---"), None)
+        if closing is not None:
+            start = closing + 1
+
+    for line in lines[start:]:
+        stripped = line.strip().lstrip("#").strip().strip("*")
+        if stripped and stripped != "---":
             return stripped[:_TITLE_LIMIT]
     return name[:_TITLE_LIMIT]
 

@@ -589,3 +589,47 @@ class TestTopics:
             "/v1/memories/topics", params={"project_key": PROJECT}, headers=auth(client, "outsider")
         )
         assert r.json()["topic_keys"] == []
+
+
+class TestTitles:
+    """The index title is what the TUI lists, so a useless one hides the memory."""
+
+    async def test_frontmatter_does_not_become_the_title(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import Memory
+
+        await save(
+            client,
+            summary="---\nname: auth-jwt\ntype: project\n---\n\nThe refresh token expires early.",
+            topic_key="auth/jwt",
+        )
+
+        async with sessionmaker() as session:
+            row = (await session.execute(select(Memory))).scalar_one()
+
+        assert row.title == "The refresh token expires early."
+
+    async def test_a_heading_is_used_when_there_is_no_frontmatter(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import Memory
+
+        await save(client, summary="## Switched to Adyen\n\nDetails follow.", topic_key="x")
+
+        async with sessionmaker() as session:
+            row = (await session.execute(select(Memory))).scalar_one()
+
+        assert row.title == "Switched to Adyen"
+
+    async def test_unterminated_frontmatter_still_yields_something(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import Memory
+
+        await save(client, summary="---\nbroken frontmatter, never closed", topic_key="y")
+
+        async with sessionmaker() as session:
+            row = (await session.execute(select(Memory))).scalar_one()
+
+        assert row.title == "broken frontmatter, never closed"

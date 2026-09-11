@@ -44,6 +44,18 @@ export interface ProjectOut {
   negative: number;
 }
 
+/**
+ * How long to wait for a response.
+ *
+ * A save runs extraction, which on a local 35B model takes one to two minutes
+ * for a long memory. Node's default fetch gives up well before that and reports
+ * a network failure for a request the server went on to complete successfully —
+ * which is how an import came back saying "skipped" for memories that were in
+ * fact stored. Reads get a short timeout; writes get a generous one.
+ */
+const READ_TIMEOUT_MS = 30_000;
+const WRITE_TIMEOUT_MS = 15 * 60_000;
+
 export class DrymemError extends Error {
   constructor(
     message: string,
@@ -62,10 +74,15 @@ export class DrymemClient {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const write = init.method !== undefined && init.method !== "GET";
+    const timeoutMs = write ? WRITE_TIMEOUT_MS : READ_TIMEOUT_MS;
+    const abort = AbortSignal.timeout(timeoutMs);
+
     let response: Response;
     try {
       response = await fetch(`${this.base}${path}`, {
         ...init,
+        signal: abort,
         headers: {
           Authorization: `Bearer ${this.config.token}`,
           "Content-Type": "application/json",
@@ -73,8 +90,16 @@ export class DrymemClient {
         },
       });
     } catch (cause) {
-      // A connection error is the common case for a self-hosted server, so name
-      // the address rather than leaving "fetch failed".
+      // A timeout is not the same as an unreachable server: the request may
+      // well have succeeded, so telling someone it failed invites a retry that
+      // duplicates work. Say which happened.
+      if (abort.aborted) {
+        throw new DrymemError(
+          `The drymem server did not answer within ${Math.round(timeoutMs / 1000)}s. ` +
+            `The memory may still have been saved — check before retrying.`,
+          0,
+        );
+      }
       throw new DrymemError(`Cannot reach the drymem server at ${this.base}: ${cause}`, 0);
     }
 
