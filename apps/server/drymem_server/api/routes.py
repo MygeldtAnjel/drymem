@@ -1,4 +1,15 @@
-"""HTTP surface. The five memory operations, plus projects and health."""
+"""
+The memory engine's HTTP surface.
+
+Everything here needs the graph, a model, or both: saving and reading memories,
+search, the sittings they came out of, discovering subjects and distilling a
+skill from them. Identity, people, projects and the skills catalogue belong to
+the control plane in `apps/api` and were removed from this file when it took
+them over.
+
+Nothing here authenticates. `X-Drymem-Principal` says who the caller is; see
+`deps.py` for why that is safe.
+"""
 
 from __future__ import annotations
 
@@ -19,35 +30,20 @@ from drymem_server.api.schemas import (
     FeedbackRequest,
     FeedbackResponse,
     HealthResponse,
-    MemberOut,
-    MemberRequest,
-    MemberRoleRequest,
-    MembersResponse,
     MemorySchemaResponse,
     MemoryTypeOut,
-    MeOut,
-    OverviewResponse,
-    ProjectOut,
-    ProjectsResponse,
     PromoteResponse,
-    PublishSkillRequest,
-    RenameMeRequest,
-    RenameProjectRequest,
     SaveMemoryRequest,
     SaveMemoryResponse,
     SearchResponse,
     SessionOut,
     SessionsResponse,
-    SkillOut,
-    SkillsResponse,
     TopicsResponse,
     UpdateMemoryRequest,
-    UserOut,
-    UsersResponse,
 )
 from drymem_server.schema import MEMORY_TYPES, SECTIONS, TEMPLATE
 from drymem_server.scrubber import PrivateKeyFound
-from drymem_server.service import LastMemberError, MemoryService
+from drymem_server.service import MemoryService
 from drymem_server.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -219,35 +215,6 @@ async def promote_memory(episode_uuid: str, service: ServiceDep) -> PromoteRespo
     )
 
 
-@router.get(
-    "/v1/projects/{project_key:path}/members", response_model=MembersResponse, tags=["projects"]
-)
-async def list_members(project_key: str, service: ServiceDep) -> MembersResponse:
-    members = await service.members(project_key=project_key)
-    if members is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
-    return MembersResponse(
-        project_key=project_key,
-        members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
-    )
-
-
-@router.post(
-    "/v1/projects/{project_key:path}/members", response_model=MembersResponse, tags=["projects"]
-)
-async def add_member(project_key: str, body: MemberRequest, service: ServiceDep) -> MembersResponse:
-    """Add someone to a project. They see its team memories, never its private ones."""
-    members = await service.add_member(project_key=project_key, email=body.email)
-    if members is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, "No such project, or no such user in this org."
-        )
-    return MembersResponse(
-        project_key=project_key,
-        members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
-    )
-
-
 @router.get("/v1/skills/discover", response_model=DiscoverResponse, tags=["skills"])
 async def discover_skills(
     service: ServiceDep,
@@ -284,23 +251,6 @@ async def distill_skill(body: DistillRequest, service: ServiceDep) -> DistillRes
         content=draft.content,
         model=draft.model,
         memory_count=draft.memory_count,
-    )
-
-
-@router.get("/v1/projects", response_model=ProjectsResponse, tags=["projects"])
-async def list_projects(service: ServiceDep) -> ProjectsResponse:
-    return ProjectsResponse(
-        projects=[
-            ProjectOut(
-                id=str(p.id),
-                project_key=p.project_key,
-                display_name=p.display_name,
-                memory_count=count,
-                positive=positive,
-                negative=negative,
-            )
-            for p, count, positive, negative in await service.projects()
-        ]
     )
 
 
@@ -342,164 +292,6 @@ async def list_sessions(
             for s in sessions
         ],
     )
-
-
-@router.get("/v1/users", response_model=UsersResponse, tags=["users"])
-async def list_users(service: ServiceDep) -> UsersResponse:
-    """Everyone in this org, with counts only — never anyone's memories."""
-    return UsersResponse(
-        users=[
-            UserOut(
-                id=str(u.id),
-                email=u.email,
-                name=u.name,
-                memory_count=memories,
-                project_count=projects,
-                created_at=u.created_at,
-            )
-            for u, memories, projects in await service.org_users()
-        ]
-    )
-
-
-def _skill_out(skill, author: str) -> SkillOut:
-    return SkillOut(
-        id=str(skill.id),
-        name=skill.name,
-        topic=skill.topic,
-        content=skill.content,
-        author=author,
-        model=skill.model,
-        memory_count=skill.memory_count,
-        updated_at=skill.updated_at,
-    )
-
-
-@router.get("/v1/skills", response_model=SkillsResponse, tags=["skills"])
-async def list_skills(service: ServiceDep, project_key: str = Query(...)) -> SkillsResponse:
-    """Skills this project has published."""
-    return SkillsResponse(
-        project_key=project_key,
-        skills=[_skill_out(s, email) for s, email in await service.skills(project_key=project_key)],
-    )
-
-
-@router.post("/v1/skills", response_model=SkillOut, tags=["skills"])
-async def publish_skill(body: PublishSkillRequest, service: ServiceDep) -> SkillOut:
-    """Publish a reviewed draft to the project. Publishing twice replaces it."""
-    skill = await service.publish_skill(
-        project_key=body.project_key,
-        name=body.name,
-        topic=body.topic,
-        content=body.content,
-        model=body.model,
-        memory_count=body.memory_count,
-    )
-    if skill is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
-    return _skill_out(skill, service.principal.email)
-
-
-@router.delete("/v1/skills/{name}", response_model=DeleteResponse, tags=["skills"])
-async def delete_skill(
-    name: str, service: ServiceDep, project_key: str = Query(...)
-) -> DeleteResponse:
-    if not await service.delete_skill(project_key=project_key, name=name):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such skill.")
-    return DeleteResponse(episode_uuid=name, deleted=True)
-
-
-def _me_out(user) -> MeOut:
-    return MeOut(
-        id=str(user.id),
-        email=user.email,
-        name=user.name,
-        org_id=str(user.org_id),
-        created_at=user.created_at,
-    )
-
-
-@router.get("/v1/me", response_model=MeOut, tags=["users"])
-async def whoami(service: ServiceDep) -> MeOut:
-    """Who this token belongs to. The UI needs it to say 'you' anywhere."""
-    user = await service.me()
-    if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such user.")
-    return _me_out(user)
-
-
-@router.patch("/v1/me", response_model=MeOut, tags=["users"])
-async def rename_me(body: RenameMeRequest, service: ServiceDep) -> MeOut:
-    """Set your display name. An empty name falls back to your email."""
-    user = await service.rename_me(name=body.name)
-    if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such user.")
-    return _me_out(user)
-
-
-@router.patch(
-    "/v1/projects/{project_key:path}/members/{email}",
-    response_model=MembersResponse,
-    tags=["projects"],
-)
-async def set_member_role(
-    project_key: str, email: str, body: MemberRoleRequest, service: ServiceDep
-) -> MembersResponse:
-    members = await service.set_member_role(project_key=project_key, email=email, role=body.role)
-    if members is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project, member, or role.")
-    return MembersResponse(
-        project_key=project_key,
-        members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
-    )
-
-
-@router.delete(
-    "/v1/projects/{project_key:path}/members/{email}",
-    response_model=MembersResponse,
-    tags=["projects"],
-)
-async def remove_member(project_key: str, email: str, service: ServiceDep) -> MembersResponse:
-    """Take someone off a project. Their own memories stay theirs and stay private."""
-    try:
-        members = await service.remove_member(project_key=project_key, email=email)
-    except LastMemberError as exc:
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    if members is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project or member.")
-    return MembersResponse(
-        project_key=project_key,
-        members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
-    )
-
-
-@router.patch("/v1/projects/{project_key:path}", response_model=ProjectOut, tags=["projects"])
-async def rename_project(
-    project_key: str, body: RenameProjectRequest, service: ServiceDep
-) -> ProjectOut:
-    """Give a project a readable name.
-
-    Declared *after* the member routes on purpose: `project_key` is a `:path`
-    converter, so registered first it would greedily match
-    `/v1/projects/<key>/members/<email>` as a project named
-    "<key>/members/<email>". The key itself never changes — it is the normalised
-    git remote, and changing it would split the team's memory in two.
-    """
-    project = await service.rename_project(project_key=project_key, display_name=body.display_name)
-    if project is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
-    return ProjectOut(
-        id=str(project.id), project_key=project.project_key, display_name=project.display_name
-    )
-
-
-@router.get("/v1/overview", response_model=OverviewResponse, tags=["projects"])
-async def project_overview(service: ServiceDep, project_key: str = Query(...)) -> OverviewResponse:
-    """Everything the dashboard opens with, in one round trip."""
-    overview = await service.overview(project_key=project_key)
-    if overview is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
-    return OverviewResponse(project_key=project_key, **overview.__dict__)
 
 
 @router.get("/healthz", response_model=HealthResponse, tags=["ops"])

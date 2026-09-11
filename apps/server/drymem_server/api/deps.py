@@ -1,34 +1,37 @@
-"""FastAPI dependencies: authentication, the store, the service.
+"""
+FastAPI dependencies: who the caller is, and the memory store.
 
-Two credentials are accepted. A bearer token is what the CLI, the MCP proxy and
-the hooks send. A session cookie is what the browser sends. The cookie path
-additionally requires an `X-Drymem-Client` header on anything that is not a
-GET: with `SameSite=Lax` that header is what stops a form on another site from
-posting into this API with the visitor's cookie, since a cross-site form cannot
-set custom headers.
+This service does not authenticate anybody. It sits behind the control plane
+(`apps/api`), which is the only thing a browser or a CLI ever talks to, and
+which passes a short-lived JWT naming the caller in `X-Drymem-Principal`. That
+token is signed with a secret the two share and expires in ninety seconds, so a
+leaked one is worthless before it can be used.
+
+The alternative — this service reading the sessions and tokens tables too —
+would put identity in two codebases and guarantee they drift.
 """
 
 from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, HTTPException, Request, status
+import jwt
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drymem_server.auth import Principal, authenticate, authenticate_session
+from drymem_server.auth import Principal
 from drymem_server.db.session import get_session
 from drymem_server.memory_store import GraphitiMemoryStore, MemoryStore
 from drymem_server.service import MemoryService
+from drymem_server.settings import settings
 
-SESSION_COOKIE = "drymem_session"
-CLIENT_HEADER = "x-drymem-client"
+PRINCIPAL_HEADER = "x-drymem-principal"
 
 _store: MemoryStore = GraphitiMemoryStore()
 
 UNAUTHENTICATED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Sign in to continue.",
-    headers={"WWW-Authenticate": "Bearer"},
+    detail="This endpoint is reached through the drymem API.",
 )
 
 
@@ -42,37 +45,41 @@ def get_store() -> MemoryStore:
     return _store
 
 
+def decode_principal(token: str) -> Principal:
+    """Verify the control plane's assertion. Any doubt is a refusal."""
+    try:
+        claims = jwt.decode(
+            token,
+            settings.service_secret,
+            algorithms=["HS256"],
+            issuer="drymem-api",
+            audience="drymem-memory",
+        )
+    except jwt.PyJWTError as exc:  # expired, wrong secret, wrong audience, malformed
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"Bad principal: {exc}") from exc
+
+    import uuid as _uuid
+
+    try:
+        user_id = _uuid.UUID(str(claims["userId"]))
+        org_id = _uuid.UUID(str(claims["orgId"]))
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bad principal.") from exc
+
+    return Principal(
+        user_id=user_id,
+        org_id=org_id,
+        email=str(claims.get("email", "")),
+        role=str(claims.get("role", "member")),
+    )
+
+
 async def current_principal(
-    request: Request,
-    session: Annotated[AsyncSession, Depends(get_session)],
-    authorization: Annotated[str | None, Header()] = None,
-    drymem_session: Annotated[str | None, Cookie()] = None,
+    x_drymem_principal: Annotated[str | None, Header()] = None,
 ) -> Principal:
-    if authorization and authorization.lower().startswith("bearer "):
-        principal = await authenticate(session, authorization[7:].strip())
-        if principal is None:
-            raise UNAUTHENTICATED
-        return principal
-
-    if drymem_session:
-        if request.method not in ("GET", "HEAD", "OPTIONS") and not request.headers.get(
-            CLIENT_HEADER
-        ):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Cross-site request refused.")
-        principal = await authenticate_session(session, drymem_session)
-        if principal is None:
-            raise UNAUTHENTICATED
-        return principal
-
-    raise UNAUTHENTICATED
-
-
-async def admin_principal(
-    principal: Annotated[Principal, Depends(current_principal)],
-) -> Principal:
-    if not principal.is_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only an organisation admin can do that.")
-    return principal
+    if not x_drymem_principal:
+        raise UNAUTHENTICATED
+    return decode_principal(x_drymem_principal)
 
 
 async def memory_service(
@@ -85,4 +92,3 @@ async def memory_service(
 ServiceDep = Annotated[MemoryService, Depends(memory_service)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 PrincipalDep = Annotated[Principal, Depends(current_principal)]
-AdminDep = Annotated[Principal, Depends(admin_principal)]

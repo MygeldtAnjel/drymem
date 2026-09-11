@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, KeyRound, TerminalSquare } from "lucide-react";
+import { CheckCircle2, KeyRound, Mail, TerminalSquare } from "lucide-react";
 
 import { CatMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -244,6 +244,196 @@ export function ApproveDevice({
             </Button>
           </CardFooter>
         )}
+      </Card>
+    </Frame>
+  );
+}
+
+/**
+ * Forgot password.
+ *
+ * The answer is the same whether or not the address exists, and the copy says
+ * so plainly rather than promising an email we may not have sent. Telling a
+ * stranger "no account here" would turn this page into a staff directory.
+ */
+export function ForgotPassword() {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState<string | null>(null);
+  const [configured, setConfigured] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const result = await auth.forgot(email.trim());
+      setSent(result.detail);
+      setConfigured(result.email_configured);
+    } catch (err) {
+      // Even a failure here must not reveal whether the address is real.
+      setSent("If that address has an account, a reset link is on its way.");
+      void err;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Frame>
+      <Card>
+        <CardHeader>
+          <CardTitle>Reset your password</CardTitle>
+          <CardDescription>
+            {sent
+              ? sent
+              : "Type the address you sign in with and we will send you a link to choose a new password."}
+          </CardDescription>
+        </CardHeader>
+        {sent ? (
+          <>
+            {!configured && (
+              <CardContent>
+                <p className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-muted-foreground">
+                  This server has no email provider configured, so the link was written to its
+                  log instead. Whoever runs it can read it out to you.
+                </p>
+              </CardContent>
+            )}
+            <CardFooter className="justify-end">
+              <Button variant="outline" onClick={() => go("signin")}>
+                Back to sign in
+              </Button>
+            </CardFooter>
+          </>
+        ) : (
+          <form onSubmit={submit}>
+            <CardContent>
+              <Field>
+                <FieldLabel htmlFor="forgot-email">Email</FieldLabel>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  autoComplete="username"
+                  autoFocus
+                  required
+                />
+              </Field>
+            </CardContent>
+            <CardFooter className="justify-between">
+              <Button type="button" variant="ghost" onClick={() => go("signin")}>
+                Back
+              </Button>
+              <Button type="submit" disabled={busy || !email.trim()}>
+                <Mail data-icon="inline-start" />
+                {busy ? "Sending…" : "Send the link"}
+              </Button>
+            </CardFooter>
+          </form>
+        )}
+      </Card>
+    </Frame>
+  );
+}
+
+/** Choose a new password from a reset link. */
+export function ResetPassword({
+  token,
+  onDone,
+}: {
+  token: string;
+  onDone: (session: Session) => void;
+}) {
+  const [email, setEmail] = useState<string | null | "invalid">(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    auth
+      .resetInfo(token)
+      .then((r) => setEmail(r.email))
+      .catch(() => setEmail("invalid"));
+  }, [token]);
+
+  if (email === null) {
+    return (
+      <Frame>
+        <Skeleton className="h-56" />
+      </Frame>
+    );
+  }
+
+  if (email === "invalid") {
+    return (
+      <Frame>
+        <Card>
+          <CardHeader>
+            <CardTitle>This link is no longer valid</CardTitle>
+            <CardDescription>
+              Reset links work once and expire after an hour. Ask for a new one.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="justify-end">
+            <Button variant="outline" onClick={() => go("forgot")}>
+              Send a new link
+            </Button>
+          </CardFooter>
+        </Card>
+      </Frame>
+    );
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await auth.reset(token, password));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Frame>
+      <Card>
+        <CardHeader>
+          <CardTitle>Choose a new password</CardTitle>
+          <CardDescription>
+            For <span className="font-medium text-foreground">{email}</span>. Everywhere else you
+            are signed in will be signed out.
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={submit}>
+          <CardContent>
+            <Field data-invalid={error ? true : undefined}>
+              <FieldLabel htmlFor="new-password">New password</FieldLabel>
+              <Input
+                id="new-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                aria-invalid={Boolean(error)}
+                autoFocus
+                required
+              />
+              <FieldDescription>At least 10 characters.</FieldDescription>
+              {error && <FieldDescription className="text-destructive">{error}</FieldDescription>}
+            </Field>
+          </CardContent>
+          <CardFooter className="justify-end">
+            <Button type="submit" disabled={busy || password.length < 10}>
+              <KeyRound data-icon="inline-start" />
+              {busy ? "Saving…" : "Set password and sign in"}
+            </Button>
+          </CardFooter>
+        </form>
       </Card>
     </Frame>
   );

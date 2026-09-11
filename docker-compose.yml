@@ -35,11 +35,12 @@ services:
     volumes:
       - drymem_pg_data:/var/lib/postgresql/data
 
-  server:
+  # The memory engine. Never published: only the API talks to it.
+  engine:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-    container_name: drymem-server
+    container_name: drymem-engine
     restart: unless-stopped
     # Host networking so the server can reach Ollama, which listens on the
     # host's 127.0.0.1 only. The alternative is rebinding Ollama to 0.0.0.0,
@@ -48,6 +49,8 @@ services:
     network_mode: host
     environment:
       DRYMEM_BIND: 127.0.0.1
+      DRYMEM_PORT: 8090
+      SERVICE_SECRET: ${SERVICE_SECRET:?set SERVICE_SECRET in .env}
       DATABASE_URL: postgresql+asyncpg://drymem:drymem_pass@localhost:5432/drymem
       NEO4J_URI: bolt://localhost:7687
       NEO4J_USER: neo4j
@@ -64,6 +67,31 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_started
+
+  # The control plane, and the web app. The only thing anyone talks to.
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: drymem-api
+    restart: unless-stopped
+    # Host networking to match the engine, which needs it to reach Ollama.
+    network_mode: host
+    environment:
+      BIND: 127.0.0.1
+      PORT: 8080
+      DATABASE_URL: postgres://drymem:drymem_pass@localhost:5432/drymem
+      MEMORY_URL: http://127.0.0.1:8090
+      SERVICE_SECRET: ${SERVICE_SECRET:?set SERVICE_SECRET in .env}
+      PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-drymem <onboarding@resend.dev>}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      engine:
+        condition: service_healthy
 
 volumes:
   drymem_neo4j_data:

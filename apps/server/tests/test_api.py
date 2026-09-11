@@ -10,7 +10,41 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import auth
+from tests.conftest import add_member, auth
+
+
+async def project_rows(client) -> list[dict]:
+    """The index's view of this project, read the way the control plane reads it.
+
+    `/v1/projects` belongs to the control plane now, so these tests count the
+    rows themselves rather than asserting through a service that is not running.
+    """
+    from sqlalchemy import case, func, select
+
+    from drymem_server.db.models import Memory, MemoryFeedback, Project
+
+    async with client.sessionmaker() as session:
+        rows = await session.execute(
+            select(
+                Project.project_key,
+                func.count(func.distinct(Memory.id)),
+                func.count(func.distinct(case((MemoryFeedback.rating > 0, MemoryFeedback.id)))),
+                func.count(func.distinct(case((MemoryFeedback.rating < 0, MemoryFeedback.id)))),
+            )
+            .outerjoin(Memory, Memory.project_id == Project.id)
+            .outerjoin(MemoryFeedback, MemoryFeedback.memory_id == Memory.id)
+            .group_by(Project.id)
+        )
+        return [
+            {
+                "project_key": key,
+                "memory_count": memories,
+                "positive": positive,
+                "negative": negative,
+            }
+            for key, memories, positive, negative in rows.all()
+        ]
+
 
 pytestmark = pytest.mark.integration
 
@@ -22,42 +56,80 @@ async def save(client, who="miguel", **kwargs):
     return await client.post("/v1/memories", json=body, headers=auth(client, who))
 
 
-class TestAuthentication:
-    async def test_no_token_is_401(self, client):
-        assert (
-            await client.post("/v1/memories", json={"project_key": PROJECT, "summary": "x"})
-        ).status_code == 401
+class TestPrincipal:
+    """The engine authenticates nobody. It verifies the control plane's word."""
 
-    async def test_a_garbage_token_is_401(self, client):
+    async def test_no_principal_is_401(self, client):
+        r = await client.get("/v1/memories/context", params={"project_key": PROJECT})
+        assert r.status_code == 401
+
+    async def test_a_forged_principal_is_401(self, client):
+        # Signed with the wrong secret: the whole point of signing it.
+        import jwt as _jwt
+
+        forged = _jwt.encode(
+            {
+                "userId": "x",
+                "orgId": "y",
+                "email": "e",
+                "role": "owner",
+                "iss": "drymem-api",
+                "aud": "drymem-memory",
+            },
+            "not-the-shared-secret",
+            algorithm="HS256",
+        )
         r = await client.get(
-            "/v1/projects", headers={"Authorization": "Bearer drymem_totally-made-up-value-here"}
+            "/v1/memories/context",
+            params={"project_key": PROJECT},
+            headers={"X-Drymem-Principal": forged},
         )
         assert r.status_code == 401
 
-    async def test_a_revoked_token_is_401(self, client):
-        assert (
-            await client.get("/v1/projects", headers=auth(client, "revoked"))
-        ).status_code == 401
+    async def test_an_expired_principal_is_401(self, client):
+        import jwt as _jwt
+        from datetime import UTC, datetime, timedelta
 
-    async def test_a_valid_token_works(self, client):
-        assert (await client.get("/v1/projects", headers=auth(client))).status_code == 200
+        from drymem_server.settings import settings
 
-    async def test_the_401_does_not_say_which_kind_of_failure(self, client):
-        """Revoked and unknown must be indistinguishable."""
-        unknown = await client.get(
-            "/v1/projects", headers={"Authorization": "Bearer drymem_aaaaaaaaaaaaaaaaaaaaaaaa"}
+        stale = _jwt.encode(
+            {
+                "userId": "x",
+                "orgId": "y",
+                "email": "e",
+                "role": "owner",
+                "iss": "drymem-api",
+                "aud": "drymem-memory",
+                "exp": datetime.now(UTC) - timedelta(minutes=1),
+            },
+            settings.service_secret,
+            algorithm="HS256",
         )
-        revoked = await client.get("/v1/projects", headers=auth(client, "revoked"))
-        assert unknown.json() == revoked.json()
+        r = await client.get(
+            "/v1/memories/context",
+            params={"project_key": PROJECT},
+            headers={"X-Drymem-Principal": stale},
+        )
+        assert r.status_code == 401
+
+    async def test_a_valid_principal_works(self, client):
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client)
+        )
+        assert r.status_code == 200
 
 
 class TestTenantIsolation:
     async def test_another_org_cannot_see_your_project(self, client):
         await save(client, "miguel")
 
-        r = await client.get("/v1/projects", headers=auth(client, "outsider"))
+        r = await client.get(
+            "/v1/memories/context",
+            params={"project_key": PROJECT},
+            headers=auth(client, "outsider"),
+        )
         assert r.status_code == 200
-        assert r.json()["projects"] == []
+        assert r.json()["episodes"] == []
 
     async def test_another_org_cannot_delete_your_memory_even_with_the_uuid(self, client, store):
         saved = (await save(client, "miguel")).json()
@@ -73,8 +145,10 @@ class TestTenantIsolation:
         """Step 2A is still private-by-default: Jose sees nothing of Miguel's yet."""
         await save(client, "miguel")
 
-        r = await client.get("/v1/projects", headers=auth(client, "jose"))
-        assert r.json()["projects"] == []
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client, "jose")
+        )
+        assert r.json()["episodes"] == []
 
     async def test_you_can_delete_your_own(self, client, store):
         saved = (await save(client, "miguel")).json()
@@ -97,7 +171,7 @@ class TestSaving:
     async def test_the_project_is_created_on_first_save(self, client):
         await save(client)
 
-        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        projects = await project_rows(client)
         assert [p["project_key"] for p in projects] == [PROJECT]
         assert projects[0]["memory_count"] == 1
 
@@ -244,7 +318,7 @@ class TestFeedback:
         await client.post(url, json={"rating": 1, "query": "payments"}, headers=auth(client))
         await client.post(url, json={"rating": -1, "query": "payments"}, headers=auth(client))
 
-        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        projects = await project_rows(client)
         assert projects[0]["positive"] == 0
         assert projects[0]["negative"] == 1
 
@@ -256,7 +330,7 @@ class TestFeedback:
         await client.post(url, json={"rating": 1, "query": "payments"}, headers=auth(client))
         await client.post(url, json={"rating": -1, "query": "auth"}, headers=auth(client))
 
-        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        projects = await project_rows(client)
         assert projects[0]["positive"] == 1
         assert projects[0]["negative"] == 1
 
@@ -268,7 +342,7 @@ class TestFeedback:
         await client.post(url, json={"rating": 1, "query": "a"}, headers=auth(client))
         await client.post(url, json={"rating": 1, "query": "b"}, headers=auth(client))
 
-        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        projects = await project_rows(client)
         assert projects[0]["memory_count"] == 1
 
     async def test_an_invalid_rating_is_rejected(self, client):
@@ -353,10 +427,8 @@ class TestTheJoseScenario:
     pass just as happily on a system with no isolation at all.
     """
 
-    async def _member(self, client, email="jose@acme.test"):
-        return await client.post(
-            f"/v1/projects/{PROJECT}/members", json={"email": email}, headers=auth(client)
-        )
+    async def _member(self, client, who="jose"):
+        await add_member(client.sessionmaker, PROJECT, client.world["people"][who][0])
 
     async def test_jose_sees_what_miguel_promoted(self, client):
         shared = (
@@ -423,11 +495,7 @@ class TestPromotion:
 
     async def test_you_cannot_promote_someone_elses_memory(self, client):
         saved = (await save(client, "miguel")).json()
-        await client.post(
-            f"/v1/projects/{PROJECT}/members",
-            json={"email": "jose@acme.test"},
-            headers=auth(client),
-        )
+        await add_member(client.sessionmaker, PROJECT, client.world["people"]["jose"][0])
 
         r = await client.post(
             f"/v1/memories/{saved['episode_uuid']}/promote", headers=auth(client, "jose")
@@ -455,66 +523,6 @@ class TestPromotion:
 
         assert [r.action for r in rows] == ["memory.promote"]
         assert rows[0].target == saved["episode_uuid"]
-
-
-class TestMembership:
-    async def test_adding_a_member_lets_them_see_the_project(self, client):
-        await save(client, "miguel")
-
-        assert (await client.get("/v1/projects", headers=auth(client, "jose"))).json()[
-            "projects"
-        ] == []
-
-        await client.post(
-            f"/v1/projects/{PROJECT}/members",
-            json={"email": "jose@acme.test"},
-            headers=auth(client),
-        )
-
-        projects = (await client.get("/v1/projects", headers=auth(client, "jose"))).json()[
-            "projects"
-        ]
-        assert [p["project_key"] for p in projects] == [PROJECT]
-
-    async def test_members_are_listed(self, client):
-        await save(client, "miguel")
-        await client.post(
-            f"/v1/projects/{PROJECT}/members",
-            json={"email": "jose@acme.test"},
-            headers=auth(client),
-        )
-
-        r = await client.get(f"/v1/projects/{PROJECT}/members", headers=auth(client))
-        assert sorted(m["email"] for m in r.json()["members"]) == [
-            "jose@acme.test",
-            "miguel@acme.test",
-        ]
-
-    async def test_adding_twice_is_not_an_error(self, client):
-        await save(client, "miguel")
-        url = f"/v1/projects/{PROJECT}/members"
-
-        await client.post(url, json={"email": "jose@acme.test"}, headers=auth(client))
-        r = await client.post(url, json={"email": "jose@acme.test"}, headers=auth(client))
-
-        assert r.status_code == 200
-        assert len(r.json()["members"]) == 2
-
-    async def test_you_cannot_add_someone_from_another_org(self, client):
-        await save(client, "miguel")
-
-        r = await client.post(
-            f"/v1/projects/{PROJECT}/members",
-            json={"email": "outsider@other.test"},
-            headers=auth(client),
-        )
-        assert r.status_code == 404
-
-    async def test_a_non_member_cannot_list_members(self, client):
-        await save(client, "miguel")
-
-        r = await client.get(f"/v1/projects/{PROJECT}/members", headers=auth(client, "jose"))
-        assert r.status_code == 404
 
 
 class TestLegacyGroupSafety:
@@ -549,11 +557,7 @@ class TestLegacyGroupSafety:
             group_id=sanitize_group_id(PROJECT),
             metadata=Metadata(PROJECT, "miguel@acme.test"),
         )
-        await client.post(
-            f"/v1/projects/{PROJECT}/members",
-            json={"email": "jose@acme.test"},
-            headers=auth(client),
-        )
+        await add_member(client.sessionmaker, PROJECT, client.world["people"]["jose"][0])
 
         for who in ("miguel", "jose"):
             r = await client.get(

@@ -2,23 +2,27 @@
 Shared fixtures.
 
 Integration tests run against a real Postgres (a scratch database created and
-dropped per run) and a real Neo4j, with the fake extractor so no model is
-needed. Testing the API against SQLite would prove nothing: the schema uses
-Postgres UUID columns and the ACL relies on real joins.
+dropped per run) with the fake extractor, so no model is needed. Testing against
+SQLite would prove nothing: the schema uses Postgres UUID columns and the ACL
+relies on real joins.
+
+The engine authenticates nobody. `auth()` mints the same signed assertion the
+control plane sends, which is exactly what a request from it looks like.
 """
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
+import jwt
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from drymem_server.api.app import create_app
-from drymem_server.api.deps import get_session, set_store
-from drymem_server.auth import create_token
-from drymem_server.db.models import Base, Org, User
+from drymem_server.api.deps import PRINCIPAL_HEADER, get_session, set_store
+from drymem_server.db.models import ORG_OWNER, Base, Org, User
 from drymem_server.memory_store import Episode, Fact, SaveResult
 from drymem_server.settings import settings
 
@@ -110,28 +114,21 @@ async def world(sessionmaker):
         session.add_all([acme, other])
         await session.flush()
 
-        miguel = User(org_id=acme.id, email="miguel@acme.test", name="Miguel")
+        miguel = User(org_id=acme.id, email="miguel@acme.test", name="Miguel", role=ORG_OWNER)
         jose = User(org_id=acme.id, email="jose@acme.test", name="Jose")
-        outsider = User(org_id=other.id, email="outsider@other.test", name="Outsider")
+        outsider = User(
+            org_id=other.id, email="outsider@other.test", name="Outsider", role=ORG_OWNER
+        )
         session.add_all([miguel, jose, outsider])
         await session.flush()
 
-        tokens = {}
-        for user, key in ((miguel, "miguel"), (jose, "jose"), (outsider, "outsider")):
-            raw, _ = await create_token(session, user, label=key)
-            tokens[key] = raw
-
-        revoked_raw, revoked = await create_token(session, miguel, label="revoked")
-        from datetime import UTC, datetime
-
-        revoked.revoked_at = datetime.now(UTC)
-        tokens["revoked"] = revoked_raw
-
         await session.commit()
         return {
-            "tokens": tokens,
-            "orgs": {"acme": acme.id, "other": other.id},
-            "users": {"miguel": miguel.id, "jose": jose.id, "outsider": outsider.id},
+            "people": {
+                "miguel": (miguel.id, acme.id, miguel.email, ORG_OWNER),
+                "jose": (jose.id, acme.id, jose.email, "member"),
+                "outsider": (outsider.id, other.id, outsider.email, ORG_OWNER),
+            }
         }
 
 
@@ -151,8 +148,50 @@ async def client(sessionmaker, store, world):
     app.dependency_overrides[get_session] = override_session
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         ac.world = world
+        ac.sessionmaker = sessionmaker
         yield ac
 
 
 def auth(client, who="miguel") -> dict[str, str]:
-    return {"Authorization": f"Bearer {client.world['tokens'][who]}"}
+    """The header the control plane sends: a signed, short-lived principal."""
+    user_id, org_id, email, role = client.world["people"][who]
+    token = jwt.encode(
+        {
+            "userId": str(user_id),
+            "orgId": str(org_id),
+            "email": email,
+            "role": role,
+            "iss": "drymem-api",
+            "aud": "drymem-memory",
+            "exp": datetime.now(UTC) + timedelta(minutes=5),
+        },
+        settings.service_secret,
+        algorithm="HS256",
+    )
+    return {PRINCIPAL_HEADER: token}
+
+
+async def add_member(sessionmaker, project_key: str, who_id, role: str = "member") -> None:
+    """Put someone on a project.
+
+    Membership is the control plane's to grant now, so the engine's tests set it
+    up directly rather than through an endpoint this service no longer has.
+    """
+    from sqlalchemy import select
+
+    from drymem_server.db.models import Project, ProjectMember
+
+    async with sessionmaker() as session:
+        project = (
+            await session.execute(select(Project).where(Project.project_key == project_key))
+        ).scalar_one()
+        exists = (
+            await session.execute(
+                select(ProjectMember).where(
+                    ProjectMember.project_id == project.id, ProjectMember.user_id == who_id
+                )
+            )
+        ).scalar_one_or_none()
+        if exists is None:
+            session.add(ProjectMember(project_id=project.id, user_id=who_id, role=role))
+            await session.commit()

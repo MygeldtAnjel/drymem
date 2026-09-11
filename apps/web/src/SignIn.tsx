@@ -16,6 +16,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth, type Bootstrap, type Session } from "@/api";
+import { go } from "@/router";
 
 export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
   const [state, setState] = useState<Bootstrap | null>(null);
@@ -131,6 +132,16 @@ export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
               {busy ? "One moment…" : creating ? "Create organisation" : "Sign in"}
               {!busy && <ArrowRight data-icon="inline-end" />}
             </Button>
+
+            {!creating && (
+              <button
+                type="button"
+                className="self-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                onClick={() => go("forgot")}
+              >
+                Forgotten your password?
+              </button>
+            )}
           </form>
         )}
 

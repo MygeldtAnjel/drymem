@@ -34,7 +34,7 @@ import {
   type Session,
   type Skill,
 } from "./api";
-import { AcceptInvite, ApproveDevice } from "@/pages/Gate";
+import { AcceptInvite, ApproveDevice, ForgotPassword, ResetPassword } from "@/pages/Gate";
 import { Shell } from "@/components/Shell";
 import { Blank } from "@/components/Bits";
 import { MemoriesPage, MemoryDetail } from "@/pages/Memories";
@@ -120,6 +120,10 @@ export function App() {
   }
   if (route.page === "device" && route.id) {
     return <ApproveDevice code={route.id} session={session} />;
+  }
+  if (route.page === "forgot") return <ForgotPassword />;
+  if (route.page === "reset" && route.id) {
+    return <ResetPassword token={route.id} onDone={signedIn} />;
   }
   if (session === null) return <SignIn onDone={signedIn} />;
 

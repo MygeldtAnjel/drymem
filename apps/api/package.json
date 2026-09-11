@@ -1,0 +1,31 @@
+{
+  "name": "@drymem/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "cookie-parser": "^1.4.7",
+    "drizzle-orm": "^0.44.7",
+    "express": "^5.1.0",
+    "jose": "^6.1.0",
+    "postgres": "^3.4.7",
+    "resend": "^6.2.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.4",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.20.7",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.9"
+  }
+}

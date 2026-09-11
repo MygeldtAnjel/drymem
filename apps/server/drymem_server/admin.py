@@ -1,8 +1,11 @@
 """
-drymem-admin — server-side account management.
+drymem-admin — repair and migration, where the database is.
 
-Runs where the database is, not on a developer's laptop. Until there is a
-dashboard (step 6) this is how a person gets a token.
+Accounts, tokens and invitations are the control plane's job now: people sign
+up, get invited, and run `drymem login` in a browser. What is left here is the
+work that spans *both* stores — renaming a person across Postgres and the graph,
+indexing episodes that have no row — plus the numbers the pilot is judged on.
+None of it belongs in a web request.
 """
 
 from __future__ import annotations
@@ -13,8 +16,7 @@ import sys
 
 from sqlalchemy import func, select
 
-from drymem_server.auth import create_token
-from drymem_server.db.models import ApiToken, Memory, Org, Project, ProjectMember, User
+from drymem_server.db.models import Memory, Org, Project, ProjectMember, User
 from drymem_server.db.session import sessionmaker_for
 from drymem_server.settings import settings
 
@@ -32,62 +34,6 @@ async def _org(session, name: str) -> Org:
     session.add(org)
     await session.flush()
     return org
-
-
-async def user_create(email: str, org_name: str, name: str | None) -> int:
-    factory = sessionmaker_for(settings.database_url)
-    async with factory() as session:
-        org = await _org(session, org_name)
-        existing = (
-            await session.execute(select(User).where(User.email == email, User.org_id == org.id))
-        ).scalar_one_or_none()
-        if existing:
-            print(f"User already exists: {email} in {org.name}", file=sys.stderr)
-            return 1
-        session.add(User(org_id=org.id, email=email, name=name))
-        await session.commit()
-    print(f"Created {email} in org {org_name}")
-    return 0
-
-
-async def token_create(email: str, label: str | None) -> int:
-    factory = sessionmaker_for(settings.database_url)
-    async with factory() as session:
-        user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
-        if user is None:
-            print(f"No such user: {email}. Create it first.", file=sys.stderr)
-            return 1
-        raw, _ = await create_token(session, user, label=label)
-        await session.commit()
-
-    # Shown once. Only the SHA-256 is stored, so it cannot be recovered later.
-    print(raw)
-    print("\nThis token is shown once. Store it now.", file=sys.stderr)
-    return 0
-
-
-async def token_revoke(label: str) -> int:
-    from datetime import UTC, datetime
-
-    factory = sessionmaker_for(settings.database_url)
-    async with factory() as session:
-        tokens = (
-            (
-                await session.execute(
-                    select(ApiToken).where(ApiToken.label == label, ApiToken.revoked_at.is_(None))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not tokens:
-            print(f"No active token labelled {label!r}", file=sys.stderr)
-            return 1
-        for token in tokens:
-            token.revoked_at = datetime.now(UTC)
-        await session.commit()
-    print(f"Revoked {len(tokens)} token(s) labelled {label!r}")
-    return 0
 
 
 async def backfill(project_key: str, email: str) -> int:
@@ -427,55 +373,9 @@ async def user_delete(email: str) -> int:
     return 0
 
 
-async def invite_link(email: str, role: str, org_name: str | None) -> int:
-    """Print an invitation link for someone to set a password with.
-
-    The break-glass for a server whose users predate identity: they exist, have
-    tokens, and cannot sign in to the web because they have no password. An
-    invite for their own email claims the existing row instead of making a new
-    one. Also how the very first admin gets a second admin in without SMTP.
-    """
-    from drymem_server.auth import Principal, create_invite
-
-    factory = sessionmaker_for(settings.database_url)
-    async with factory() as session:
-        if org_name:
-            org = await _org(session, org_name)
-        else:
-            org = (await session.execute(select(Org).limit(1))).scalar_one_or_none()
-            if org is None:
-                print("No organisation yet. Open the web UI and create one.", file=sys.stderr)
-                return 1
-        owner = (
-            await session.execute(
-                select(User).where(User.org_id == org.id).order_by(User.created_at).limit(1)
-            )
-        ).scalar_one_or_none()
-        inviter = Principal(
-            user_id=owner.id if owner else None,
-            org_id=org.id,
-            email=owner.email if owner else "drymem-admin",
-            role="owner",
-        )
-        raw, invite = await create_invite(
-            session, inviter=inviter, email=email, role=role, project=None
-        )
-        await session.commit()
-
-    base = (settings.public_url or "http://127.0.0.1:8080").rstrip("/")
-    print(f"{base}/#/invite/{raw}")
-    print(f"  for {invite.email} as {invite.role}, valid until {invite.expires_at:%Y-%m-%d %H:%M}")
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-
-    p = sub.add_parser("user-create", help="Add a user to an org")
-    p.add_argument("email")
-    p.add_argument("--org", required=True)
-    p.add_argument("--name")
 
     p = sub.add_parser("user-rename", help="Change a user's email, in both stores")
     p.add_argument("old")
@@ -483,18 +383,6 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("user-delete", help="Remove a user, their tokens and their index rows")
     p.add_argument("email")
-
-    p = sub.add_parser("invite-link", help="Print an invitation link (sets or resets a password)")
-    p.add_argument("email")
-    p.add_argument("--role", default="member", choices=["member", "admin"])
-    p.add_argument("--org", help="Org name; defaults to the only one")
-
-    p = sub.add_parser("token-create", help="Issue an API token (shown once)")
-    p.add_argument("email")
-    p.add_argument("--label")
-
-    p = sub.add_parser("token-revoke", help="Revoke every active token with this label")
-    p.add_argument("label")
 
     p = sub.add_parser("backfill", help="Index graph episodes that have no database row")
     p.add_argument("project_key")
@@ -507,23 +395,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--days", type=int, default=14)
 
     args = parser.parse_args(argv)
-    if args.command == "user-create":
-        return asyncio.run(user_create(args.email, args.org, args.name))
     if args.command == "user-rename":
         return asyncio.run(user_rename(args.old, args.new))
     if args.command == "user-delete":
         return asyncio.run(user_delete(args.email))
-    if args.command == "invite-link":
-        return asyncio.run(invite_link(args.email, args.role, args.org))
-    if args.command == "token-create":
-        return asyncio.run(token_create(args.email, args.label))
     if args.command == "backfill":
         return asyncio.run(backfill(args.project_key, args.email))
     if args.command == "migrate-scopes":
         return asyncio.run(migrate_scopes(args.project_key))
-    if args.command == "stats":
-        return asyncio.run(stats(args.days))
-    return asyncio.run(token_revoke(args.label))
+    return asyncio.run(stats(args.days))
 
 
 if __name__ == "__main__":

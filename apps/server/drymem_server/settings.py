@@ -50,19 +50,10 @@ class Settings(BaseSettings):
     # Extra literals to redact, e.g. client names or internal hostnames.
     scrub_denylist: str = ""
 
-    # Where the UI is reached from, for links in invites and device-login
-    # prompts. Empty means "use the host of the request that asked".
-    public_url: str = ""
-    # Off on a laptop over http; on behind TLS.
-    cookie_secure: bool = False
-    session_days: int = 30
-    invite_days: int = 7
-    # Invites are printed for the admin to forward unless SMTP is configured.
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = ""
+    # Shared with the control plane (`apps/api`), which signs a short-lived
+    # assertion of who the caller is. This service verifies it and trusts
+    # nothing else, which is what lets it listen without auth of its own.
+    service_secret: str = "dev-only-change-me-0c4f1a9b7e2d5836"
 
 
 settings = Settings()

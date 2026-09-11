@@ -51,6 +51,31 @@ reads. The server serves the current shape at `GET /v1/memories/schema`.
 
 ---
 
+## How it is put together
+
+Three apps, one database, one door.
+
+| | | |
+|---|---|---|
+| `apps/web` | React + Tailwind + shadcn/ui | What people look at. Served by the API. |
+| `apps/api` | Express + TypeScript + Drizzle | **Port 8080, the only public one.** Identity, people, projects, the skills registry, billing, audit. Serves the web app. |
+| `apps/server` | FastAPI + Python + Graphiti | **Port 8090, never published.** Memories, the knowledge graph, extraction, the scrubber, discovery and distillation. |
+
+A browser and the CLI only ever talk to `apps/api`. It resolves who you are and
+passes a signed, ninety-second assertion to the engine, which verifies it and
+trusts nothing else — so identity lives in exactly one codebase.
+
+Alembic, in `apps/server/migrations`, is the single schema authority for the
+database both use. `make migrate` applies it.
+
+```bash
+make up        # everything, in Docker
+make dev       # engine and API with reload, databases in Docker
+make test      # every suite
+```
+
+---
+
 ## Installation
 
 ### Prerequisites

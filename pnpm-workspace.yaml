@@ -1,4 +1,5 @@
 packages:
+  - "apps/api"
   - "apps/cli"
   - "apps/landing"
   - "apps/web"

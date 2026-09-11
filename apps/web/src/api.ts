@@ -110,6 +110,9 @@ export interface Invite {
   invited_by: string | null;
   expires_at: string;
   invite_url?: string | null;
+  /** Whether the server actually managed to email it. Never assumed. */
+  emailed?: boolean;
+  email_error?: string | null;
 }
 
 export interface InvitePublic {
@@ -227,6 +230,18 @@ export const auth = {
   login: (email: string, password: string) =>
     request<Session>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
+
+  forgot: (email: string) =>
+    request<{ detail: string; email_configured: boolean }>("/auth/forgot", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  resetInfo: (token: string) => request<{ email: string }>(`/auth/reset/${token}`),
+  reset: (token: string, password: string) =>
+    request<Session>(`/auth/reset/${token}`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
   changePassword: (current: string, next: string) =>
     request<void>("/auth/password", {
       method: "POST",
