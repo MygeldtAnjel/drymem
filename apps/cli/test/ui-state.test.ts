@@ -308,3 +308,54 @@ describe("errors", () => {
     expect(state.loading).toBe(false);
   });
 });
+
+
+describe("Enter, however the terminal sends it", () => {
+  /**
+   * Ink maps CR to `key.return` but LF to a name with no flag on the key
+   * object, so a terminal that sends LF silently did nothing. Every path that
+   * accepts Enter is checked against all three forms.
+   */
+  const forms: Array<[string, string, KeyPress]> = [
+    ["key.return", "", { return: true }],
+    ["carriage return", "\r", {}],
+    ["line feed", "\n", {}],
+  ];
+
+  for (const [label, input, key] of forms) {
+    it(`runs a dashboard action - ${label}`, () => {
+      expect(press(loaded(), input, key).screen).toBe("recent");
+    });
+
+    it(`opens a memory from the list - ${label}`, () => {
+      const state = press(withEpisodes(), input, key);
+      expect(state.screen).toBe("detail");
+      expect(state.selected?.uuid).toBe("u1");
+    });
+
+    it(`submits a search - ${label}`, () => {
+      let state = press(loaded(), "s");
+      for (const ch of "auth") state = press(state, ch);
+      state = press(state, input, key);
+
+      expect(state.query).toBe("auth");
+      expect(state.screen).toBe("search");
+    });
+  }
+
+  it("never types a control character into the search box", () => {
+    let state = press(loaded(), "s");
+    for (const ch of "au") state = press(state, ch);
+    state = press(state, "\u0007"); // a bell, not a letter
+
+    expect(state.draftQuery).toBe("au");
+  });
+
+  it("does NOT confirm a delete - a stray keypress must not destroy a memory", () => {
+    const confirming = press(press(withEpisodes(), "\r", {}), "d");
+
+    for (const [, input, key] of forms) {
+      expect(press(confirming, input, key).screen).toBe("confirmDelete");
+    }
+  });
+});

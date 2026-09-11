@@ -101,15 +101,30 @@ function go(state: State, screen: Screen): State {
 const isUp = (input: string, key: KeyPress) => key.upArrow || input === "k";
 const isDown = (input: string, key: KeyPress) => key.downArrow || input === "j";
 
+/**
+ * Enter, however the terminal chose to send it.
+ *
+ * Ink maps carriage return to `key.return`, but a line feed to an internal name
+ * of "enter" that has **no flag on the key object at all** — so a terminal that
+ * sends LF silently does nothing. Checking the raw input as well covers both,
+ * and costs nothing.
+ */
+const isEnter = (input: string, key: KeyPress) =>
+  Boolean(key.return) || input === "\r" || input === "\n";
+
 function typing(state: State, input: string, key: KeyPress): State {
-  if (key.return) {
+  if (isEnter(input, key)) {
     // An empty query would fetch everything; treat it as a cancel.
     if (!state.draftQuery.trim()) return { ...state, screen: state.previous };
     return { ...state, screen: "search", query: state.draftQuery, loading: true, cursor: 0 };
   }
   if (key.escape) return { ...state, screen: state.previous, draftQuery: "" };
   if (key.backspace || key.delete) return { ...state, draftQuery: state.draftQuery.slice(0, -1) };
-  if (input && !key.ctrl) return { ...state, draftQuery: state.draftQuery + input };
+  // Guard against control characters becoming query text — a stray \r or \n
+  // would otherwise be typed into the search box.
+  if (input && !key.ctrl && !/[\u0000-\u001f]/.test(input)) {
+    return { ...state, draftQuery: state.draftQuery + input };
+  }
   return state;
 }
 
@@ -123,7 +138,7 @@ function onDashboard(state: State, input: string, key: KeyPress): State {
   }
   if (input === "r") return { ...go(state, "recent"), loading: true };
 
-  if (key.return) {
+  if (isEnter(input, key)) {
     switch (ACTIONS[state.cursor]) {
       case "Recent memories":
         return { ...go(state, "recent"), loading: true };
@@ -148,7 +163,7 @@ function onList(state: State, input: string, key: KeyPress): State {
   }
   if (key.escape) return go(state, "dashboard");
 
-  if (key.return && state.screen === "recent") {
+  if (isEnter(input, key) && state.screen === "recent") {
     const episode = state.episodes[state.cursor];
     if (!episode) return state;
     return { ...go(state, "detail"), selected: episode, detailScroll: 0, previous: "recent" };
@@ -173,6 +188,7 @@ function onDetail(state: State, input: string, key: KeyPress): State {
 function onConfirmDelete(state: State, input: string, key: KeyPress): State {
   if (input === "y") return { ...state, loading: true };
   if (input === "n" || key.escape) return { ...state, screen: "detail", status: "" };
+  // Enter must not confirm a delete: a stray keypress should never destroy a memory.
   return state;
 }
 
