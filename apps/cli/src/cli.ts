@@ -6,6 +6,7 @@
  */
 
 import { DrymemClient, DrymemError } from "./client.js";
+import type { Source } from "./import.js";
 import { requireConfig } from "./config.js";
 import { HOOKS, readPayload, type HookName } from "./hooks.js";
 import { resolveProjectKey } from "./identity.js";
@@ -18,6 +19,8 @@ Usage
   npx drymem save <summary>       Save a memory for the current project
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
+  npx drymem import <source>      Backfill memories the team already wrote down
+                                  (claude-memory, git, docs, ecc, engram; --dry-run to preview)
   npx drymem promote <episode-id> Share a memory with the project's members
   npx drymem delete <episode-id>  Remove a memory
   npx drymem projects             List the projects you can see
@@ -126,6 +129,56 @@ async function main(argv: string[]): Promise<number> {
         console.log(`### ${episode.name} (${when(episode.created_at)}${who})`);
         console.log(`${episode.content.slice(0, 300)}\n`);
       }
+      return 0;
+    }
+
+    case "import": {
+      const { SOURCES, collect, newOnly } = await import("./import.js");
+      const source = rest[0] as Source | undefined;
+      if (!source || !SOURCES.includes(source)) {
+        fail(`Which source? One of: ${SOURCES.join(", ")}`);
+      }
+      const dryRun = rest.includes("--dry-run");
+
+      const items = collect(source, process.cwd(), rest.includes("--all-projects"));
+      if (items.length === 0) {
+        console.log(`Nothing to import from ${source}.`);
+        return 0;
+      }
+
+      // Ask what is already there rather than tracking state locally: the
+      // server is the only thing that knows, and a lock file would drift.
+      const existing = new Set(await client.topicKeys(projectKey));
+      const pending = newOnly(items, existing);
+
+      console.log(`${source}: ${items.length} found, ${pending.length} new`);
+      if (pending.length === 0) return 0;
+
+      if (dryRun) {
+        for (const item of pending) console.log(`  would import ${item.topicKey}`);
+        return 0;
+      }
+
+      let saved = 0;
+      for (const item of pending) {
+        try {
+          const result = await client.save({
+            project_key: projectKey,
+            summary: item.summary,
+            topic_key: item.topicKey,
+            tool: `import:${item.source}`,
+          });
+          saved += 1;
+          const notes = [result.scrubbed, result.degraded && "extraction degraded"]
+            .filter(Boolean)
+            .join("; ");
+          console.log(`  ${saved}/${pending.length} ${item.topicKey}${notes ? ` (${notes})` : ""}`);
+        } catch (error) {
+          // One bad item must not abandon the rest of a long backfill.
+          console.error(`  skipped ${item.topicKey}: ${error instanceof Error ? error.message : error}`);
+        }
+      }
+      console.log(`\nImported ${saved} memory(ies). They are private until you promote them.`);
       return 0;
     }
 

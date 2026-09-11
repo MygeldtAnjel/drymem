@@ -285,6 +285,65 @@
         }
       }
     },
+    "/v1/memories/topics": {
+      "get": {
+        "tags": [
+          "memories"
+        ],
+        "summary": "List Topics",
+        "description": "Every topic key already stored. Used by `drymem import` to stay idempotent.",
+        "operationId": "list_topics_v1_memories_topics_get",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/memories/{episode_uuid}": {
       "delete": {
         "tags": [
@@ -1148,6 +1207,27 @@
           "results"
         ],
         "title": "SearchResponse"
+      },
+      "TopicsResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "topic_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topic Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "topic_keys"
+        ],
+        "title": "TopicsResponse"
       },
       "UpdateMemoryRequest": {
         "properties": {

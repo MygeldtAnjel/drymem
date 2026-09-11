@@ -69,6 +69,11 @@ class ContextResponse(BaseModel):
     episodes: list[EpisodeOut]
 
 
+class TopicsResponse(BaseModel):
+    project_key: str
+    topic_keys: list[str]
+
+
 class DeleteResponse(BaseModel):
     episode_uuid: str
     deleted: bool

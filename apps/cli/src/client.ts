@@ -128,6 +128,14 @@ export class DrymemClient {
     return data.episodes;
   }
 
+  /** Topic keys already stored — what makes `drymem import` idempotent. */
+  async topicKeys(projectKey: string): Promise<string[]> {
+    const data = await this.request<{ topic_keys: string[] }>(
+      `/v1/memories/topics?${this.query({ project_key: projectKey })}`,
+    );
+    return data.topic_keys;
+  }
+
   async delete(episodeUuid: string): Promise<boolean> {
     const data = await this.request<{ deleted: boolean }>(`/v1/memories/${episodeUuid}`, {
       method: "DELETE",
@@ -184,5 +192,16 @@ async function describe(response: Response): Promise<string> {
     return "Not authorised. Your token is missing, revoked, or wrong — run `npx drymem setup`.";
   }
   if (response.status === 404) return detail || "Not found.";
+  if (response.status === 422 && detail.startsWith("[")) {
+    // FastAPI returns a list of field errors; the raw JSON is unreadable.
+    try {
+      const problems = JSON.parse(detail) as Array<{ loc?: unknown[]; msg?: string }>;
+      return problems
+        .map((p) => `${(p.loc ?? []).slice(1).join(".") || "request"}: ${p.msg ?? "invalid"}`)
+        .join("; ");
+    } catch {
+      /* fall through to the raw detail */
+    }
+  }
   return detail || `Request failed with ${response.status}`;
 }

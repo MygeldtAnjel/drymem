@@ -82,6 +82,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/memories/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Topics
+         * @description Every topic key already stored. Used by `drymem import` to stay idempotent.
+         */
+        get: operations["list_topics_v1_memories_topics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/memories/{episode_uuid}": {
         parameters: {
             query?: never;
@@ -420,6 +440,13 @@ export interface components {
             /** Results */
             results: components["schemas"]["FactOut"][];
         };
+        /** TopicsResponse */
+        TopicsResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Topic Keys */
+            topic_keys: string[];
+        };
         /** UpdateMemoryRequest */
         UpdateMemoryRequest: {
             /** Project Key */
@@ -588,6 +615,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContextResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_topics_v1_memories_topics_get: {
+        parameters: {
+            query: {
+                project_key: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopicsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -561,3 +561,31 @@ class TestLegacyGroupSafety:
             )
             names = [e["name"] for e in r.json()["episodes"]]
             assert "old/unscoped" not in names, f"{who} must not read the unscoped group"
+
+
+class TestTopics:
+    async def test_lists_stored_topic_keys(self, client):
+        await save(client, topic_key="auth/jwt")
+        await save(client, topic_key="db/migration")
+
+        r = await client.get(
+            "/v1/memories/topics", params={"project_key": PROJECT}, headers=auth(client)
+        )
+
+        assert r.json()["topic_keys"] == ["auth/jwt", "db/migration"]
+
+    async def test_a_memory_without_a_topic_key_is_not_listed(self, client):
+        await save(client)  # no topic_key
+
+        r = await client.get(
+            "/v1/memories/topics", params={"project_key": PROJECT}, headers=auth(client)
+        )
+        assert r.json()["topic_keys"] == []
+
+    async def test_another_org_sees_nothing(self, client):
+        await save(client, "miguel", topic_key="auth/jwt")
+
+        r = await client.get(
+            "/v1/memories/topics", params={"project_key": PROJECT}, headers=auth(client, "outsider")
+        )
+        assert r.json()["topic_keys"] == []

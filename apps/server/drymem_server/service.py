@@ -187,6 +187,23 @@ class MemoryService:
             if ep.name == topic_key or ep.name.startswith(f"{topic_key}/update-")
         ]
 
+    async def topic_keys(self, *, project_key: str) -> list[str]:
+        """Every topic key this caller has already stored in a project.
+
+        Import needs this to be idempotent, and reading it from the index is
+        both exact and cheap — paging the graph would cap out and make a second
+        import silently duplicate whatever fell outside the window.
+        """
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return []
+        rows = await self.session.execute(
+            select(Memory.topic_key).where(
+                Memory.project_id == project.id, Memory.topic_key.is_not(None)
+            )
+        )
+        return sorted({key for key in rows.scalars() if key})
+
     async def delete(self, *, episode_uuid: str) -> bool:
         """Remove an episode, and its index row.
 

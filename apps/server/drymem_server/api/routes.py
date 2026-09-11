@@ -24,6 +24,7 @@ from drymem_server.api.schemas import (
     SaveMemoryRequest,
     SaveMemoryResponse,
     SearchResponse,
+    TopicsResponse,
     UpdateMemoryRequest,
 )
 from drymem_server.scrubber import PrivateKeyFound
@@ -134,6 +135,14 @@ async def memory_context(
             )
             for e in episodes
         ],
+    )
+
+
+@router.get("/v1/memories/topics", response_model=TopicsResponse, tags=["memories"])
+async def list_topics(service: ServiceDep, project_key: str = Query(...)) -> TopicsResponse:
+    """Every topic key already stored. Used by `drymem import` to stay idempotent."""
+    return TopicsResponse(
+        project_key=project_key, topic_keys=await service.topic_keys(project_key=project_key)
     )
 
 
