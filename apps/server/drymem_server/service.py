@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from drymem_server.auth import Principal, ensure_project, project_for
 from drymem_server.db.models import (
+    ROLE_ADMIN,
+    ROLE_MEMBER,
     SCOPE_PRIVATE,
     SCOPE_TEAM,
     AuditLog,
@@ -75,6 +77,24 @@ class Entry:
     topic_key: str = ""
     promoted_at: datetime | None = None
     rating: int | None = None
+
+
+class LastMemberError(Exception):
+    """Raised rather than leaving a project nobody can open."""
+
+
+@dataclass(frozen=True)
+class Overview:
+    """What a project looks like at a glance."""
+
+    memories: int
+    shared: int
+    sessions: int
+    members: int
+    skills: int
+    positive: int
+    negative: int
+    by_type: dict[str, int]
 
 
 @dataclass(frozen=True)
@@ -600,6 +620,134 @@ class MemoryService:
         ]
         summaries.sort(key=lambda x: x.ended_at, reverse=True)
         return summaries[:limit]
+
+    async def me(self) -> User | None:
+        return await self.session.get(User, self.principal.user_id)
+
+    async def rename_me(self, *, name: str) -> User | None:
+        user = await self.me()
+        if user is None:
+            return None
+        user.name = name.strip() or None
+        await self.session.flush()
+        return user
+
+    async def rename_project(self, *, project_key: str, display_name: str) -> Project | None:
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return None
+        project.display_name = display_name.strip() or None
+        self.audit("project.rename", f"{project_key}:{display_name}")
+        await self.session.flush()
+        return project
+
+    async def set_member_role(
+        self, *, project_key: str, email: str, role: str
+    ) -> list[tuple[User, str]] | None:
+        from drymem_server.db.models import ProjectMember
+
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None or role not in (ROLE_MEMBER, ROLE_ADMIN):
+            return None
+
+        member = (
+            await self.session.execute(
+                select(ProjectMember)
+                .join(User, User.id == ProjectMember.user_id)
+                .where(ProjectMember.project_id == project.id, User.email == email)
+            )
+        ).scalar_one_or_none()
+        if member is None:
+            return None
+
+        member.role = role
+        self.audit("project.set_role", f"{project_key}:{email}:{role}")
+        await self.session.flush()
+        return await self.members(project_key=project_key)
+
+    async def remove_member(self, *, project_key: str, email: str) -> list[tuple[User, str]] | None:
+        """Take someone off a project. Their memories stay theirs.
+
+        Removing the last member is refused: a project with nobody on it cannot
+        be opened by anyone, including whoever would need to fix that.
+        """
+        from drymem_server.db.models import ProjectMember
+
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return None
+
+        current = await self.members(project_key=project_key) or []
+        if len(current) <= 1:
+            raise LastMemberError("A project must keep at least one member.")
+
+        member = (
+            await self.session.execute(
+                select(ProjectMember)
+                .join(User, User.id == ProjectMember.user_id)
+                .where(ProjectMember.project_id == project.id, User.email == email)
+            )
+        ).scalar_one_or_none()
+        if member is None:
+            return None
+
+        await self.session.delete(member)
+        self.audit("project.remove_member", f"{project_key}:{email}")
+        await self.session.flush()
+        return await self.members(project_key=project_key)
+
+    async def overview(self, *, project_key: str) -> Overview | None:
+        """The numbers the dashboard opens with, in one round trip."""
+        from drymem_server.db.models import ProjectMember
+
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return None
+
+        rows = await self.session.execute(
+            select(Memory.memory_type, Memory.scope, func.count(Memory.id))
+            .where(Memory.project_id == project.id)
+            .group_by(Memory.memory_type, Memory.scope)
+        )
+        by_type: dict[str, int] = {}
+        total = shared = 0
+        for kind, scope, n in rows.all():
+            by_type[kind] = by_type.get(kind, 0) + n
+            total += n
+            if scope == SCOPE_TEAM:
+                shared += n
+
+        sessions = await self.session.execute(
+            select(func.count(func.distinct(Memory.session_id))).where(
+                Memory.project_id == project.id, Memory.session_id.is_not(None)
+            )
+        )
+        members = await self.session.execute(
+            select(func.count(ProjectMember.id)).where(ProjectMember.project_id == project.id)
+        )
+        skills = await self.session.execute(
+            select(func.count(Skill.id)).where(Skill.project_id == project.id)
+        )
+        votes = await self.session.execute(
+            select(
+                func.count(case((MemoryFeedback.rating > 0, 1))),
+                func.count(case((MemoryFeedback.rating < 0, 1))),
+            )
+            .join(Memory, Memory.id == MemoryFeedback.memory_id)
+            .where(Memory.project_id == project.id)
+        )
+        positive, negative = votes.one()
+
+        return Overview(
+            memories=total,
+            shared=shared,
+            sessions=sessions.scalar() or 0,
+            members=members.scalar() or 0,
+            skills=skills.scalar() or 0,
+            positive=positive or 0,
+            negative=negative or 0,
+            by_type=by_type,
+        )
 
     async def org_users(self) -> list[tuple[User, int, int]]:
         """Everyone in this org, with what they have contributed.

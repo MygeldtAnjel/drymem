@@ -281,3 +281,114 @@ async def test_deleting_a_skill(client):
         await client.get("/v1/skills", headers=auth(client), params={"project_key": PROJECT})
     ).json()
     assert body["skills"] == []
+
+
+# ---- the admin surface -----------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_whoami(client):
+    body = (await client.get("/v1/me", headers=auth(client))).json()
+    assert body["email"] == "miguel@acme.test"
+    assert body["name"] == "Miguel"
+
+
+@pytest.mark.asyncio
+async def test_renaming_yourself(client):
+    body = (
+        await client.patch("/v1/me", headers=auth(client), json={"name": "Miguel B"})
+    ).json()
+    assert body["name"] == "Miguel B"
+
+    cleared = (await client.patch("/v1/me", headers=auth(client), json={"name": ""})).json()
+    assert cleared["name"] is None
+
+
+@pytest.mark.asyncio
+async def test_renaming_a_project_keeps_its_key(client):
+    """The key is the git remote. Renaming it would split the team's memory."""
+    await save(client)
+    body = (
+        await client.patch(
+            f"/v1/projects/{PROJECT}", headers=auth(client), json={"display_name": "Payments"}
+        )
+    ).json()
+    assert body["display_name"] == "Payments"
+    assert body["project_key"] == PROJECT
+
+
+@pytest.mark.asyncio
+async def test_member_routes_are_not_swallowed_by_the_project_route(client):
+    """`project_key` is a greedy `:path`. Registered first, PATCH on a project
+    would match `/projects/<key>/members/<email>` as a project by that name."""
+    await save(client)
+    await client.post(
+        f"/v1/projects/{PROJECT}/members", headers=auth(client), json={"email": "jose@acme.test"}
+    )
+
+    response = await client.patch(
+        f"/v1/projects/{PROJECT}/members/jose@acme.test",
+        headers=auth(client),
+        json={"role": "admin"},
+    )
+    assert response.status_code == 200, response.text
+    roles = {m["email"]: m["role"] for m in response.json()["members"]}
+    assert roles["jose@acme.test"] == "admin"
+
+    # And the project's own name was not touched by that call.
+    projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+    assert [p["project_key"] for p in projects] == [PROJECT]
+
+
+@pytest.mark.asyncio
+async def test_removing_a_member(client):
+    await save(client)
+    await client.post(
+        f"/v1/projects/{PROJECT}/members", headers=auth(client), json={"email": "jose@acme.test"}
+    )
+    response = await client.delete(
+        f"/v1/projects/{PROJECT}/members/jose@acme.test", headers=auth(client)
+    )
+    assert response.status_code == 200
+    assert [m["email"] for m in response.json()["members"]] == ["miguel@acme.test"]
+
+
+@pytest.mark.asyncio
+async def test_the_last_member_cannot_be_removed(client):
+    """A project with nobody on it cannot be opened by anyone, including whoever
+    would have to fix that."""
+    await save(client)
+    response = await client.delete(
+        f"/v1/projects/{PROJECT}/members/miguel@acme.test", headers=auth(client)
+    )
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_overview_counts_what_the_dashboard_opens_with(client):
+    await save(client, topic="a", memory_type="decision")
+    saved = await save(client, topic="b", memory_type="bugfix")
+    await client.post(f"/v1/memories/{saved['episode_uuid']}/promote", headers=auth(client))
+    await client.post(
+        f"/v1/memories/{saved['episode_uuid']}/feedback",
+        headers=auth(client),
+        json={"rating": 1, "query": ""},
+    )
+
+    body = (
+        await client.get("/v1/overview", headers=auth(client), params={"project_key": PROJECT})
+    ).json()
+    assert body["memories"] == 2
+    assert body["shared"] == 1
+    assert body["members"] == 1
+    assert body["positive"] == 1
+    assert body["by_type"] == {"decision": 1, "bugfix": 1}
+
+
+@pytest.mark.asyncio
+async def test_overview_of_a_project_you_are_not_in_is_not_found(client):
+    await save(client, "miguel")
+    response = await client.get(
+        "/v1/overview", headers=auth(client, "outsider"), params={"project_key": PROJECT}
+    )
+    assert response.status_code == 404

@@ -1,8 +1,12 @@
+import { fileURLToPath } from "node:url";
+
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   // Built into the server package so FastAPI serves it from one origin —
   // no CORS, no second deploy, and it works on-prem.
   build: { outDir: "../server/drymem_server/web", emptyOutDir: true },

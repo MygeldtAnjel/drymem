@@ -242,6 +242,38 @@ class MemorySchemaResponse(BaseModel):
     template: str
 
 
+class MeOut(BaseModel):
+    id: str
+    email: str
+    name: str | None = None
+    org_id: str
+    created_at: datetime | None = None
+
+
+class RenameMeRequest(BaseModel):
+    name: str = Field("", max_length=200)
+
+
+class RenameProjectRequest(BaseModel):
+    display_name: str = Field("", max_length=200)
+
+
+class MemberRoleRequest(BaseModel):
+    role: str = Field(..., description="member or admin")
+
+
+class OverviewResponse(BaseModel):
+    project_key: str
+    memories: int = 0
+    shared: int = 0
+    sessions: int = 0
+    members: int = 0
+    skills: int = 0
+    positive: int = 0
+    negative: int = 0
+    by_type: dict[str, int] = {}
+
+
 class HealthResponse(BaseModel):
     status: str
     postgres: bool

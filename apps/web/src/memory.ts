@@ -78,8 +78,8 @@ export function split(body: string): { lead: string; sections: Section[] } {
   };
 }
 
-/** The label a type carries, and the question it answers. */
-export const TYPES: Record<string, string> = {
+/** Each type and the question it answers. Order is the order they appear in. */
+export const MEMORY_TYPES: Record<string, string> = {
   decision: "Why it is done this way",
   architecture: "How this part is put together",
   bugfix: "What broke, and what fixed it",
@@ -87,3 +87,6 @@ export const TYPES: Record<string, string> = {
   convention: "How this team does this",
   note: "Worth not losing",
 };
+
+/** Kept as an alias because chips and filters both read it. */
+export const TYPES = MEMORY_TYPES;

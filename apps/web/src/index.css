@@ -1,0 +1,203 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/*
+ * drymem — the console.
+ *
+ * A dark operator's room with one warm light in it: amber, the colour of the
+ * cat's eye in the mark. Everything else is a cool near-black in four steps,
+ * so depth comes from value rather than from shadows or gradients.
+ *
+ * There is no light mode and no `.dark` class to toggle: the palette is
+ * defined once on `:root`, which is why no component in this app carries a
+ * `dark:` override. Every value was measured against the surface it sits on;
+ * the ratios in the comments are real, not aspirational.
+ *
+ * The rule that keeps earning its keep: a state is never carried by hue alone.
+ * Every badge pairs its colour with a word and usually an icon, so the screen
+ * still reads in greyscale and to someone who cannot separate the hues.
+ */
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --background: #0b0d10;
+  --foreground: #e8eaed; /* 16.14:1 on background */
+
+  --card: #111419;
+  --card-foreground: #e8eaed; /* 15.31:1 */
+  --popover: #171b21;
+  --popover-foreground: #e8eaed;
+
+  /* The one light in the room. */
+  --primary: #f2a93b; /* 9.24:1 on card */
+  --primary-foreground: #1a1305; /* 9.23:1 on primary */
+
+  --secondary: #1e232b;
+  --secondary-foreground: #e8eaed;
+  --muted: #171b21;
+  --muted-foreground: #98a1ad; /* 7.06:1 on card */
+  --accent: #1e232b;
+  --accent-foreground: #e8eaed;
+
+  --destructive: #f0596b; /* 5.58:1 */
+  --destructive-foreground: #1a0508;
+  --success: #3fb27f; /* 6.93:1 */
+  --success-foreground: #04120c;
+
+  --border: #232932;
+  /* An input's outline is a meaningful boundary, so it needs 3:1 against its
+     own field — not the 1.3:1 a decorative hairline can get away with. */
+  --input: #525c6b;
+  --ring: #f2a93b;
+
+  /* One hue per memory type, reused wherever that type is counted. */
+  --chart-1: #a98bf5; /* decision */
+  --chart-2: #5b9cf5; /* architecture */
+  --chart-3: #f0596b; /* bugfix */
+  --chart-4: #f2a93b; /* discovery */
+  --chart-5: #3fb27f; /* convention */
+
+  --sidebar: #111419;
+  --sidebar-foreground: #e8eaed;
+  --sidebar-primary: #f2a93b;
+  --sidebar-primary-foreground: #1a1305;
+  --sidebar-accent: #1e232b;
+  --sidebar-accent-foreground: #e8eaed;
+  --sidebar-border: #232932;
+  --sidebar-ring: #f2a93b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    @apply font-sans;
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 30%, transparent);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #333c48 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #333c48;
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 99px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #525c6b;
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /*
+   * Memory-type chips. Each kind answers a different question, and someone
+   * scanning forty memories wants to sort them without reading them — so each
+   * type gets its own hue, always printed beside its own word. Every pair below
+   * clears 7:1 on its own field.
+   */
+  .chip-decision {
+    background: #1c1930;
+    color: #c4aefa;
+  }
+  .chip-architecture {
+    background: #141d2e;
+    color: #8fbcfb;
+  }
+  .chip-bugfix {
+    background: #2a161b;
+    color: #f7909c;
+  }
+  .chip-discovery {
+    background: #2a2113;
+    color: #f7c375;
+  }
+  .chip-convention {
+    background: #122620;
+    color: #6fd1a5;
+  }
+  .chip-note {
+    background: #1a1f26;
+    color: #aab3bf;
+  }
+}

@@ -64,3 +64,35 @@ export function ratio(positive: number, negative: number): string | null {
   if (up + down === 0) return null;
   return `${Math.round((up / (up + down)) * 100)}%`;
 }
+
+
+/**
+ * "3 hours ago", "yesterday", "12 Sept".
+ *
+ * A list of memories is read by recency far more often than by date, and
+ * "2026-09-11T16:04Z" makes a reader do the arithmetic themselves.
+ */
+export function relative(value: string | null): string {
+  if (!value) return "—";
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return value.slice(0, 10);
+
+  const seconds = Math.round((Date.now() - then) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return when(value);
+}
+
+/** `2026-09-11 16:04` — for the places where the exact moment is the point. */
+export function stamp(value: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${when(value)} · ${clock(value)}`;
+}

@@ -44,6 +44,10 @@ def _serve_web(app: FastAPI) -> None:
 
     app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
 
+    @app.get("/favicon.svg", include_in_schema=False)
+    async def favicon() -> FileResponse:
+        return FileResponse(WEB_DIR / "favicon.svg", media_type="image/svg+xml")
+
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:
         return FileResponse(WEB_DIR / "index.html")

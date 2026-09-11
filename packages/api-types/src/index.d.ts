@@ -357,6 +357,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whoami
+         * @description Who this token belongs to. The UI needs it to say 'you' anywhere.
+         */
+        get: operations["whoami_v1_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Me
+         * @description Set your display name. An empty name falls back to your email.
+         */
+        patch: operations["rename_me_v1_me_patch"];
+        trace?: never;
+    };
+    "/v1/projects/{project_key}/members/{email}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Member
+         * @description Take someone off a project. Their own memories stay theirs and stay private.
+         */
+        delete: operations["remove_member_v1_projects__project_key__members__email__delete"];
+        options?: never;
+        head?: never;
+        /** Set Member Role */
+        patch: operations["set_member_role_v1_projects__project_key__members__email__patch"];
+        trace?: never;
+    };
+    "/v1/projects/{project_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Project
+         * @description Give a project a readable name.
+         *
+         *     Declared *after* the member routes on purpose: `project_key` is a `:path`
+         *     converter, so registered first it would greedily match
+         *     `/v1/projects/<key>/members/<email>` as a project named
+         *     "<key>/members/<email>". The key itself never changes — it is the normalised
+         *     git remote, and changing it would split the team's memory in two.
+         */
+        patch: operations["rename_project_v1_projects__project_key__patch"];
+        trace?: never;
+    };
+    "/v1/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Project Overview
+         * @description Everything the dashboard opens with, in one round trip.
+         */
+        get: operations["project_overview_v1_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -532,6 +623,19 @@ export interface components {
             /** Extractor */
             extractor: string;
         };
+        /** MeOut */
+        MeOut: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /** Org Id */
+            org_id: string;
+            /** Created At */
+            created_at?: string | null;
+        };
         /** MemberOut */
         MemberOut: {
             /** User Id */
@@ -548,6 +652,14 @@ export interface components {
              * @description An existing user in this org
              */
             email: string;
+        };
+        /** MemberRoleRequest */
+        MemberRoleRequest: {
+            /**
+             * Role
+             * @description member or admin
+             */
+            role: string;
         };
         /** MembersResponse */
         MembersResponse: {
@@ -574,6 +686,53 @@ export interface components {
             name: string;
             /** Description */
             description: string;
+        };
+        /** OverviewResponse */
+        OverviewResponse: {
+            /** Project Key */
+            project_key: string;
+            /**
+             * Memories
+             * @default 0
+             */
+            memories: number;
+            /**
+             * Shared
+             * @default 0
+             */
+            shared: number;
+            /**
+             * Sessions
+             * @default 0
+             */
+            sessions: number;
+            /**
+             * Members
+             * @default 0
+             */
+            members: number;
+            /**
+             * Skills
+             * @default 0
+             */
+            skills: number;
+            /**
+             * Positive
+             * @default 0
+             */
+            positive: number;
+            /**
+             * Negative
+             * @default 0
+             */
+            negative: number;
+            /**
+             * By Type
+             * @default {}
+             */
+            by_type: {
+                [key: string]: number;
+            };
         };
         /** ProjectOut */
         ProjectOut: {
@@ -633,6 +792,22 @@ export interface components {
              * @default 0
              */
             memory_count: number;
+        };
+        /** RenameMeRequest */
+        RenameMeRequest: {
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+        };
+        /** RenameProjectRequest */
+        RenameProjectRequest: {
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
         };
         /** SaveMemoryRequest */
         SaveMemoryRequest: {
@@ -1495,6 +1670,214 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whoami_v1_me_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_me_v1_me_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameMeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_v1_projects__project_key__members__email__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                project_key: string;
+                email: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_member_role_v1_projects__project_key__members__email__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                project_key: string;
+                email: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_project_v1_projects__project_key__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                project_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameProjectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_overview_v1_overview_get: {
+        parameters: {
+            query: {
+                project_key: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewResponse"];
                 };
             };
             /** @description Validation Error */

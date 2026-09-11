@@ -1191,6 +1191,385 @@
         }
       }
     },
+    "/v1/me": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Whoami",
+        "description": "Who this token belongs to. The UI needs it to say 'you' anywhere.",
+        "operationId": "whoami_v1_me_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Rename Me",
+        "description": "Set your display name. An empty name falls back to your email.",
+        "operationId": "rename_me_v1_me_patch",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameMeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project_key}/members/{email}": {
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Set Member Role",
+        "operationId": "set_member_role_v1_projects__project_key__members__email__patch",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Remove Member",
+        "description": "Take someone off a project. Their own memories stay theirs and stay private.",
+        "operationId": "remove_member_v1_projects__project_key__members__email__delete",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Email"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project_key}": {
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Rename Project",
+        "description": "Give a project a readable name.\n\nDeclared *after* the member routes on purpose: `project_key` is a `:path`\nconverter, so registered first it would greedily match\n`/v1/projects/<key>/members/<email>` as a project named\n\"<key>/members/<email>\". The key itself never changes \u2014 it is the normalised\ngit remote, and changing it would split the team's memory in two.",
+        "operationId": "rename_project_v1_projects__project_key__patch",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/overview": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "Project Overview",
+        "description": "Everything the dashboard opens with, in one round trip.",
+        "operationId": "project_overview_v1_overview_get",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -1569,6 +1948,52 @@
         ],
         "title": "HealthResponse"
       },
+      "MeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "org_id"
+        ],
+        "title": "MeOut"
+      },
       "MemberOut": {
         "properties": {
           "user_id": {
@@ -1605,6 +2030,20 @@
           "email"
         ],
         "title": "MemberRequest"
+      },
+      "MemberRoleRequest": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "description": "member or admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "MemberRoleRequest"
       },
       "MembersResponse": {
         "properties": {
@@ -1674,6 +2113,62 @@
           "description"
         ],
         "title": "MemoryTypeOut"
+      },
+      "OverviewResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "memories": {
+            "type": "integer",
+            "title": "Memories",
+            "default": 0
+          },
+          "shared": {
+            "type": "integer",
+            "title": "Shared",
+            "default": 0
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions",
+            "default": 0
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members",
+            "default": 0
+          },
+          "skills": {
+            "type": "integer",
+            "title": "Skills",
+            "default": 0
+          },
+          "positive": {
+            "type": "integer",
+            "title": "Positive",
+            "default": 0
+          },
+          "negative": {
+            "type": "integer",
+            "title": "Negative",
+            "default": 0
+          },
+          "by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Type",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key"
+        ],
+        "title": "OverviewResponse"
       },
       "ProjectOut": {
         "properties": {
@@ -1812,6 +2307,30 @@
           "content"
         ],
         "title": "PublishSkillRequest"
+      },
+      "RenameMeRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "RenameMeRequest"
+      },
+      "RenameProjectRequest": {
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Display Name",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "RenameProjectRequest"
       },
       "SaveMemoryRequest": {
         "properties": {

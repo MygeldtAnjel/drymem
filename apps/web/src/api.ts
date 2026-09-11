@@ -4,6 +4,24 @@
  */
 
 const TOKEN_KEY = "drymem.token";
+const PROJECT_KEY = "drymem.project";
+
+/** The last project you were looking at. A convenience, never a source of truth. */
+export function rememberedProject(): string | null {
+  try {
+    return localStorage.getItem(PROJECT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function rememberProject(key: string): void {
+  try {
+    localStorage.setItem(PROJECT_KEY, key);
+  } catch {
+    /* private browsing: the choice simply will not persist */
+  }
+}
 
 export interface Project {
   id: string;
@@ -64,6 +82,39 @@ export interface Skill {
   model: string | null;
   memory_count: number;
   updated_at: string | null;
+}
+
+export interface Me {
+  id: string;
+  email: string;
+  name: string | null;
+  org_id: string;
+  created_at: string | null;
+}
+
+export interface Overview {
+  project_key: string;
+  memories: number;
+  shared: number;
+  sessions: number;
+  members: number;
+  skills: number;
+  positive: number;
+  negative: number;
+  by_type: Record<string, number>;
+}
+
+export interface Health {
+  status: string;
+  postgres: boolean;
+  neo4j: boolean;
+  extractor: string;
+}
+
+export interface MemorySchema {
+  types: Array<{ name: string; description: string }>;
+  sections: string[];
+  template: string;
 }
 
 export interface Cluster {
@@ -133,10 +184,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  health: () =>
-    request<{ status: string; postgres: boolean; neo4j: boolean; extractor: string }>(
-      "/healthz",
-    ),
+  health: () => request<Health>("/healthz"),
+
+  me: () => request<Me>("/v1/me"),
+
+  renameMe: (name: string) =>
+    request<Me>("/v1/me", { method: "PATCH", body: JSON.stringify({ name }) }),
+
+  schema: () => request<MemorySchema>("/v1/memories/schema"),
+
+  overview: (projectKey: string) => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    return request<Overview>(`/v1/overview?${q}`);
+  },
 
   projects: async (): Promise<Project[]> => {
     const data = await request<{ projects: Partial<Project>[] }>("/v1/projects");
@@ -190,6 +250,28 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email }),
     });
+    return data.members;
+  },
+
+  renameProject: (projectKey: string, displayName: string) =>
+    request<Project>(`/v1/projects/${projectKey}`, {
+      method: "PATCH",
+      body: JSON.stringify({ display_name: displayName }),
+    }),
+
+  setMemberRole: async (projectKey: string, email: string, role: string): Promise<Member[]> => {
+    const data = await request<{ members: Member[] }>(
+      `/v1/projects/${projectKey}/members/${encodeURIComponent(email)}`,
+      { method: "PATCH", body: JSON.stringify({ role }) },
+    );
+    return data.members;
+  },
+
+  removeMember: async (projectKey: string, email: string): Promise<Member[]> => {
+    const data = await request<{ members: Member[] }>(
+      `/v1/projects/${projectKey}/members/${encodeURIComponent(email)}`,
+      { method: "DELETE" },
+    );
     return data.members;
   },
 
