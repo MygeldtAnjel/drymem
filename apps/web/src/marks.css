@@ -8,7 +8,14 @@
 .mark--private { color: var(--sig-private); }
 .mark--team    { color: var(--sig-team); }
 .mark--live    { color: var(--sig-live); }
-.mark--struck  { color: var(--sig-struck); }
+/* A chip, not a tint: paper-on-oxblood is 7.90:1 and it is the binding. */
+.mark--struck {
+  color: var(--sig-struck);
+  background: var(--sig-struck-field);
+  border-radius: 2px;
+  padding: 1px;
+  box-sizing: content-box;
+}
 
 .mark-legend {
   display: flex;

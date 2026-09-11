@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, api, getToken, setToken, type Episode, type Fact, type Project } from "./api";
 import { Markdown } from "./Markdown";
-import { MarkLegend, ScopeMark, TreatmentMark } from "./Marks";
+import { MarkLegend, ScopeMark, TeamMark, TreatmentMark } from "./Marks";
 import { BackIcon, DeleteIcon, NotUsefulIcon, ShareIcon, UsefulIcon } from "./Icons";
 import { clock, firstLine, leaf, ratio, stem, when } from "./format";
 import { SignIn } from "./SignIn";
@@ -351,6 +351,31 @@ function Volume({ onSignOut }: { onSignOut: () => void }) {
   );
 }
 
+/**
+ * True once `key`'s element has scrolled out of its scroll container.
+ *
+ * Keyed on the entry, not just the ref: the first mount happens while no entry
+ * is selected, so the ref is still null and the effect returns early — and a
+ * ref's identity never changes, so it would never run again.
+ */
+function useScrolledPast(ref: React.RefObject<HTMLElement | null>, key: string | null): boolean {
+  const [past, setPast] = useState(false);
+
+  useEffect(() => {
+    setPast(false);
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setPast(!entry?.isIntersecting), {
+      root: el.closest(".page__sheet"),
+      threshold: 0,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, key]);
+
+  return past;
+}
+
 function Entry({
   episode,
   stamped,
@@ -368,6 +393,9 @@ function Entry({
   onBack: () => void;
   project?: Project;
 }) {
+  const headRef = useRef<HTMLElement>(null);
+  const scrolled = useScrolledPast(headRef, episode?.uuid ?? null);
+
   if (!episode) {
     return (
       <section className="page page--empty">
@@ -388,15 +416,19 @@ function Entry({
       </button>
 
       <div className="page__sheet">
-        {/* Running head: the topic key and its treatment stay visible once the
-            header scrolls away, so a several-screen body never loses its
-            place — a citator always shows which authority you are inside. */}
-        <div className="page__running" aria-hidden>
+        {/* Running head: appears only once the entry head has left the
+            viewport, so a several-screen body keeps its place without
+            repeating the title to itself at rest. */}
+        <div
+          className={`page__running${scrolled ? " page__running--on" : ""}`}
+          aria-hidden={!scrolled}
+        >
           <ScopeMark scope={episode.scope} />
           <span className="mono">{leaf(episode.name)}</span>
         </div>
 
-        <header className="page__head">
+        <div className="page__body">
+        <header className="page__head" ref={headRef}>
           <div className="page__signal">
             <ScopeMark scope={episode.scope} />
             <span className="legend">{episode.scope === "team" ? "Shared" : "Private"}</span>
@@ -409,6 +441,7 @@ function Entry({
         </header>
 
         <Markdown source={episode.content} />
+        </div>
       </div>
 
       <aside className="rail" aria-label="Actions">
@@ -424,14 +457,15 @@ function Entry({
         >
           <NotUsefulIcon /> Not useful
         </button>
-        <button
-          className="rail__btn"
-          onClick={onPromote}
-          disabled={episode.scope === "team"}
-          title={episode.scope === "team" ? "Already shared" : "Share with the project"}
-        >
-          <ShareIcon /> {episode.scope === "team" ? "Shared" : "Share"}
-        </button>
+        {episode.scope === "team" ? (
+          <p className="rail__state">
+            <TeamMark title="" /> Shared
+          </p>
+        ) : (
+          <button className="rail__btn" onClick={onPromote} title="Share with the project">
+            <ShareIcon /> Share
+          </button>
+        )}
         <button className="rail__btn rail__btn--danger" onClick={onDelete}>
           <DeleteIcon /> Delete
         </button>

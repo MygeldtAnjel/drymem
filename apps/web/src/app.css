@@ -63,6 +63,7 @@ select.index__project {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   background: var(--ink-900);
 }
 
@@ -117,6 +118,7 @@ select.index__project {
 
 .index__scroll {
   overflow-y: auto;
+  min-height: 0;
   padding: 0.5rem 0.5rem 2rem;
   flex: 1;
 }
@@ -205,7 +207,11 @@ select.index__project {
   font-size: 0.625rem;
 }
 .fact__struck {
-  color: var(--sig-struck);
+  color: var(--paper);
+  background: var(--sig-struck-field);
+  border-radius: 2px;
+  padding: 0 0.3125rem;
+  letter-spacing: 0.06em;
 }
 
 /* ─── the page ───────────────────────────────────────────────────────── */
@@ -215,6 +221,11 @@ select.index__project {
   grid-template-columns: 1fr auto;
   overflow: hidden;
   background: var(--ink-900);
+  /* A grid item's min-height is `auto`, so a several-screen memory stretched
+     this track past the viewport: the column barely scrolled, the entry head
+     never left, and prose ran under the running head. Everything in this
+     column that scrolls needs to be allowed to shrink. */
+  min-height: 0;
 }
 
 .page--empty {
@@ -226,27 +237,45 @@ select.index__project {
 /* India paper: cool and thin, never cream. The only lit surface here. */
 .page__sheet {
   overflow-y: auto;
-  padding: 3rem 3.5rem 6rem;
+  min-height: 0;
+  /* No top padding: a sticky element inside a padded scroll container is
+     constrained *below* that padding, so the running head could not reach the
+     edge and text scrolled through the gap above it. The inset lives on the
+     inner wrapper instead. */
+  padding: 0 0 6rem;
   background: var(--paper);
   color: var(--paper-ink);
   border-left: 1px solid var(--paper-edge);
   box-shadow: -18px 0 40px -24px rgb(0 0 0 / 0.85);
 }
 
+.page__body {
+  padding: 3rem 3.5rem 0;
+}
+
 .page__running {
   position: sticky;
-  top: -1px;
+  top: 0;
   z-index: 2;
   display: flex;
   align-items: center;
   gap: 0.4375rem;
-  margin: -3rem -3.5rem 2rem;
   padding: 0.625rem 3.5rem;
   background: color-mix(in srgb, var(--paper) 94%, transparent);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--paper-edge);
   color: var(--paper-ink-soft);
   font-size: 0.75rem;
+  /* R2: only in the running state. At rest it repeated the entry head. */
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.page__running--on {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
 
 .page__head {
@@ -398,9 +427,13 @@ select.index__project {
   background: var(--ink-800);
   color: var(--paper);
 }
-.rail__btn:disabled {
-  opacity: 0.45;
-  cursor: default;
+.rail__state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  font-size: var(--step-0);
+  color: var(--gilt);
 }
 .rail__btn--on {
   color: var(--gilt);
@@ -509,7 +542,9 @@ select.index__project {
   border-color: var(--ink-400);
 }
 .btn:disabled {
-  opacity: 0.45;
+  /* A colour, not a veil: 0.45 opacity put every disabled label under 2.2:1. */
+  color: var(--ink-400);
+  border-color: var(--ink-700);
   cursor: default;
 }
 .btn--gilt {
@@ -626,10 +661,12 @@ select.index__project {
     grid-template-columns: minmax(17rem, 23rem) 1fr;
   }
   .page__sheet {
-    padding: 2rem 2rem 5rem;
+    padding: 0 0 5rem;
+  }
+  .page__body {
+    padding: 2rem 2rem 0;
   }
   .page__running {
-    margin: -2rem -2rem 1.75rem;
     padding: 0.5rem 2rem;
   }
   .rail {
@@ -679,12 +716,14 @@ select.index__project {
     min-height: 0;
   }
   .page__sheet {
-    padding: 1.75rem 1.25rem 2rem;
+    padding: 0 0 2rem;
     border-left: none;
     box-shadow: none;
   }
+  .page__body {
+    padding: 1.75rem 1.25rem 0;
+  }
   .page__running {
-    margin: -1.75rem -1.25rem 1.5rem;
     padding: 0.5rem 1.25rem;
   }
   /* On a phone the rail becomes a footer bar — the actions stay reachable. */

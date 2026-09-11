@@ -18,7 +18,7 @@
   --ink-700: #5a6678;
   --ink-600: #626f82;
   --ink-400: #8b95a6;
-  --ink-300: #8d95a2;
+  --ink-300: #a3adbb;
   --ink-200: #b6bcc6;
 
   /* Binding and stamping. Used sparingly, like a spine. */
@@ -33,9 +33,14 @@
   --paper-ink: #15161a;
   --paper-ink-soft: #4c515c;
 
-  /* Treatment signals. Each pairs with a glyph; never used alone. */
+  /* Treatment signals. Each pairs with a glyph; never used alone.
+     The struck mark is set *on* the binding rather than in a lightened tint of
+     it: a light mark on an oxblood chip keeps the colour the world actually
+     names (#8c1d2c) at the one moment the world says it belongs, instead of
+     drifting to a rose that passes contrast but leaves the family. */
   --sig-live: #2f7d4f;
-  --sig-struck: #d4677a;
+  --sig-struck: var(--paper);
+  --sig-struck-field: #8c1d2c;
   --sig-team: #c8a951;
   --sig-private: #8b95a6;
 
