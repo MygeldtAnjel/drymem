@@ -43,6 +43,9 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-haiku-4-5"
+    # Drafting a skill is the one place model quality shows most, so this is
+    # a bigger model than extraction uses. Only reached when a key is set.
+    distill_model: str = "claude-opus-5"
 
     # Extra literals to redact, e.g. client names or internal hostnames.
     scrub_denylist: str = ""

@@ -233,3 +233,57 @@ export function sync(
   if (!options.dryRun) writeLock(project, { version: LOCK_VERSION, skills: lock.skills });
   return result;
 }
+
+
+/**
+ * Which recurring subjects have no skill covering them.
+ *
+ * The diff happens here, not on the server: only this machine knows what is in
+ * `.claude/skills/`, and a gap is defined by what is installed, not by what the
+ * server thinks ought to be.
+ *
+ * Matching is deliberately loose — a topic counts as covered if a skill's name
+ * or its description mentions it. A false "covered" costs a suggestion; a false
+ * "missing" costs someone's afternoon writing a skill that already exists.
+ */
+export function gaps(
+  clusters: Array<{ topic: string; memory_count: number }>,
+  project: string,
+  bundled: string | null = bundledSkillsDir(),
+): Array<{ topic: string; memory_count: number }> {
+  const haystack = installedText(project, bundled).toLowerCase();
+  return clusters.filter((c) => {
+    const topic = c.topic.toLowerCase().trim();
+    if (!topic) return false;
+    return !haystack.includes(topic);
+  });
+}
+
+/** Names and descriptions of every skill this project can reach. */
+function installedText(project: string, bundled: string | null): string {
+  const parts: string[] = [];
+  const dirs = [join(project, SKILLS_DIR), ...(bundled ? [bundled] : [])];
+
+  for (const root of dirs) {
+    if (!existsSync(root)) continue;
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      parts.push(entry.name.replace(/-/g, " "));
+      const skill = join(root, entry.name, "SKILL.md");
+      if (!existsSync(skill)) continue;
+      // The frontmatter says what a skill is for; the body is instructions and
+      // would match almost anything.
+      const head = readFileSync(skill, "utf8").split("---")[1] ?? "";
+      parts.push(head);
+    }
+  }
+  return parts.join("\n");
+}
+
+/** Write a draft where a person will find it, without installing it. */
+export function writeDraft(project: string, name: string, content: string): string {
+  const path = join(project, ".drymem", "drafts", `${name}.SKILL.md`);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, content.endsWith("\n") ? content : `${content}\n`);
+  return path;
+}

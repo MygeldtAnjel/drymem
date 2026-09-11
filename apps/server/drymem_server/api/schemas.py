@@ -131,6 +131,30 @@ class ProjectsResponse(BaseModel):
     projects: list[ProjectOut]
 
 
+class ClusterOut(BaseModel):
+    topic: str
+    memory_count: int
+    facts: list[str] = []
+
+
+class DiscoverResponse(BaseModel):
+    project_key: str
+    clusters: list[ClusterOut]
+
+
+class DistillRequest(BaseModel):
+    project_key: str
+    topic: str = Field(..., min_length=1)
+
+
+class DistillResponse(BaseModel):
+    topic: str
+    name: str
+    content: str
+    model: str
+    memory_count: int
+
+
 class HealthResponse(BaseModel):
     status: str
     postgres: bool

@@ -56,6 +56,20 @@ export interface ProjectOut {
 const READ_TIMEOUT_MS = 30_000;
 const WRITE_TIMEOUT_MS = 15 * 60_000;
 
+export interface Cluster {
+  topic: string;
+  memory_count: number;
+  facts: string[];
+}
+
+export interface DistilledSkill {
+  topic: string;
+  name: string;
+  content: string;
+  model: string;
+  memory_count: number;
+}
+
 export class DrymemError extends Error {
   constructor(
     message: string,
@@ -180,6 +194,22 @@ export class DrymemClient {
     await this.request(`/v1/memories/${episodeUuid}/feedback`, {
       method: "POST",
       body: JSON.stringify({ rating, query }),
+    });
+  }
+
+  /** Subjects the team's memories keep returning to. */
+  async discover(projectKey: string, minMemories = 2): Promise<Cluster[]> {
+    const data = await this.request<{ clusters: Cluster[] }>(
+      `/v1/skills/discover?${this.query({ project_key: projectKey, min_memories: minMemories })}`,
+    );
+    return data.clusters;
+  }
+
+  /** Draft a SKILL.md from the memories about a subject. Always a draft. */
+  async distill(projectKey: string, topic: string): Promise<DistilledSkill> {
+    return this.request<DistilledSkill>("/v1/skills/distill", {
+      method: "POST",
+      body: JSON.stringify({ project_key: projectKey, topic }),
     });
   }
 

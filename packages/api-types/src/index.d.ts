@@ -190,6 +190,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/skills/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover Skills
+         * @description Subjects the team's memories keep returning to.
+         *
+         *     Which of them lack a skill is decided by the client, which is the only side
+         *     that knows what is installed on this machine.
+         */
+        get: operations["discover_skills_v1_skills_discover_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/skills/distill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Distill Skill
+         * @description Draft a SKILL.md from the memories about a subject.
+         *
+         *     The result is a draft for a person to review, never something installed
+         *     automatically: a skill changes how every agent on the team behaves.
+         */
+        post: operations["distill_skill_v1_skills_distill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects": {
         parameters: {
             query?: never;
@@ -231,6 +277,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ClusterOut */
+        ClusterOut: {
+            /** Topic */
+            topic: string;
+            /** Memory Count */
+            memory_count: number;
+            /**
+             * Facts
+             * @default []
+             */
+            facts: string[];
+        };
         /** ContextResponse */
         ContextResponse: {
             /** Project Key */
@@ -244,6 +302,33 @@ export interface components {
             episode_uuid: string;
             /** Deleted */
             deleted: boolean;
+        };
+        /** DiscoverResponse */
+        DiscoverResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Clusters */
+            clusters: components["schemas"]["ClusterOut"][];
+        };
+        /** DistillRequest */
+        DistillRequest: {
+            /** Project Key */
+            project_key: string;
+            /** Topic */
+            topic: string;
+        };
+        /** DistillResponse */
+        DistillResponse: {
+            /** Topic */
+            topic: string;
+            /** Name */
+            name: string;
+            /** Content */
+            content: string;
+            /** Model */
+            model: string;
+            /** Memory Count */
+            memory_count: number;
         };
         /** EpisodeOut */
         EpisodeOut: {
@@ -821,6 +906,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_skills_v1_skills_discover_get: {
+        parameters: {
+            query: {
+                project_key: string;
+                min_memories?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    distill_skill_v1_skills_distill_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DistillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistillResponse"];
                 };
             };
             /** @description Validation Error */

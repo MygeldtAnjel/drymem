@@ -656,6 +656,137 @@
         }
       }
     },
+    "/v1/skills/discover": {
+      "get": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Discover Skills",
+        "description": "Subjects the team's memories keep returning to.\n\nWhich of them lack a skill is decided by the client, which is the only side\nthat knows what is installed on this machine.",
+        "operationId": "discover_skills_v1_skills_discover_get",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "min_memories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 2,
+              "title": "Min Memories"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoverResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/skills/distill": {
+      "post": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Distill Skill",
+        "description": "Draft a SKILL.md from the memories about a subject.\n\nThe result is a draft for a person to review, never something installed\nautomatically: a skill changes how every agent on the team behaves.",
+        "operationId": "distill_skill_v1_skills_distill_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DistillRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistillResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects": {
       "get": {
         "tags": [
@@ -730,6 +861,32 @@
   },
   "components": {
     "schemas": {
+      "ClusterOut": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "memory_count": {
+            "type": "integer",
+            "title": "Memory Count"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic",
+          "memory_count"
+        ],
+        "title": "ClusterOut"
+      },
       "ContextResponse": {
         "properties": {
           "project_key": {
@@ -768,6 +925,79 @@
           "deleted"
         ],
         "title": "DeleteResponse"
+      },
+      "DiscoverResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterOut"
+            },
+            "type": "array",
+            "title": "Clusters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "clusters"
+        ],
+        "title": "DiscoverResponse"
+      },
+      "DistillRequest": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "topic": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Topic"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "topic"
+        ],
+        "title": "DistillRequest"
+      },
+      "DistillResponse": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "memory_count": {
+            "type": "integer",
+            "title": "Memory Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic",
+          "name",
+          "content",
+          "model",
+          "memory_count"
+        ],
+        "title": "DistillResponse"
       },
       "EpisodeOut": {
         "properties": {

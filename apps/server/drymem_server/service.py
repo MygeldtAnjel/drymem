@@ -198,6 +198,29 @@ class MemoryService:
             if ep.name == topic_key or ep.name.startswith(f"{topic_key}/update-")
         ]
 
+    async def discover(self, *, project_key: str, min_memories: int) -> list[dict]:
+        """Subjects this project's memories keep returning to."""
+        from drymem_server.discover import clusters_for
+
+        groups = await self.readable_groups(project_key)
+        members = await self.members(project_key=project_key) or []
+        people = [u.email for u, _ in members] + [u.name for u, _ in members if u.name]
+        return [
+            c.as_dict()
+            for c in await clusters_for(groups, min_memories=min_memories, people=people)
+        ]
+
+    async def distill(self, *, project_key: str, topic: str):
+        """Draft a skill from the memories about `topic`. Returns None if there are none."""
+        from drymem_server.discover import memories_about
+        from drymem_server.distill import draft_skill
+
+        groups = await self.readable_groups(project_key)
+        memories = await memories_about(groups, topic)
+        if not memories:
+            return None
+        return await draft_skill(topic, memories)
+
     async def topic_keys(self, *, project_key: str) -> list[str]:
         """Every topic key this caller has already stored in a project.
 

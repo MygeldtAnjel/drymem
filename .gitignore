@@ -12,3 +12,6 @@ __pycache__/
 apps/server/.venv/
 node_modules/
 apps/cli/dist/
+
+# Skill drafts are working files; the lock file is not
+.drymem/drafts/

@@ -8,8 +8,12 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from drymem_server.api.deps import PrincipalDep, ServiceDep, SessionDep, get_store
 from drymem_server.api.schemas import (
+    ClusterOut,
     ContextResponse,
     DeleteResponse,
+    DiscoverResponse,
+    DistillRequest,
+    DistillResponse,
     EpisodeOut,
     FactOut,
     FeedbackRequest,
@@ -216,6 +220,45 @@ async def add_member(project_key: str, body: MemberRequest, service: ServiceDep)
     return MembersResponse(
         project_key=project_key,
         members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
+    )
+
+
+@router.get("/v1/skills/discover", response_model=DiscoverResponse, tags=["skills"])
+async def discover_skills(
+    service: ServiceDep,
+    project_key: str = Query(...),
+    min_memories: int = Query(2, ge=1, le=50),
+) -> DiscoverResponse:
+    """Subjects the team's memories keep returning to.
+
+    Which of them lack a skill is decided by the client, which is the only side
+    that knows what is installed on this machine.
+    """
+    clusters = await service.discover(project_key=project_key, min_memories=min_memories)
+    return DiscoverResponse(project_key=project_key, clusters=[ClusterOut(**c) for c in clusters])
+
+
+@router.post("/v1/skills/distill", response_model=DistillResponse, tags=["skills"])
+async def distill_skill(body: DistillRequest, service: ServiceDep) -> DistillResponse:
+    """Draft a SKILL.md from the memories about a subject.
+
+    The result is a draft for a person to review, never something installed
+    automatically: a skill changes how every agent on the team behaves.
+    """
+    try:
+        draft = await service.distill(project_key=body.project_key, topic=body.topic)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    if draft is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"No memories about {body.topic!r} to write from."
+        )
+    return DistillResponse(
+        topic=draft.topic,
+        name=draft.name,
+        content=draft.content,
+        model=draft.model,
+        memory_count=draft.memory_count,
     )
 
 

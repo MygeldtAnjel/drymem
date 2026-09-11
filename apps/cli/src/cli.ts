@@ -22,7 +22,7 @@ Usage
   npx drymem save <summary>       Save a memory for the current project
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
-  npx drymem skills <cmd>         list | status | sync  (installs .claude/skills/)
+  npx drymem skills <cmd>         list | status | sync | discover | distill <topic>
   npx drymem import <source>      Backfill memories the team already wrote down
                                   (claude-memory, git, docs, ecc, engram; --dry-run to preview)
   npx drymem promote <episode-id> Share a memory with the project's members
@@ -191,7 +191,46 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
 
-      fail(`Unknown skills command: ${sub}. Try list, status or sync.`);
+      if (sub === "discover") {
+        const { gaps } = await import("./skills.js");
+        const client = new DrymemClient(requireConfig());
+        const key = resolveProjectKey(process.cwd());
+        const clusters = await client.discover(key, Number(rest[1] ?? 2));
+
+        if (clusters.length === 0) {
+          console.log("Nothing recurs yet. Discover needs memories to work from.");
+          return 0;
+        }
+        const missing = gaps(clusters, process.cwd());
+        console.log(`  ${clusters.length} recurring subject(s), ${missing.length} with no skill:\n`);
+        for (const c of missing) {
+          console.log(`  ${String(c.memory_count).padStart(3)} memories  ${c.topic}`);
+        }
+        if (missing.length > 0) {
+          console.log(`\n  Draft one:  npx drymem skills distill "${missing[0]?.topic}"`);
+        }
+        return 0;
+      }
+
+      if (sub === "distill") {
+        const { writeDraft } = await import("./skills.js");
+        const topic = rest.slice(1).filter((a) => !a.startsWith("--")).join(" ").trim();
+        if (!topic) fail('Which subject? e.g. npx drymem skills distill "payments"');
+
+        const client = new DrymemClient(requireConfig());
+        const key = resolveProjectKey(process.cwd());
+        console.log(`Drafting a skill for "${topic}"…`);
+        const draft = await client.distill(key, topic);
+        const path = writeDraft(process.cwd(), draft.name, draft.content);
+
+        console.log(`\n  Drafted from ${draft.memory_count} memories using ${draft.model}`);
+        console.log(`  ${path}`);
+        console.log(`\n  This is a draft, not an installed skill. Read it, edit it, and`);
+        console.log(`  move it to ${SKILLS_DIR}/${draft.name}/SKILL.md if it earns its place.`);
+        return 0;
+      }
+
+      fail(`Unknown skills command: ${sub}. Try list, status, sync, discover or distill.`);
       return 1;
     }
 

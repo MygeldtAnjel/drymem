@@ -18,8 +18,10 @@ import {
   availableSkills,
   hashSkill,
   readLock,
+  gaps,
   statusOf,
   sync,
+  writeDraft,
 } from "../src/skills.js";
 
 const VERSION = "2.1.0";
@@ -222,5 +224,68 @@ describe("the real bundled set", () => {
     expect(names).toContain("tdd");
     expect(names).toContain("grilling");
     expect(names.length).toBeGreaterThanOrEqual(18);
+  });
+});
+
+describe("gaps", () => {
+  it("hides a subject an installed skill already covers", () => {
+    sync(project, VERSION, { bundled });
+    const found = gaps([{ topic: "tdd", memory_count: 5 }], project, bundled);
+
+    expect(found).toEqual([]);
+  });
+
+  it("surfaces a subject nothing covers", () => {
+    sync(project, VERSION, { bundled });
+    const found = gaps([{ topic: "Adyen", memory_count: 5 }], project, bundled);
+
+    expect(found.map((g) => g.topic)).toEqual(["Adyen"]);
+  });
+
+  it("matches a skill's description, not just its name", () => {
+    // `code-review` is named for the activity; a memory cluster about "review"
+    // should not be reported as uncovered.
+    writeFileSync(
+      join(bundled, "code-review", "SKILL.md"),
+      "---\nname: code-review\ndescription: Review a branch against the spec.\n---\n\nDo it.",
+    );
+    sync(project, VERSION, { bundled });
+
+    expect(gaps([{ topic: "spec", memory_count: 3 }], project, bundled)).toEqual([]);
+  });
+
+  it("counts a skill the team wrote themselves as coverage", () => {
+    makeSkill(
+      join(project, SKILLS_DIR),
+      "adyen-quirks",
+      "---\nname: adyen-quirks\ndescription: Adyen's authorisation rules.\n---\n\nours",
+    );
+
+    expect(gaps([{ topic: "adyen", memory_count: 9 }], project, bundled)).toEqual([]);
+  });
+
+  it("ignores an empty topic", () => {
+    expect(gaps([{ topic: "  ", memory_count: 3 }], project, bundled)).toEqual([]);
+  });
+
+  it("is case insensitive", () => {
+    sync(project, VERSION, { bundled });
+    expect(gaps([{ topic: "TDD", memory_count: 4 }], project, bundled)).toEqual([]);
+  });
+});
+
+describe("writeDraft", () => {
+  it("writes where a person will find it, and does not install it", () => {
+    const path = writeDraft(project, "adyen", "---\nname: adyen\n---\n\nbody");
+
+    expect(path).toContain(join(".drymem", "drafts"));
+    expect(readFileSync(path, "utf8")).toContain("name: adyen");
+    // The critical part: a draft must not become an active skill by itself.
+    expect(existsSync(join(project, SKILLS_DIR, "adyen"))).toBe(false);
+  });
+
+  it("ends the file with a newline", () => {
+    const path = writeDraft(project, "x", "no trailing newline");
+    expect(readFileSync(path, "utf8").endsWith("\n")).toBe(true);
   });
 });
