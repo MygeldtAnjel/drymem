@@ -11,7 +11,7 @@ import argparse
 import asyncio
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from drymem_server.auth import create_token
 from drymem_server.db.models import ApiToken, Memory, Org, Project, ProjectMember, User
@@ -341,6 +341,92 @@ async def stats(days: int) -> int:
     return 0
 
 
+async def user_rename(old: str, new: str) -> int:
+    """Change a user's email everywhere it is recorded.
+
+    Two stores hold it. Postgres holds the row, and Neo4j holds a copy inside
+    every episode's `source_description` because that metadata has to survive a
+    database that is not there. Changing one and not the other would leave a
+    person's own memories attributed to an address that no longer exists.
+
+    Tokens survive: they are keyed on the user's id, not their email.
+    """
+    from drymem_server.graph import get_graphiti
+
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        user = (await session.execute(select(User).where(User.email == old))).scalar_one_or_none()
+        if user is None:
+            print(f"No user with email {old!r}.", file=sys.stderr)
+            return 1
+
+        clash = (
+            await session.execute(select(User).where(User.email == new, User.org_id == user.org_id))
+        ).scalar_one_or_none()
+        if clash is not None:
+            print(f"{new!r} is already taken in this org.", file=sys.stderr)
+            return 1
+
+        user.email = new
+        await session.commit()
+
+    graphiti = await get_graphiti()
+    updated = await graphiti.driver.execute_query(
+        """
+        MATCH (e:Episodic)
+        WHERE e.source_description CONTAINS $old
+        SET e.source_description = replace(e.source_description, $old, $new)
+        RETURN count(e) AS n
+        """,
+        old=old,
+        new=new,
+    )
+    episodes = _row_count(updated)
+
+    print(f"Renamed {old} -> {new}")
+    print(f"  episodes re-attributed: {episodes}")
+    print("  tokens still work: they are keyed on the user id, not the email.")
+    return 0
+
+
+def _row_count(result: object) -> int:
+    """Graphiti returns the driver's own result shape, which differs by version."""
+    records = result[0] if isinstance(result, tuple) else result
+    for record in records or []:
+        try:
+            return int(record["n"])
+        except (KeyError, TypeError, ValueError):
+            return 0
+    return 0
+
+
+async def user_delete(email: str) -> int:
+    """Remove a user, their tokens, their memberships and their index rows.
+
+    Their episodes stay in the graph — deleting them would need every uuid, and
+    an orphaned episode in a group nobody reads is far safer than a half-finished
+    delete. `migrate-scopes` and `backfill` can both be re-run afterwards.
+    """
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if user is None:
+            print(f"No user with email {email!r}.", file=sys.stderr)
+            return 1
+
+        memories = (
+            await session.execute(select(func.count(Memory.id)).where(Memory.author_id == user.id))
+        ).scalar() or 0
+        await session.delete(user)
+        await session.commit()
+
+    print(f"Deleted {email}")
+    print(f"  index rows removed: {memories}")
+    if memories:
+        print("  their episodes remain in the graph, in a group nobody now reads.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -349,6 +435,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("email")
     p.add_argument("--org", required=True)
     p.add_argument("--name")
+
+    p = sub.add_parser("user-rename", help="Change a user's email, in both stores")
+    p.add_argument("old")
+    p.add_argument("new")
+
+    p = sub.add_parser("user-delete", help="Remove a user, their tokens and their index rows")
+    p.add_argument("email")
 
     p = sub.add_parser("token-create", help="Issue an API token (shown once)")
     p.add_argument("email")
@@ -370,6 +463,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "user-create":
         return asyncio.run(user_create(args.email, args.org, args.name))
+    if args.command == "user-rename":
+        return asyncio.run(user_rename(args.old, args.new))
+    if args.command == "user-delete":
+        return asyncio.run(user_delete(args.email))
     if args.command == "token-create":
         return asyncio.run(token_create(args.email, args.label))
     if args.command == "backfill":

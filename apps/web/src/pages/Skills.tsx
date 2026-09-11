@@ -33,6 +33,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import type { Cluster, Skill } from "@/api";
 import { count, relative } from "@/format";
+import { frontmatter } from "@/memory";
 
 export type Draft = { name: string; content: string; model: string; memory_count: number };
 
@@ -65,6 +66,7 @@ export function SkillsPage({
 
   const openSkill = open?.kind === "skill" ? skills.find((s) => s.name === open.key) : undefined;
   const openDraft = open?.kind === "draft" ? drafts[open.key] : undefined;
+  const document = frontmatter(openSkill?.content ?? openDraft?.content ?? "");
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,7 +177,7 @@ export function SkillsPage({
 
       {/* Reading a skill is reading a document, so it gets the whole width. */}
       <Dialog open={Boolean(openSkill || openDraft)} onOpenChange={(o) => !o && onOpen(null)}>
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-h-[85vh] gap-3 overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="font-mono">
               {openSkill?.name ?? openDraft?.name ?? "Skill"}
@@ -187,10 +189,13 @@ export function SkillsPage({
                   ? `Draft written by ${openDraft.model} from ${count(openDraft.memory_count, "memory", "memories")}. Read it before publishing — nothing is installed until you do.`
                   : ""}
             </DialogDescription>
+            {document.meta.description && (
+              <p className="text-sm text-foreground">{document.meta.description}</p>
+            )}
           </DialogHeader>
 
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <Markdown source={openSkill?.content ?? openDraft?.content ?? ""} />
+          <div className="min-w-0 rounded-lg border bg-muted/20 p-4">
+            <Markdown source={document.body} />
           </div>
 
           <DialogFooter>

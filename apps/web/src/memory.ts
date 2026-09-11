@@ -90,3 +90,34 @@ export const MEMORY_TYPES: Record<string, string> = {
 
 /** Kept as an alias because chips and filters both read it. */
 export const TYPES = MEMORY_TYPES;
+
+
+/**
+ * Split a SKILL.md's YAML frontmatter off its body.
+ *
+ * A skill file carries `name` and `description` at the top for the agent that
+ * installs it. Rendering that block as prose put two horizontal rules and a
+ * pair of `key: value` lines above every skill a person opened — machine
+ * metadata shown to a human because nobody told it not to.
+ */
+export function frontmatter(source: string): {
+  meta: Record<string, string>;
+  body: string;
+} {
+  const lines = source.split("\n");
+  if (lines[0]?.trim() !== "---") return { meta: {}, body: source };
+
+  const close = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
+  if (close < 1) return { meta: {}, body: source };
+
+  const meta: Record<string, string> = {};
+  for (const line of lines.slice(1, close)) {
+    const at = line.indexOf(":");
+    if (at > 0) meta[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+  }
+  // A second `---` immediately after is a rule the model added, not a divider
+  // anyone wants at the top of the page.
+  const rest = lines.slice(close + 1);
+  while (rest.length > 0 && (rest[0]!.trim() === "" || rest[0]!.trim() === "---")) rest.shift();
+  return { meta, body: rest.join("\n") };
+}

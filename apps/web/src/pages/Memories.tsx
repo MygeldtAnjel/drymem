@@ -281,7 +281,7 @@ export function MemoryDetail({
             </div>
             <CardTitle className="text-lg leading-snug">{title}</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-6">
+          <CardContent className="flex min-w-0 flex-col gap-6">
             {lead && <Markdown source={lead} />}
             {body.map((section, i) => (
               <section key={`${section.heading}-${i}`} className="flex flex-col gap-2">

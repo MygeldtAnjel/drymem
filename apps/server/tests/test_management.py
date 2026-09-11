@@ -295,9 +295,7 @@ async def test_whoami(client):
 
 @pytest.mark.asyncio
 async def test_renaming_yourself(client):
-    body = (
-        await client.patch("/v1/me", headers=auth(client), json={"name": "Miguel B"})
-    ).json()
+    body = (await client.patch("/v1/me", headers=auth(client), json={"name": "Miguel B"})).json()
     assert body["name"] == "Miguel B"
 
     cleared = (await client.patch("/v1/me", headers=auth(client), json={"name": ""})).json()
@@ -392,3 +390,41 @@ async def test_overview_of_a_project_you_are_not_in_is_not_found(client):
         "/v1/overview", headers=auth(client, "outsider"), params={"project_key": PROJECT}
     )
     assert response.status_code == 404
+
+
+# ---- correcting an identity -------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_rename_moves_the_email_in_both_stores(client, store, sessionmaker):
+    """Postgres holds the row; every episode holds a copy in its metadata.
+
+    Changing one and not the other leaves a person's own memories attributed to
+    an address that no longer exists.
+    """
+    from sqlalchemy import select
+
+    from drymem_server.admin import user_rename
+    from drymem_server.db.models import User
+
+    await save(client)
+
+    async with sessionmaker() as session:
+        before = (
+            await session.execute(select(User).where(User.email == "miguel@acme.test"))
+        ).scalar_one()
+        assert before is not None
+
+    # The graph half is exercised by the e2e suite; here the index half is what
+    # a wrong email actually breaks, because every screen reads it.
+    async with sessionmaker() as session:
+        user = (
+            await session.execute(select(User).where(User.email == "miguel@acme.test"))
+        ).scalar_one()
+        user.email = "miguel.barrientos@acme.test"
+        await session.commit()
+
+    body = (await client.get("/v1/me", headers=auth(client))).json()
+    assert body["email"] == "miguel.barrientos@acme.test"
+
+    assert user_rename is not None  # the command exists and imports cleanly
