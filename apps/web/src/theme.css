@@ -1,0 +1,142 @@
+/*
+ * Still Good Law — the world.
+ *
+ * A citator asks one question of every authority: does it still stand? drymem
+ * asks the same of every memory. So the surface is a reference volume open
+ * under a lamp: cool near-black around it, India paper where you read, gilt
+ * only where a spine would be stamped, oxblood only where something is struck.
+ *
+ * State is carried by a MARK first and colour second — an open ring, a filled
+ * disc, an upright bar, a struck bar. Colour is confirmation, never the message.
+ */
+
+:root {
+  /* Chrome — law library at night. Cool, never warm. */
+  --ink-900: #101318;
+  --ink-850: #171a1f;
+  --ink-800: #1d2127;
+  --ink-700: #5a6678;
+  --ink-600: #626f82;
+  --ink-400: #8b95a6;
+  --ink-300: #8d95a2;
+  --ink-200: #b6bcc6;
+
+  /* Binding and stamping. Used sparingly, like a spine. */
+  --oxblood: #8c1d2c;
+  --oxblood-bright: #d4677a;
+  --gilt: #c8a951;
+  --gilt-dim: #8a7439;
+
+  /* The page. India paper: thin, cool, never cream. */
+  --paper: #f1f0ea;
+  --paper-edge: #dedcd2;
+  --paper-ink: #15161a;
+  --paper-ink-soft: #4c515c;
+
+  /* Treatment signals. Each pairs with a glyph; never used alone. */
+  --sig-live: #2f7d4f;
+  --sig-struck: #d4677a;
+  --sig-team: #c8a951;
+  --sig-private: #8b95a6;
+
+  --measure: 66ch;
+  --rail: 3px;
+
+  --step-0: 0.8125rem;
+  --step-1: 0.9375rem;
+  --step-2: 1.0625rem;
+  --step-3: 1.375rem;
+  --step-4: 1.875rem;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, monospace;
+  --serif: "Spectral", Iowan Old Style, Charter, Georgia, serif;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ink-900);
+  color: var(--ink-200);
+  font-family: var(--sans);
+  font-size: var(--step-1);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A legend, not a label: small caps carry the chrome's voice throughout. */
+.legend {
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  font-weight: 600;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gilt);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Gilt is 1.99:1 on India paper — invisible exactly where prose links live. */
+.page__sheet :focus-visible,
+.prose :focus-visible {
+  outline-color: var(--oxblood);
+}
+
+::selection {
+  background: var(--gilt);
+  color: var(--ink-900);
+}
+
+/* Scrollbars belong to the cabinet, not the browser. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-600) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--ink-600);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

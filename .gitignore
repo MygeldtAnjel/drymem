@@ -15,3 +15,6 @@ apps/cli/dist/
 
 # Skill drafts are working files; the lock file is not
 .drymem/drafts/
+
+# Review captures are regenerated; the design records are not
+.impeccable/review/

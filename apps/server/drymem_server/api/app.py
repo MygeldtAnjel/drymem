@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from drymem_server.api.routes import router
+
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 DESCRIPTION = """
 Shared long-term memory for AI coding agents.
@@ -22,7 +28,25 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
     app.include_router(router)
+    _serve_web(app)
     return app
+
+
+def _serve_web(app: FastAPI) -> None:
+    """Serve the browser UI from this same origin.
+
+    One origin means no CORS, no second deployment, and no third-party host —
+    which matters for a product whose pitch is that nothing leaves the network.
+    Mounted last so it can never shadow an API route.
+    """
+    if not WEB_DIR.is_dir():
+        return  # server running without a built UI; the API still works
+
+    app.mount("/assets", StaticFiles(directory=WEB_DIR / "assets"), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def index() -> FileResponse:
+        return FileResponse(WEB_DIR / "index.html")
 
 
 app = create_app()

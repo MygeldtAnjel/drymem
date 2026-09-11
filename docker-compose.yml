@@ -36,7 +36,9 @@ services:
       - drymem_pg_data:/var/lib/postgresql/data
 
   server:
-    build: ./apps/server
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
     container_name: drymem-server
     restart: unless-stopped
     # Host networking so the server can reach Ollama, which listens on the
