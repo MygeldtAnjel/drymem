@@ -141,8 +141,24 @@ def sanitize_group_id(project_key: str) -> str:
 
 
 def group_id_for(cwd: str | Path) -> str:
-    """The group id a memory saved from `cwd` belongs in."""
+    """The unscoped group id. Pre-3A memories live here; new writes do not."""
     return sanitize_group_id(resolve_project_key(cwd))
+
+
+def group_id_team(project_key: str) -> str:
+    """Where promoted memories live. Every project member reads this."""
+    return sanitize_group_id(f"{project_key}/team")
+
+
+def group_id_private(project_key: str, user_id: object) -> str:
+    """Where one person's unshared memories live.
+
+    Eight hex of the user's uuid, not the whole thing: a full uuid pushes the id
+    past the 60-char cap into the hash branch, which is deterministic but
+    unreadable for anyone debugging against Neo4j directly. Eight hex is 4
+    billion values inside a single project.
+    """
+    return sanitize_group_id(f"{project_key}/u/{str(user_id).replace('-', '')[:8]}")
 
 
 def resolve_author(cwd: str | Path) -> str:

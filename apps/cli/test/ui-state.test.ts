@@ -195,8 +195,29 @@ describe("detail", () => {
     expect(press(open(), "d").screen).toBe("confirmDelete");
   });
 
-  it("p explains that promotion is not here yet", () => {
-    expect(press(open(), "p").status).toContain("step 3A");
+  it("p shares a private memory", () => {
+    const before = open();
+    expect(effectFor(before, press(before, "p"), "p")).toEqual({
+      type: "promote",
+      episodeUuid: "u1",
+    });
+  });
+
+  it("p on an already-shared memory says so instead of re-sharing", () => {
+    const before = open();
+    const shared = { ...before, selected: { ...before.selected!, scope: "team" } };
+
+    expect(press(shared, "p").status).toBe("Already shared with the team.");
+    expect(effectFor(shared, press(shared, "p"), "p")).toBeNull();
+  });
+
+  it("promotion marks the memory in the list and the detail view", () => {
+    const state = reduce(open(), { type: "promoted", episodeUuid: "u1" });
+
+    expect(state.selected?.scope).toBe("team");
+    expect(state.episodes.find((e) => e.uuid === "u1")?.scope).toBe("team");
+    expect(state.episodes.find((e) => e.uuid === "u2")?.scope).toBe("private");
+    expect(state.status).toBe("Shared with the team");
   });
 
   it("records a rating", () => {

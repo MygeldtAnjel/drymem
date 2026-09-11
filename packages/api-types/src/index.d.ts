@@ -126,6 +126,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/memories/{episode_uuid}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Memory
+         * @description Share a memory with the project's members.
+         *
+         *     Only your own memory, and only into a project you belong to. Promoting an
+         *     already-promoted memory succeeds without duplicating it, so a retry is safe.
+         */
+        post: operations["promote_memory_v1_memories__episode_uuid__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/{project_key}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Members */
+        get: operations["list_members_v1_projects__project_key__members_get"];
+        put?: never;
+        /**
+         * Add Member
+         * @description Add someone to a project. They see its team memories, never its private ones.
+         */
+        post: operations["add_member_v1_projects__project_key__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects": {
         parameters: {
             query?: never;
@@ -252,6 +296,30 @@ export interface components {
             /** Extractor */
             extractor: string;
         };
+        /** MemberOut */
+        MemberOut: {
+            /** User Id */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Role */
+            role: string;
+        };
+        /** MemberRequest */
+        MemberRequest: {
+            /**
+             * Email
+             * @description An existing user in this org
+             */
+            email: string;
+        };
+        /** MembersResponse */
+        MembersResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Members */
+            members: components["schemas"]["MemberOut"][];
+        };
         /** ProjectOut */
         ProjectOut: {
             /** Id */
@@ -280,6 +348,15 @@ export interface components {
         ProjectsResponse: {
             /** Projects */
             projects: components["schemas"]["ProjectOut"][];
+        };
+        /** PromoteResponse */
+        PromoteResponse: {
+            /** Episode Uuid */
+            episode_uuid: string;
+            /** Scope */
+            scope: string;
+            /** Promoted At */
+            promoted_at?: string | null;
         };
         /** SaveMemoryRequest */
         SaveMemoryRequest: {
@@ -581,6 +658,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeedbackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_memory_v1_memories__episode_uuid__promote_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                episode_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_v1_projects__project_key__members_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                project_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_v1_projects__project_key__members_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                project_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersResponse"];
                 };
             };
             /** @description Validation Error */

@@ -167,6 +167,93 @@ async def backfill(project_key: str, email: str) -> int:
     return 0
 
 
+async def migrate_scopes(project_key: str) -> int:
+    """Move pre-3A memories out of the unscoped group into their author's.
+
+    Each episode's author is in Postgres, so this moves them precisely rather
+    than guessing. Until it runs, a project with more than one member simply
+    stops reading the unscoped group (see `MemoryService.readable_groups`) — the
+    memories are not lost, just not shown, which is the safe failure.
+
+    Idempotent, and an episode with no index row is reported rather than moved:
+    without a row there is nothing that says whose it is.
+    """
+    import os
+
+    from neo4j import AsyncGraphDatabase
+
+    from drymem_server.identity import group_id_private, sanitize_group_id
+
+    legacy = sanitize_group_id(project_key)
+    factory = sessionmaker_for(settings.database_url)
+
+    async with factory() as session:
+        project = (
+            await session.execute(select(Project).where(Project.project_key == project_key))
+        ).scalar_one_or_none()
+        if project is None:
+            print(f"No such project: {project_key}", file=sys.stderr)
+            return 1
+
+        rows = (
+            await session.execute(
+                select(Memory.episode_uuid, Memory.author_id).where(Memory.project_id == project.id)
+            )
+        ).all()
+        owner = {uuid: author for uuid, author in rows}
+
+    driver = AsyncGraphDatabase.driver(
+        os.getenv("NEO4J_URI", settings.neo4j_uri),
+        auth=(settings.neo4j_user, settings.neo4j_password),
+    )
+    moved = orphaned = 0
+    try:
+        async with driver.session() as neo:
+            result = await neo.run(
+                "MATCH (e:Episodic) WHERE e.group_id = $g RETURN e.uuid AS uuid", g=legacy
+            )
+            uuids = [record["uuid"] async for record in result]
+
+            for uuid in uuids:
+                author = owner.get(uuid)
+                if author is None:
+                    orphaned += 1
+                    continue
+                target = group_id_private(project_key, author)
+                await neo.run(
+                    "MATCH (n) WHERE n.group_id = $old AND n.uuid = $uuid SET n.group_id = $new",
+                    old=legacy,
+                    uuid=uuid,
+                    new=target,
+                )
+                moved += 1
+
+            # Entities and relationships in the legacy group belong to whoever
+            # owns the episodes there. With one author they move wholesale; with
+            # several they are left alone rather than guessed at.
+            authors = {owner[u] for u in uuids if u in owner}
+            if len(authors) == 1:
+                target = group_id_private(project_key, next(iter(authors)))
+                await neo.run(
+                    "MATCH (n) WHERE n.group_id = $old SET n.group_id = $new",
+                    old=legacy,
+                    new=target,
+                )
+                await neo.run(
+                    "MATCH ()-[r]->() WHERE r.group_id = $old SET r.group_id = $new",
+                    old=legacy,
+                    new=target,
+                )
+    finally:
+        await driver.close()
+
+    print(f"Moved {moved} episode(s) out of {legacy}")
+    if orphaned:
+        print(f"  {orphaned} left in place — no index row, so no known author.", file=sys.stderr)
+        print("  Run `drymem-admin backfill` first to give them one.", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -187,6 +274,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("project_key")
     p.add_argument("--as", dest="email", required=True, help="Attribute them to this user")
 
+    p = sub.add_parser("migrate-scopes", help="Move pre-3A memories into their author's group")
+    p.add_argument("project_key")
+
     args = parser.parse_args(argv)
     if args.command == "user-create":
         return asyncio.run(user_create(args.email, args.org, args.name))
@@ -194,6 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(token_create(args.email, args.label))
     if args.command == "backfill":
         return asyncio.run(backfill(args.project_key, args.email))
+    if args.command == "migrate-scopes":
+        return asyncio.run(migrate_scopes(args.project_key))
     return asyncio.run(token_revoke(args.label))
 
 

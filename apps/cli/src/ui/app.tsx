@@ -27,7 +27,7 @@ import {
 } from "./state.js";
 
 export interface AppProps {
-  client: Pick<DrymemClient, "projects" | "context" | "search" | "delete" | "rate">;
+  client: Pick<DrymemClient, "projects" | "context" | "search" | "delete" | "rate" | "promote">;
   projectKey: string;
   /** Test seam: lets a test drive the reducer without a real terminal. */
   onState?: (state: State) => void;
@@ -57,6 +57,11 @@ export function App({ client, projectKey, onState }: AppProps) {
           case "rate": {
             await client.rate(effect.episodeUuid, effect.rating, effect.query);
             dispatch({ type: "rated", episodeUuid: effect.episodeUuid, rating: effect.rating });
+            return;
+          }
+          case "promote": {
+            await client.promote(effect.episodeUuid);
+            dispatch({ type: "promoted", episodeUuid: effect.episodeUuid });
             return;
           }
           case "delete": {

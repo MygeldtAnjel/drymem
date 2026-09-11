@@ -44,6 +44,7 @@ type FakeClient = AppProps["client"] & {
   search: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
   rate: ReturnType<typeof vi.fn>;
+  promote: ReturnType<typeof vi.fn>;
 };
 
 function fakeClient(overrides: Partial<Record<string, unknown>> = {}): FakeClient {
@@ -53,6 +54,7 @@ function fakeClient(overrides: Partial<Record<string, unknown>> = {}): FakeClien
     search: vi.fn().mockResolvedValue([superseded]),
     delete: vi.fn().mockResolvedValue(true),
     rate: vi.fn().mockResolvedValue(undefined),
+    promote: vi.fn().mockResolvedValue({ scope: "team" }),
     ...overrides,
   } as unknown as FakeClient;
 }
@@ -242,5 +244,25 @@ describe("version skew", () => {
 
     expect(frame).not.toContain("NaN");
     expect(frame).toContain("no ratings yet");
+  });
+});
+
+describe("sharing", () => {
+  it("p shares the memory and marks it in the list", async () => {
+    const client = fakeClient();
+    const { stdin, lastFrame } = await mount(client);
+    stdin.write("r");
+    await settle();
+    stdin.write("\r");
+    await settle();
+    stdin.write("p");
+    await settle();
+
+    expect(client.promote).toHaveBeenCalledWith("u1");
+    expect(lastFrame()).toContain("Shared with the team");
+
+    stdin.write("\u001b");
+    await settle();
+    expect(lastFrame()).toContain("[team]");
   });
 });

@@ -135,6 +135,13 @@ export class DrymemClient {
     return data.deleted;
   }
 
+  /** Share a memory with the project's members. A copy — the original stays private. */
+  async promote(episodeUuid: string): Promise<{ scope: string }> {
+    return this.request<{ scope: string }>(`/v1/memories/${episodeUuid}/promote`, {
+      method: "POST",
+    });
+  }
+
   /** Record whether a retrieved memory was useful. `query` is what surfaced it. */
   async rate(episodeUuid: string, rating: 1 | -1, query = ""): Promise<void> {
     await this.request(`/v1/memories/${episodeUuid}/feedback`, {

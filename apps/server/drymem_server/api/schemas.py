@@ -92,6 +92,27 @@ class FeedbackResponse(BaseModel):
     query: str
 
 
+class PromoteResponse(BaseModel):
+    episode_uuid: str
+    scope: str
+    promoted_at: datetime | None = None
+
+
+class MemberRequest(BaseModel):
+    email: str = Field(..., description="An existing user in this org")
+
+
+class MemberOut(BaseModel):
+    user_id: str
+    email: str
+    role: str
+
+
+class MembersResponse(BaseModel):
+    project_key: str
+    members: list[MemberOut]
+
+
 class ProjectOut(BaseModel):
     id: str
     project_key: str

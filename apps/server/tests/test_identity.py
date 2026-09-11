@@ -186,3 +186,39 @@ class TestSshAliases:
         from drymem_server.identity import resolve_ssh_host
 
         assert resolve_ssh_host("totally-made-up-host-xyz") == "totally-made-up-host-xyz"
+
+
+@pytest.mark.parametrize("case", FIXTURES["scopes"], ids=[c["private"] for c in FIXTURES["scopes"]])
+def test_shared_fixture_scoped_groups(case):
+    """Team and private groups, from the fixture the TypeScript suite also reads."""
+    from drymem_server.identity import group_id_private, group_id_team
+
+    assert group_id_team(case["key"]) == case["team"]
+    assert group_id_private(case["key"], case["userId"]) == case["private"]
+
+
+class TestScopeIsolation:
+    def test_team_and_private_never_collide(self):
+        from drymem_server.identity import group_id_private, group_id_team
+
+        key = "github.com/acme/payments"
+        assert group_id_team(key) != group_id_private(key, "aaaaaaaa-1111-2222-3333-444444444444")
+
+    def test_two_users_get_different_groups(self):
+        from drymem_server.identity import group_id_private
+
+        key = "github.com/acme/payments"
+        assert group_id_private(key, "aaaaaaaa-1111") != group_id_private(key, "bbbbbbbb-2222")
+
+    def test_the_same_user_is_stable(self):
+        from drymem_server.identity import group_id_private
+
+        uid = "aaaaaaaa-1111-2222-3333-444444444444"
+        assert group_id_private("k", uid) == group_id_private("k", uid)
+
+    def test_a_long_project_key_still_fits(self):
+        from drymem_server.identity import group_id_private, group_id_team
+
+        key = "github.com/acme/" + "a" * 80
+        assert len(group_id_team(key)) <= 60
+        assert len(group_id_private(key, "aaaaaaaa-1111")) <= 60

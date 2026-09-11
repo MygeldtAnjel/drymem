@@ -15,6 +15,8 @@ import { describe, expect, it } from "vitest";
 import fixtures from "../../../packages/api-types/fixtures/remotes.json";
 import {
   groupIdFor,
+  groupIdPrivate,
+  groupIdTeam,
   normalizeRemote,
   resolveAuthor,
   resolveProjectKey,
@@ -125,5 +127,23 @@ describe("resolveAuthor", () => {
   it("falls back to user@host when git has no identity", () => {
     const plain = mkdtempSync(join(tmpdir(), "drymem-"));
     expect(resolveAuthor(plain)).toMatch(/^.+@.+$/);
+  });
+});
+
+describe("scoped groups — shared fixture", () => {
+  for (const { key, userId, team, private: priv } of fixtures.scopes) {
+    it(`${key} -> ${team} / ${priv}`, () => {
+      expect(groupIdTeam(key)).toBe(team);
+      expect(groupIdPrivate(key, userId)).toBe(priv);
+    });
+  }
+
+  it("team and private never collide", () => {
+    const key = "github.com/acme/payments";
+    expect(groupIdTeam(key)).not.toBe(groupIdPrivate(key, "aaaaaaaa-1111"));
+  });
+
+  it("two users get different groups", () => {
+    expect(groupIdPrivate("k", "aaaaaaaa-1111")).not.toBe(groupIdPrivate("k", "bbbbbbbb-2222"));
   });
 });

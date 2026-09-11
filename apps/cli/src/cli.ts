@@ -18,6 +18,7 @@ Usage
   npx drymem save <summary>       Save a memory for the current project
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
+  npx drymem promote <episode-id> Share a memory with the project's members
   npx drymem delete <episode-id>  Remove a memory
   npx drymem projects             List the projects you can see
   npx drymem ui                   Browse, search and rate memories in a terminal UI
@@ -125,6 +126,15 @@ async function main(argv: string[]): Promise<number> {
         console.log(`### ${episode.name} (${when(episode.created_at)}${who})`);
         console.log(`${episode.content.slice(0, 300)}\n`);
       }
+      return 0;
+    }
+
+    case "promote": {
+      const id = rest[0];
+      if (!id) fail("Which memory? Pass its episode id.");
+      const result = await client.promote(id);
+      console.log(`Promoted ${id} — scope is now ${result.scope}`);
+      console.log("Your private copy is untouched; the team now has one too.");
       return 0;
     }
 

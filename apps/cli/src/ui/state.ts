@@ -61,6 +61,7 @@ export type Action =
   | { type: "error"; message: string }
   | { type: "status"; message: string }
   | { type: "rated"; episodeUuid: string; rating: 1 | -1 }
+  | { type: "promoted"; episodeUuid: string }
   | { type: "removed"; episodeUuid: string }
   | { type: "key"; input: string; key: KeyPress };
 
@@ -161,7 +162,10 @@ function onDetail(state: State, input: string, key: KeyPress): State {
   if (isUp(input, key)) return { ...state, detailScroll: Math.max(0, state.detailScroll - 1) };
   if (input === "d") return { ...state, screen: "confirmDelete" };
   if (input === "p") {
-    return { ...state, status: "Promotion arrives in step 3A — memories are private for now." };
+    if (state.selected?.scope === "team") {
+      return { ...state, status: "Already shared with the team." };
+    }
+    return { ...state, loading: true };
   }
   return state;
 }
@@ -211,6 +215,18 @@ export function reduce(state: State, action: Action): State {
         loading: false,
       };
 
+    case "promoted": {
+      const mark = (e: EpisodeOut) =>
+        e.uuid === action.episodeUuid ? { ...e, scope: "team" } : e;
+      return {
+        ...state,
+        episodes: state.episodes.map(mark),
+        selected: state.selected ? mark(state.selected) : null,
+        status: "Shared with the team",
+        loading: false,
+      };
+    }
+
     case "removed": {
       const episodes = state.episodes.filter((e) => e.uuid !== action.episodeUuid);
       return clampCursor({
@@ -259,6 +275,9 @@ export function effectFor(before: State, after: State, input: string): Effect | 
   if (before.screen === "confirmDelete" && input === "y" && before.selected) {
     return { type: "delete", episodeUuid: before.selected.uuid };
   }
+  if (before.screen === "detail" && input === "p" && before.selected?.scope !== "team") {
+    return { type: "promote", episodeUuid: before.selected!.uuid };
+  }
   if (before.screen === "detail" && (input === "+" || input === "-") && before.selected) {
     return {
       type: "rate",
@@ -274,4 +293,5 @@ export type Effect =
   | { type: "fetchEpisodes" }
   | { type: "search"; query: string }
   | { type: "delete"; episodeUuid: string }
-  | { type: "rate"; episodeUuid: string; rating: 1 | -1; query: string };
+  | { type: "rate"; episodeUuid: string; rating: 1 | -1; query: string }
+  | { type: "promote"; episodeUuid: string };

@@ -341,3 +341,223 @@ class TestBackfill:
 
         assert len(rows) == 2, "a second run must not duplicate"
         assert {r.title for r in rows} == {"old/one", "old/two"}
+
+
+class TestTheJoseScenario:
+    """The scenario the product exists for, and the acceptance test for step 3A.
+
+    Miguel works on payments on Monday. Jose picks it up Thursday and his agent
+    already knows what Miguel learned — but only what Miguel chose to share.
+
+    Both directions are asserted. A test that only checked "Jose sees it" would
+    pass just as happily on a system with no isolation at all.
+    """
+
+    async def _member(self, client, email="jose@acme.test"):
+        return await client.post(
+            f"/v1/projects/{PROJECT}/members", json={"email": email}, headers=auth(client)
+        )
+
+    async def test_jose_sees_what_miguel_promoted(self, client):
+        shared = (
+            await save(
+                client,
+                "miguel",
+                summary="Adyen rejects zero-amount auths.",
+                topic_key="payments/adyen",
+            )
+        ).json()
+        await self._member(client)
+
+        await client.post(f"/v1/memories/{shared['episode_uuid']}/promote", headers=auth(client))
+
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client, "jose")
+        )
+        names = [e["name"] for e in r.json()["episodes"]]
+
+        assert "payments/adyen" in names
+        assert r.json()["episodes"][0]["author"] == "miguel@acme.test"
+
+    async def test_jose_never_sees_what_miguel_kept_private(self, client):
+        await save(client, "miguel", summary="Half-finished note about auth.", topic_key="auth/wip")
+        await self._member(client)
+
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client, "jose")
+        )
+
+        assert r.json()["episodes"] == [], "an un-promoted memory must stay private"
+
+    async def test_promotion_leaves_the_authors_own_copy(self, client):
+        shared = (await save(client, "miguel", topic_key="payments/adyen")).json()
+        await client.post(f"/v1/memories/{shared['episode_uuid']}/promote", headers=auth(client))
+
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client)
+        )
+        assert any(e["name"] == "payments/adyen" for e in r.json()["episodes"])
+
+    async def test_team_memories_come_first(self, client):
+        """The session-start budget is small; a vouched-for answer outranks a note."""
+        shared = (await save(client, "miguel", topic_key="payments/adyen")).json()
+        await client.post(f"/v1/memories/{shared['episode_uuid']}/promote", headers=auth(client))
+        await save(client, "miguel", topic_key="my/scratch")
+
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client)
+        )
+        assert r.json()["episodes"][0]["scope"] == "team"
+
+
+class TestPromotion:
+    async def test_promoting_twice_does_not_duplicate(self, client, store):
+        saved = (await save(client)).json()
+        url = f"/v1/memories/{saved['episode_uuid']}/promote"
+
+        assert (await client.post(url, headers=auth(client))).status_code == 200
+        assert (await client.post(url, headers=auth(client))).status_code == 200
+
+        team = [g for g in store.episodes if g.endswith("-team")]
+        assert sum(len(store.episodes[g]) for g in team) == 1
+
+    async def test_you_cannot_promote_someone_elses_memory(self, client):
+        saved = (await save(client, "miguel")).json()
+        await client.post(
+            f"/v1/projects/{PROJECT}/members",
+            json={"email": "jose@acme.test"},
+            headers=auth(client),
+        )
+
+        r = await client.post(
+            f"/v1/memories/{saved['episode_uuid']}/promote", headers=auth(client, "jose")
+        )
+        assert r.status_code == 404
+
+    async def test_another_org_cannot_promote(self, client):
+        saved = (await save(client, "miguel")).json()
+
+        r = await client.post(
+            f"/v1/memories/{saved['episode_uuid']}/promote", headers=auth(client, "outsider")
+        )
+        assert r.status_code == 404
+
+    async def test_promotion_is_audited(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import AuditLog
+
+        saved = (await save(client)).json()
+        await client.post(f"/v1/memories/{saved['episode_uuid']}/promote", headers=auth(client))
+
+        async with sessionmaker() as session:
+            rows = (await session.execute(select(AuditLog))).scalars().all()
+
+        assert [r.action for r in rows] == ["memory.promote"]
+        assert rows[0].target == saved["episode_uuid"]
+
+
+class TestMembership:
+    async def test_adding_a_member_lets_them_see_the_project(self, client):
+        await save(client, "miguel")
+
+        assert (await client.get("/v1/projects", headers=auth(client, "jose"))).json()[
+            "projects"
+        ] == []
+
+        await client.post(
+            f"/v1/projects/{PROJECT}/members",
+            json={"email": "jose@acme.test"},
+            headers=auth(client),
+        )
+
+        projects = (await client.get("/v1/projects", headers=auth(client, "jose"))).json()[
+            "projects"
+        ]
+        assert [p["project_key"] for p in projects] == [PROJECT]
+
+    async def test_members_are_listed(self, client):
+        await save(client, "miguel")
+        await client.post(
+            f"/v1/projects/{PROJECT}/members",
+            json={"email": "jose@acme.test"},
+            headers=auth(client),
+        )
+
+        r = await client.get(f"/v1/projects/{PROJECT}/members", headers=auth(client))
+        assert sorted(m["email"] for m in r.json()["members"]) == [
+            "jose@acme.test",
+            "miguel@acme.test",
+        ]
+
+    async def test_adding_twice_is_not_an_error(self, client):
+        await save(client, "miguel")
+        url = f"/v1/projects/{PROJECT}/members"
+
+        await client.post(url, json={"email": "jose@acme.test"}, headers=auth(client))
+        r = await client.post(url, json={"email": "jose@acme.test"}, headers=auth(client))
+
+        assert r.status_code == 200
+        assert len(r.json()["members"]) == 2
+
+    async def test_you_cannot_add_someone_from_another_org(self, client):
+        await save(client, "miguel")
+
+        r = await client.post(
+            f"/v1/projects/{PROJECT}/members",
+            json={"email": "outsider@other.test"},
+            headers=auth(client),
+        )
+        assert r.status_code == 404
+
+    async def test_a_non_member_cannot_list_members(self, client):
+        await save(client, "miguel")
+
+        r = await client.get(f"/v1/projects/{PROJECT}/members", headers=auth(client, "jose"))
+        assert r.status_code == 404
+
+
+class TestLegacyGroupSafety:
+    """Pre-3A memories have no scope. They must never become everyone's."""
+
+    async def test_a_sole_member_still_reads_their_legacy_memories(self, client, store):
+        from drymem_server.identity import sanitize_group_id
+        from drymem_server.memory_store import Metadata
+
+        await save(client, "miguel")  # creates the project with one member
+        await store.save(
+            name="old/unscoped",
+            body="Written before scopes existed.",
+            group_id=sanitize_group_id(PROJECT),
+            metadata=Metadata(PROJECT, "miguel@acme.test"),
+        )
+
+        r = await client.get(
+            "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client)
+        )
+        assert any(e["name"] == "old/unscoped" for e in r.json()["episodes"])
+
+    async def test_legacy_memories_stop_being_read_once_a_second_member_joins(self, client, store):
+        """The unscoped group is shared, so on a team project it would leak."""
+        from drymem_server.identity import sanitize_group_id
+        from drymem_server.memory_store import Metadata
+
+        await save(client, "miguel")
+        await store.save(
+            name="old/unscoped",
+            body="Written before scopes existed.",
+            group_id=sanitize_group_id(PROJECT),
+            metadata=Metadata(PROJECT, "miguel@acme.test"),
+        )
+        await client.post(
+            f"/v1/projects/{PROJECT}/members",
+            json={"email": "jose@acme.test"},
+            headers=auth(client),
+        )
+
+        for who in ("miguel", "jose"):
+            r = await client.get(
+                "/v1/memories/context", params={"project_key": PROJECT}, headers=auth(client, who)
+            )
+            names = [e["name"] for e in r.json()["episodes"]]
+            assert "old/unscoped" not in names, f"{who} must not read the unscoped group"

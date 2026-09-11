@@ -1,24 +1,110 @@
 {
   "_comment": "Shared by test_identity.py and identity.test.ts. Two implementations of project identity that drift would silently split a team into two projects, so neither side may change this file alone.",
   "canonical": [
-    { "url": "git@github.com:acme/drymem.git",                 "key": "github.com/acme/drymem", "ssh": true },
-    { "url": "git@github.com:acme/drymem",                     "key": "github.com/acme/drymem", "ssh": true },
-    { "url": "https://github.com/acme/drymem.git",             "key": "github.com/acme/drymem", "ssh": false },
-    { "url": "https://github.com/acme/drymem",                 "key": "github.com/acme/drymem", "ssh": false },
-    { "url": "https://github.com/Acme/drymem",                 "key": "github.com/acme/drymem", "ssh": false },
-    { "url": "ssh://git@github.com/acme/drymem.git",           "key": "github.com/acme/drymem", "ssh": true },
-    { "url": "ssh://git@github.com:22/acme/drymem.git",        "key": "github.com/acme/drymem", "ssh": true },
-    { "url": "https://user:token@github.com/acme/drymem.git",  "key": "github.com/acme/drymem", "ssh": false },
-    { "url": "https://github.com/acme/drymem/",                "key": "github.com/acme/drymem", "ssh": false },
-    { "url": "  git@GitHub.com:Acme/DryMem.git  ",             "key": "github.com/acme/drymem", "ssh": true },
-    { "url": "git@gitlab.com:acme/drymem.git",                 "key": "gitlab.com/acme/drymem", "ssh": true },
-    { "url": "git@bitbucket.org:acme/drymem.git",              "key": "bitbucket.org/acme/drymem", "ssh": true },
-    { "url": "git@gitlab.com:acme/team/drymem.git",            "key": "gitlab.com/acme/team/drymem", "ssh": true }
+    {
+      "url": "git@github.com:acme/drymem.git",
+      "key": "github.com/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "git@github.com:acme/drymem",
+      "key": "github.com/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "https://github.com/acme/drymem.git",
+      "key": "github.com/acme/drymem",
+      "ssh": false
+    },
+    {
+      "url": "https://github.com/acme/drymem",
+      "key": "github.com/acme/drymem",
+      "ssh": false
+    },
+    {
+      "url": "https://github.com/Acme/drymem",
+      "key": "github.com/acme/drymem",
+      "ssh": false
+    },
+    {
+      "url": "ssh://git@github.com/acme/drymem.git",
+      "key": "github.com/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "ssh://git@github.com:22/acme/drymem.git",
+      "key": "github.com/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "https://user:token@github.com/acme/drymem.git",
+      "key": "github.com/acme/drymem",
+      "ssh": false
+    },
+    {
+      "url": "https://github.com/acme/drymem/",
+      "key": "github.com/acme/drymem",
+      "ssh": false
+    },
+    {
+      "url": "  git@GitHub.com:Acme/DryMem.git  ",
+      "key": "github.com/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "git@gitlab.com:acme/drymem.git",
+      "key": "gitlab.com/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "git@bitbucket.org:acme/drymem.git",
+      "key": "bitbucket.org/acme/drymem",
+      "ssh": true
+    },
+    {
+      "url": "git@gitlab.com:acme/team/drymem.git",
+      "key": "gitlab.com/acme/team/drymem",
+      "ssh": true
+    }
   ],
-  "rejected": ["", "   ", "not a url", "https://"],
+  "rejected": [
+    "",
+    "   ",
+    "not a url",
+    "https://"
+  ],
   "groupIds": [
-    { "key": "github.com/acme/drymem", "groupId": "github-com-acme-drymem" },
-    { "key": "github.com/acme/dry_mem.v2", "groupId": "github-com-acme-dry-mem-v2" },
-    { "key": "local/api-1a2b3c4d", "groupId": "local-api-1a2b3c4d" }
+    {
+      "key": "github.com/acme/drymem",
+      "groupId": "github-com-acme-drymem"
+    },
+    {
+      "key": "github.com/acme/dry_mem.v2",
+      "groupId": "github-com-acme-dry-mem-v2"
+    },
+    {
+      "key": "local/api-1a2b3c4d",
+      "groupId": "local-api-1a2b3c4d"
+    }
+  ],
+  "scopes": [
+    {
+      "key": "github.com/acme/drymem",
+      "userId": "1fe1c7cf-1e51-47ef-bc88-d1e8c23faff7",
+      "team": "github-com-acme-drymem-team",
+      "private": "github-com-acme-drymem-u-1fe1c7cf"
+    },
+    {
+      "key": "github.com/acme/drymem",
+      "userId": "aaaaaaaa-0000-0000-0000-000000000000",
+      "team": "github-com-acme-drymem-team",
+      "private": "github-com-acme-drymem-u-aaaaaaaa"
+    },
+    {
+      "key": "local/api-1a2b3c4d",
+      "userId": "beefcafe-1111-2222-3333-444444444444",
+      "team": "local-api-1a2b3c4d-team",
+      "private": "local-api-1a2b3c4d-u-beefcafe"
+    }
   ]
 }

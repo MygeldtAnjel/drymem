@@ -15,8 +15,12 @@ from drymem_server.api.schemas import (
     FeedbackRequest,
     FeedbackResponse,
     HealthResponse,
+    MemberOut,
+    MemberRequest,
+    MembersResponse,
     ProjectOut,
     ProjectsResponse,
+    PromoteResponse,
     SaveMemoryRequest,
     SaveMemoryResponse,
     SearchResponse,
@@ -158,6 +162,52 @@ async def rate_memory(
     if not await service.rate(episode_uuid=episode_uuid, rating=body.rating, query=body.query):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such memory.")
     return FeedbackResponse(episode_uuid=episode_uuid, rating=body.rating, query=body.query)
+
+
+@router.post(
+    "/v1/memories/{episode_uuid}/promote", response_model=PromoteResponse, tags=["memories"]
+)
+async def promote_memory(episode_uuid: str, service: ServiceDep) -> PromoteResponse:
+    """Share a memory with the project's members.
+
+    Only your own memory, and only into a project you belong to. Promoting an
+    already-promoted memory succeeds without duplicating it, so a retry is safe.
+    """
+    memory = await service.promote(episode_uuid=episode_uuid)
+    if memory is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such memory.")
+    return PromoteResponse(
+        episode_uuid=episode_uuid, scope=memory.scope, promoted_at=memory.promoted_at
+    )
+
+
+@router.get(
+    "/v1/projects/{project_key:path}/members", response_model=MembersResponse, tags=["projects"]
+)
+async def list_members(project_key: str, service: ServiceDep) -> MembersResponse:
+    members = await service.members(project_key=project_key)
+    if members is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such project.")
+    return MembersResponse(
+        project_key=project_key,
+        members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
+    )
+
+
+@router.post(
+    "/v1/projects/{project_key:path}/members", response_model=MembersResponse, tags=["projects"]
+)
+async def add_member(project_key: str, body: MemberRequest, service: ServiceDep) -> MembersResponse:
+    """Add someone to a project. They see its team memories, never its private ones."""
+    members = await service.add_member(project_key=project_key, email=body.email)
+    if members is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "No such project, or no such user in this org."
+        )
+    return MembersResponse(
+        project_key=project_key,
+        members=[MemberOut(user_id=str(u.id), email=u.email, role=r) for u, r in members],
+    )
 
 
 @router.get("/v1/projects", response_model=ProjectsResponse, tags=["projects"])

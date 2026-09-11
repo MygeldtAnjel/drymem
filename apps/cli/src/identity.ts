@@ -149,6 +149,22 @@ export function groupIdFor(cwd: string): string {
   return sanitizeGroupId(resolveProjectKey(cwd));
 }
 
+/** Where promoted memories live. Every project member reads this. */
+export function groupIdTeam(projectKey: string): string {
+  return sanitizeGroupId(`${projectKey}/team`);
+}
+
+/**
+ * Where one person's unshared memories live.
+ *
+ * Eight hex of the user's uuid, not the whole thing: a full uuid pushes the id
+ * past the 60-char cap into the hash branch, which is deterministic but
+ * unreadable for anyone debugging against Neo4j directly.
+ */
+export function groupIdPrivate(projectKey: string, userId: string): string {
+  return sanitizeGroupId(`${projectKey}/u/${userId.replace(/-/g, "").slice(0, 8)}`);
+}
+
 /** Who is saving this memory. Their git identity, or a machine-local one. */
 export function resolveAuthor(cwd: string): string {
   const email = git(cwd, "config", "user.email");

@@ -109,6 +109,7 @@ export function Recent({ state }: { state: State }) {
                 <Text color={MUTED}>
                   {author(episode.author)} · {when(episode.created_at)}
                 </Text>
+                {episode.scope === "team" ? <Text color="green"> [team]</Text> : null}
                 {rating ? <Text>{rating > 0 ? " 👍" : " 👎"}</Text> : null}
               </Text>
               <Text color={MUTED}>    {firstLine(episode.content)}</Text>
@@ -207,7 +208,7 @@ export function Detail({ state }: { state: State }) {
         </Text>
       )}
 
-      <Footer keys="j/k scroll · + useful · - not useful · d delete · esc back · q quit" />
+      <Footer keys="j/k scroll · + useful · - not useful · p share · d delete · esc back · q quit" />
     </Box>
   );
 }
