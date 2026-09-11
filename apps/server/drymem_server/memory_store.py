@@ -68,6 +68,9 @@ class SaveResult:
     uuid: str
     entity_count: int
     edge_count: int
+    # Set when extraction failed and only the episode was written. The memory is
+    # still retrievable by recency and text; it just has no edges in the graph.
+    degraded: str | None = None
 
 
 @dataclass(frozen=True)
@@ -124,18 +127,49 @@ class GraphitiMemoryStore:
 
     async def save(self, *, name: str, body: str, group_id: str, metadata: Metadata) -> SaveResult:
         graphiti = await self._graphiti()
-        result = await graphiti.add_episode(
-            name=name,
-            episode_body=body,
-            source_description=metadata.encode(),
-            reference_time=datetime.now(UTC),
-            group_id=group_id,
-        )
+        try:
+            result = await graphiti.add_episode(
+                name=name,
+                episode_body=body,
+                source_description=metadata.encode(),
+                reference_time=datetime.now(UTC),
+                group_id=group_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - see _save_episode_only
+            return await self._save_episode_only(name, body, group_id, metadata, exc)
+
         return SaveResult(
             uuid=result.episode.uuid,
             entity_count=len(result.nodes or []),
             edge_count=len(result.edges or []),
         )
+
+    async def _save_episode_only(
+        self, name: str, body: str, group_id: str, metadata: Metadata, exc: Exception
+    ) -> SaveResult:
+        """Persist the episode alone when extraction failed.
+
+        Extraction is the slow, fallible half of a save — a model that is down,
+        out of memory, or returning garbage. Letting that lose the memory would
+        be the worst possible trade: the summary is the thing a human wrote and
+        cannot easily reproduce, while the entities can be re-derived later by
+        re-ingesting. So the episode is written without a graph around it.
+        """
+        from graphiti_core.nodes import EpisodeType, EpisodicNode
+
+        episode = EpisodicNode(
+            name=name,
+            group_id=group_id,
+            labels=[],
+            source=EpisodeType.text,
+            content=body,
+            source_description=metadata.encode(),
+            created_at=datetime.now(UTC),
+            valid_at=datetime.now(UTC),
+        )
+        graphiti = await self._graphiti()
+        await episode.save(graphiti.driver)
+        return SaveResult(uuid=episode.uuid, entity_count=0, edge_count=0, degraded=str(exc)[:200])
 
     async def search(self, *, query: str, group_ids: list[str], limit: int) -> list[Fact]:
         graphiti = await self._graphiti()

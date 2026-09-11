@@ -17,6 +17,25 @@ services:
       - drymem_neo4j_data:/data
       - drymem_neo4j_logs:/logs
 
+  postgres:
+    image: postgres:17-alpine
+    container_name: drymem-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: drymem
+      POSTGRES_PASSWORD: drymem_pass
+      POSTGRES_DB: drymem
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drymem"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - drymem_pg_data:/var/lib/postgresql/data
+
 volumes:
   drymem_neo4j_data:
   drymem_neo4j_logs:
+  drymem_pg_data:

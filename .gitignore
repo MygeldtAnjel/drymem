@@ -7,3 +7,6 @@ __pycache__/
 .roo/*
 .claude/*
 .mcp.json
+
+# uv creates a venv per project dir
+apps/server/.venv/
