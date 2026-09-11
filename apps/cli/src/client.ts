@@ -40,6 +40,8 @@ export interface ProjectOut {
   project_key: string;
   display_name: string | null;
   memory_count: number;
+  positive: number;
+  negative: number;
 }
 
 export class DrymemError extends Error {
@@ -133,9 +135,26 @@ export class DrymemClient {
     return data.deleted;
   }
 
+  /** Record whether a retrieved memory was useful. `query` is what surfaced it. */
+  async rate(episodeUuid: string, rating: 1 | -1, query = ""): Promise<void> {
+    await this.request(`/v1/memories/${episodeUuid}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ rating, query }),
+    });
+  }
+
   async projects(): Promise<ProjectOut[]> {
-    const data = await this.request<{ projects: ProjectOut[] }>("/v1/projects");
-    return data.projects;
+    const data = await this.request<{ projects: Partial<ProjectOut>[] }>("/v1/projects");
+    // Normalise at the boundary: a server older than this client omits fields,
+    // and an absent number quietly becomes NaN everywhere downstream.
+    return data.projects.map((p) => ({
+      id: p.id ?? "",
+      project_key: p.project_key ?? "",
+      display_name: p.display_name ?? null,
+      memory_count: p.memory_count ?? 0,
+      positive: p.positive ?? 0,
+      negative: p.negative ?? 0,
+    }));
   }
 
   async health(): Promise<{ status: string; postgres: boolean; neo4j: boolean }> {

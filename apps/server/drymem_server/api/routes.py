@@ -12,6 +12,8 @@ from drymem_server.api.schemas import (
     DeleteResponse,
     EpisodeOut,
     FactOut,
+    FeedbackRequest,
+    FeedbackResponse,
     HealthResponse,
     ProjectOut,
     ProjectsResponse,
@@ -139,6 +141,25 @@ async def delete_memory(episode_uuid: str, service: ServiceDep) -> DeleteRespons
     return DeleteResponse(episode_uuid=episode_uuid, deleted=True)
 
 
+@router.post(
+    "/v1/memories/{episode_uuid}/feedback", response_model=FeedbackResponse, tags=["memories"]
+)
+async def rate_memory(
+    episode_uuid: str, body: FeedbackRequest, service: ServiceDep
+) -> FeedbackResponse:
+    """Record whether a retrieved memory was useful.
+
+    This is the pilot's precision metric: PLAN.md's 90% bar is measured from
+    these rows, so the query that surfaced the memory is stored alongside the
+    thumb — a rating with no query cannot be learned from.
+    """
+    if body.rating not in (1, -1):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "rating must be 1 or -1.")
+    if not await service.rate(episode_uuid=episode_uuid, rating=body.rating, query=body.query):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such memory.")
+    return FeedbackResponse(episode_uuid=episode_uuid, rating=body.rating, query=body.query)
+
+
 @router.get("/v1/projects", response_model=ProjectsResponse, tags=["projects"])
 async def list_projects(service: ServiceDep) -> ProjectsResponse:
     return ProjectsResponse(
@@ -148,8 +169,10 @@ async def list_projects(service: ServiceDep) -> ProjectsResponse:
                 project_key=p.project_key,
                 display_name=p.display_name,
                 memory_count=count,
+                positive=positive,
+                negative=negative,
             )
-            for p, count in await service.projects()
+            for p, count, positive, negative in await service.projects()
         ]
     )
 

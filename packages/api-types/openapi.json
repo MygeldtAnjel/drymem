@@ -344,6 +344,75 @@
         }
       }
     },
+    "/v1/memories/{episode_uuid}/feedback": {
+      "post": {
+        "tags": [
+          "memories"
+        ],
+        "summary": "Rate Memory",
+        "description": "Record whether a retrieved memory was useful.\n\nThis is the pilot's precision metric: PLAN.md's 90% bar is measured from\nthese rows, so the query that surfaced the memory is stored alongside the\nthumb \u2014 a rating with no query cannot be learned from.",
+        "operationId": "rate_memory_v1_memories__episode_uuid__feedback_post",
+        "parameters": [
+          {
+            "name": "episode_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Episode Uuid"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects": {
       "get": {
         "tags": [
@@ -543,6 +612,50 @@
         ],
         "title": "FactOut"
       },
+      "FeedbackRequest": {
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "title": "Rating",
+            "description": "+1 or -1"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Query",
+            "description": "The search that surfaced this memory. A rating without it says 'this memory is bad'; with it, 'this memory is a bad answer to X'.",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "rating"
+        ],
+        "title": "FeedbackRequest"
+      },
+      "FeedbackResponse": {
+        "properties": {
+          "episode_uuid": {
+            "type": "string",
+            "title": "Episode Uuid"
+          },
+          "rating": {
+            "type": "integer",
+            "title": "Rating"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          }
+        },
+        "type": "object",
+        "required": [
+          "episode_uuid",
+          "rating",
+          "query"
+        ],
+        "title": "FeedbackResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -608,6 +721,16 @@
           "memory_count": {
             "type": "integer",
             "title": "Memory Count",
+            "default": 0
+          },
+          "positive": {
+            "type": "integer",
+            "title": "Positive",
+            "default": 0
+          },
+          "negative": {
+            "type": "integer",
+            "title": "Negative",
             "default": 0
           }
         },

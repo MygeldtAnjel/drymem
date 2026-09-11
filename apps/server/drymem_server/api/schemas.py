@@ -74,11 +74,31 @@ class DeleteResponse(BaseModel):
     deleted: bool
 
 
+class FeedbackRequest(BaseModel):
+    rating: int = Field(..., description="+1 or -1")
+    query: str = Field(
+        "",
+        max_length=500,
+        description=(
+            "The search that surfaced this memory. A rating without it says "
+            "'this memory is bad'; with it, 'this memory is a bad answer to X'."
+        ),
+    )
+
+
+class FeedbackResponse(BaseModel):
+    episode_uuid: str
+    rating: int
+    query: str
+
+
 class ProjectOut(BaseModel):
     id: str
     project_key: str
     display_name: str | None = None
     memory_count: int = 0
+    positive: int = 0
+    negative: int = 0
 
 
 class ProjectsResponse(BaseModel):

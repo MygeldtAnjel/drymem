@@ -11,11 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drymem_server.auth import Principal, ensure_project
-from drymem_server.db.models import SCOPE_PRIVATE, Memory, Project
+from drymem_server.db.models import SCOPE_PRIVATE, Memory, MemoryFeedback, Project
 from drymem_server.identity import sanitize_group_id
 from drymem_server.memory_store import Episode, Fact, MemoryStore, Metadata
 from drymem_server.scrubber import ScrubResult, scrub
@@ -147,13 +147,58 @@ class MemoryService:
         await self.session.flush()
         return True
 
-    async def projects(self) -> list[tuple[Project, int]]:
+    async def rate(self, *, episode_uuid: str, rating: int, query: str) -> bool:
+        """Record a thumb on a memory. Changing your mind replaces the rating.
+
+        Scoped to the caller's org, like delete: a uuid alone must not let one
+        tenant write rows against another's memory.
+        """
+        result = await self.session.execute(
+            select(Memory).where(
+                Memory.episode_uuid == episode_uuid,
+                Memory.org_id == self.principal.org_id,
+            )
+        )
+        memory = result.scalar_one_or_none()
+        if memory is None:
+            return False
+
+        existing = await self.session.execute(
+            select(MemoryFeedback).where(
+                MemoryFeedback.memory_id == memory.id,
+                MemoryFeedback.user_id == self.principal.user_id,
+                MemoryFeedback.query == query,
+            )
+        )
+        row = existing.scalar_one_or_none()
+        if row is not None:
+            row.rating = rating
+        else:
+            self.session.add(
+                MemoryFeedback(
+                    memory_id=memory.id,
+                    user_id=self.principal.user_id,
+                    rating=rating,
+                    query=query,
+                )
+            )
+        await self.session.flush()
+        return True
+
+    async def projects(self) -> list[tuple[Project, int, int, int]]:
         from drymem_server.db.models import ProjectMember
 
+        # count(distinct) because the feedback join multiplies memory rows.
         result = await self.session.execute(
-            select(Project, func.count(Memory.id))
+            select(
+                Project,
+                func.count(func.distinct(Memory.id)),
+                func.count(func.distinct(case((MemoryFeedback.rating > 0, MemoryFeedback.id)))),
+                func.count(func.distinct(case((MemoryFeedback.rating < 0, MemoryFeedback.id)))),
+            )
             .join(ProjectMember, ProjectMember.project_id == Project.id)
             .outerjoin(Memory, Memory.project_id == Project.id)
+            .outerjoin(MemoryFeedback, MemoryFeedback.memory_id == Memory.id)
             .where(
                 ProjectMember.user_id == self.principal.user_id,
                 Project.org_id == self.principal.org_id,
@@ -161,7 +206,7 @@ class MemoryService:
             .group_by(Project.id)
             .order_by(Project.project_key)
         )
-        return [(project, count) for project, count in result.all()]
+        return [tuple(row) for row in result.all()]
 
     @staticmethod
     def timestamp() -> str:

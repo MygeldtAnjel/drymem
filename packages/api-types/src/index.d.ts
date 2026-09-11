@@ -102,6 +102,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/memories/{episode_uuid}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rate Memory
+         * @description Record whether a retrieved memory was useful.
+         *
+         *     This is the pilot's precision metric: PLAN.md's 90% bar is measured from
+         *     these rows, so the query that surfaced the memory is stored alongside the
+         *     thumb — a rating with no query cannot be learned from.
+         */
+        post: operations["rate_memory_v1_memories__episode_uuid__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects": {
         parameters: {
             query?: never;
@@ -189,6 +213,29 @@ export interface components {
              */
             superseded: boolean;
         };
+        /** FeedbackRequest */
+        FeedbackRequest: {
+            /**
+             * Rating
+             * @description +1 or -1
+             */
+            rating: number;
+            /**
+             * Query
+             * @description The search that surfaced this memory. A rating without it says 'this memory is bad'; with it, 'this memory is a bad answer to X'.
+             * @default
+             */
+            query: string;
+        };
+        /** FeedbackResponse */
+        FeedbackResponse: {
+            /** Episode Uuid */
+            episode_uuid: string;
+            /** Rating */
+            rating: number;
+            /** Query */
+            query: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -218,6 +265,16 @@ export interface components {
              * @default 0
              */
             memory_count: number;
+            /**
+             * Positive
+             * @default 0
+             */
+            positive: number;
+            /**
+             * Negative
+             * @default 0
+             */
+            negative: number;
         };
         /** ProjectsResponse */
         ProjectsResponse: {
@@ -487,6 +544,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_memory_v1_memories__episode_uuid__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                episode_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackResponse"];
                 };
             };
             /** @description Validation Error */

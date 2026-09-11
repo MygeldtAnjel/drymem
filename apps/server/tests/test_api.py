@@ -220,3 +220,124 @@ class TestHealth:
         assert r.status_code == 200
         assert r.json()["postgres"] is True
         assert "extractor" in r.json()
+
+
+class TestFeedback:
+    """The pilot's precision metric. Wrong here means the 90% number is fiction."""
+
+    async def test_a_thumb_is_recorded(self, client):
+        saved = (await save(client)).json()
+
+        r = await client.post(
+            f"/v1/memories/{saved['episode_uuid']}/feedback",
+            json={"rating": 1, "query": "payments"},
+            headers=auth(client),
+        )
+
+        assert r.status_code == 200
+        assert r.json()["rating"] == 1
+
+    async def test_changing_your_mind_replaces_rather_than_adds(self, client):
+        saved = (await save(client)).json()
+        url = f"/v1/memories/{saved['episode_uuid']}/feedback"
+
+        await client.post(url, json={"rating": 1, "query": "payments"}, headers=auth(client))
+        await client.post(url, json={"rating": -1, "query": "payments"}, headers=auth(client))
+
+        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        assert projects[0]["positive"] == 0
+        assert projects[0]["negative"] == 1
+
+    async def test_the_same_memory_can_be_rated_per_query(self, client):
+        """Good for 'payments', useless for 'auth' — both are worth knowing."""
+        saved = (await save(client)).json()
+        url = f"/v1/memories/{saved['episode_uuid']}/feedback"
+
+        await client.post(url, json={"rating": 1, "query": "payments"}, headers=auth(client))
+        await client.post(url, json={"rating": -1, "query": "auth"}, headers=auth(client))
+
+        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        assert projects[0]["positive"] == 1
+        assert projects[0]["negative"] == 1
+
+    async def test_memory_count_is_not_inflated_by_ratings(self, client):
+        """The feedback join multiplies rows; the count must stay distinct."""
+        saved = (await save(client)).json()
+        url = f"/v1/memories/{saved['episode_uuid']}/feedback"
+
+        await client.post(url, json={"rating": 1, "query": "a"}, headers=auth(client))
+        await client.post(url, json={"rating": 1, "query": "b"}, headers=auth(client))
+
+        projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]
+        assert projects[0]["memory_count"] == 1
+
+    async def test_an_invalid_rating_is_rejected(self, client):
+        saved = (await save(client)).json()
+
+        r = await client.post(
+            f"/v1/memories/{saved['episode_uuid']}/feedback",
+            json={"rating": 5, "query": ""},
+            headers=auth(client),
+        )
+        assert r.status_code == 422
+
+    async def test_another_org_cannot_rate_your_memory(self, client):
+        saved = (await save(client, "miguel")).json()
+
+        r = await client.post(
+            f"/v1/memories/{saved['episode_uuid']}/feedback",
+            json={"rating": -1, "query": "x"},
+            headers=auth(client, "outsider"),
+        )
+        assert r.status_code == 404
+
+    async def test_rating_needs_a_token(self, client):
+        saved = (await save(client)).json()
+
+        r = await client.post(
+            f"/v1/memories/{saved['episode_uuid']}/feedback", json={"rating": 1, "query": ""}
+        )
+        assert r.status_code == 401
+
+
+class TestBackfill:
+    """Episodes that predate the index must become visible, exactly once."""
+
+    async def test_indexes_episodes_with_no_row(self, client, store, sessionmaker, monkeypatch):
+        from sqlalchemy import select
+
+        from drymem_server.admin import backfill
+        from drymem_server.db.models import Memory, Org, User
+        from drymem_server.identity import sanitize_group_id
+        from drymem_server.memory_store import Metadata
+
+        # Two episodes in the graph, nothing in the index — the migrated case.
+        group = sanitize_group_id(PROJECT)
+        for name in ("old/one", "old/two"):
+            await store.save(
+                name=name, body=f"# {name}\nbody", group_id=group, metadata=Metadata(PROJECT, "x")
+            )
+
+        async with sessionmaker() as session:
+            org = Org(name="Acme2", slug="acme2")
+            session.add(org)
+            await session.flush()
+            session.add(User(org_id=org.id, email="backfill@acme.test"))
+            await session.commit()
+
+        import drymem_server.memory_store as ms
+        from drymem_server import admin
+
+        # monkeypatch, not assignment: a bare assignment here leaked into the
+        # extraction tests and broke them.
+        monkeypatch.setattr(admin, "sessionmaker_for", lambda _url: sessionmaker)
+        monkeypatch.setattr(ms, "GraphitiMemoryStore", lambda: store)
+
+        assert await backfill(PROJECT, "backfill@acme.test") == 0
+        assert await backfill(PROJECT, "backfill@acme.test") == 0  # idempotent
+
+        async with sessionmaker() as session:
+            rows = (await session.execute(select(Memory))).scalars().all()
+
+        assert len(rows) == 2, "a second run must not duplicate"
+        assert {r.title for r in rows} == {"old/one", "old/two"}

@@ -20,6 +20,7 @@ Usage
   npx drymem context [n]          Show the most recent memories
   npx drymem delete <episode-id>  Remove a memory
   npx drymem projects             List the projects you can see
+  npx drymem ui                   Browse, search and rate memories in a terminal UI
   npx drymem whoami               Show the resolved project and server
   npx drymem mcp                  Run the MCP server over stdio (used by Claude Code)
   npx drymem hook <event>         Run a session hook (used by Claude Code)
@@ -44,6 +45,12 @@ async function main(argv: string[]): Promise<number> {
 
   if (command === "setup") {
     return runSetup({ global: rest.includes("--global") });
+  }
+
+  if (command === "ui") {
+    const { runUi } = await import("./ui/index.js");
+    await runUi();
+    return 0;
   }
 
   if (command === "mcp") {

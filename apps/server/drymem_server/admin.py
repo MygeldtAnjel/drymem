@@ -14,7 +14,7 @@ import sys
 from sqlalchemy import select
 
 from drymem_server.auth import create_token
-from drymem_server.db.models import ApiToken, Org, User
+from drymem_server.db.models import ApiToken, Memory, Org, Project, ProjectMember, User
 from drymem_server.db.session import sessionmaker_for
 from drymem_server.settings import settings
 
@@ -90,6 +90,83 @@ async def token_revoke(label: str) -> int:
     return 0
 
 
+async def backfill(project_key: str, email: str) -> int:
+    """Create index rows for episodes that only exist in the graph.
+
+    Memories saved before Postgres existed (or migrated from an older group id)
+    have no row, so they are searchable but invisible to anything that counts,
+    lists or rates them. The TUI made that gap obvious: the dashboard said 3
+    memories while the list showed 6.
+
+    Idempotent: `memories.episode_uuid` is unique, so a second run adds nothing.
+    """
+    from drymem_server.identity import sanitize_group_id
+    from drymem_server.memory_store import GraphitiMemoryStore
+
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if user is None:
+            print(f"No such user: {email}", file=sys.stderr)
+            return 1
+
+        project = (
+            await session.execute(
+                select(Project).where(
+                    Project.project_key == project_key, Project.org_id == user.org_id
+                )
+            )
+        ).scalar_one_or_none()
+        if project is None:
+            project = Project(org_id=user.org_id, project_key=project_key)
+            session.add(project)
+            await session.flush()
+            session.add(ProjectMember(project_id=project.id, user_id=user.id))
+            await session.flush()
+
+        episodes = await GraphitiMemoryStore().recent(
+            group_ids=[sanitize_group_id(project_key)], limit=1000
+        )
+        known = set(
+            (
+                await session.execute(
+                    select(Memory.episode_uuid).where(Memory.project_id == project.id)
+                )
+            ).scalars()
+        )
+
+        added = 0
+        for episode in episodes:
+            if episode.uuid in known:
+                continue
+            title = next(
+                (
+                    line.strip().lstrip("#").strip()
+                    for line in (episode.content or "").splitlines()
+                    if line.strip()
+                ),
+                episode.name,
+            )
+            session.add(
+                Memory(
+                    org_id=user.org_id,
+                    project_id=project.id,
+                    author_id=user.id,
+                    episode_uuid=episode.uuid,
+                    topic_key=episode.name or None,
+                    title=title[:500],
+                    tool=episode.metadata.tool if episode.metadata else "claude-code",
+                    scope="private",
+                    created_at=episode.created_at,
+                )
+            )
+            added += 1
+        await session.commit()
+
+    print(f"Indexed {added} episode(s) for {project_key} ({len(episodes)} in the graph)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -106,11 +183,17 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("token-revoke", help="Revoke every active token with this label")
     p.add_argument("label")
 
+    p = sub.add_parser("backfill", help="Index graph episodes that have no database row")
+    p.add_argument("project_key")
+    p.add_argument("--as", dest="email", required=True, help="Attribute them to this user")
+
     args = parser.parse_args(argv)
     if args.command == "user-create":
         return asyncio.run(user_create(args.email, args.org, args.name))
     if args.command == "token-create":
         return asyncio.run(token_create(args.email, args.label))
+    if args.command == "backfill":
+        return asyncio.run(backfill(args.project_key, args.email))
     return asyncio.run(token_revoke(args.label))
 
 
