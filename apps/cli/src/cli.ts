@@ -12,6 +12,9 @@ import { HOOKS, readPayload, type HookName } from "./hooks.js";
 import { resolveProjectKey } from "./identity.js";
 import { runSetup } from "./setup.js";
 
+/** Stamped into the lock file so a team can see what produced their skills. */
+const VERSION = "2.1.0";
+
 const USAGE = `drymem — shared long-term memory for AI coding agents
 
 Usage
@@ -19,6 +22,7 @@ Usage
   npx drymem save <summary>       Save a memory for the current project
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
+  npx drymem skills <cmd>         list | status | sync  (installs .claude/skills/)
   npx drymem import <source>      Backfill memories the team already wrote down
                                   (claude-memory, git, docs, ecc, engram; --dry-run to preview)
   npx drymem promote <episode-id> Share a memory with the project's members
@@ -79,8 +83,11 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  const client = new DrymemClient(requireConfig());
-  const projectKey = resolveProjectKey(process.cwd());
+  // `skills` works offline: the skills ship in this package, so a developer can
+  // install them before they have a server or a token.
+  const needsServer = command !== "skills";
+  const client = needsServer ? new DrymemClient(requireConfig()) : (null as never);
+  const projectKey = needsServer ? resolveProjectKey(process.cwd()) : "";
 
   switch (command) {
     case "whoami": {
@@ -130,6 +137,62 @@ async function main(argv: string[]): Promise<number> {
         console.log(`${episode.content.slice(0, 300)}\n`);
       }
       return 0;
+    }
+
+    case "skills": {
+      const {
+        SKILLS_DIR,
+        availableSkills,
+        bundledSkillsDir,
+        statusOf,
+        sync: syncSkills,
+      } = await import("./skills.js");
+      const sub = rest[0] ?? "status";
+      const version = VERSION;
+
+      if (sub === "list") {
+        const bundled = bundledSkillsDir();
+        const names = availableSkills(bundled);
+        if (names.length === 0) fail("No bundled skills found.");
+        const states = new Map(statusOf(process.cwd(), version, bundled).map((s) => [s.name, s.state]));
+        for (const name of names) console.log(`  ${name.padEnd(28)} ${states.get(name) ?? "missing"}`);
+        return 0;
+      }
+
+      if (sub === "status") {
+        const statuses = statusOf(process.cwd(), version);
+        if (statuses.length === 0) {
+          console.log("No skills installed. Run `drymem skills sync`.");
+          return 0;
+        }
+        for (const s of statuses) console.log(`  ${s.name.padEnd(28)} ${s.state}`);
+        console.log(`\n  ${SKILLS_DIR} · modified and unknown skills are never overwritten`);
+        return 0;
+      }
+
+      if (sub === "sync") {
+        const result = syncSkills(process.cwd(), version, {
+          force: rest.includes("--force"),
+          dryRun: rest.includes("--dry-run"),
+        });
+        const say = (label: string, names: string[]) => {
+          if (names.length > 0) console.log(`  ${label}: ${names.join(", ")}`);
+        };
+        say("installed", result.installed);
+        say("updated", result.updated);
+        say("already current", result.untouched);
+        if (result.skipped.length > 0) {
+          console.log(`  skipped (edited locally): ${result.skipped.join(", ")}`);
+          console.log("  Run with --force to replace them with ours.");
+        }
+        if (result.installed.length + result.updated.length === 0 && result.skipped.length === 0) {
+          console.log("  Everything is current.");
+        }
+        return 0;
+      }
+
+      fail(`Unknown skills command: ${sub}. Try list, status or sync.`);
+      return 1;
     }
 
     case "import": {
