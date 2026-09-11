@@ -44,7 +44,9 @@ function press(state: State, input: string, key: KeyPress = NONE): State {
   return reduce(state, { type: "key", input, key });
 }
 
-const loaded = (): State => reduce(initialState, { type: "loaded", projects: [project] });
+const LAUNCHED_FROM = "github.com/acme/payments";
+const loaded = (): State =>
+  reduce({ ...initialState, activeProject: LAUNCHED_FROM }, { type: "loaded", projects: [project] });
 const withEpisodes = (): State =>
   reduce(
     { ...loaded(), screen: "recent" },
@@ -264,7 +266,10 @@ describe("effects", () => {
   it("entering recent fetches", () => {
     const before = loaded();
     const after = press(before, "r");
-    expect(effectFor(before, after, "r")).toEqual({ type: "fetchEpisodes" });
+    expect(effectFor(before, after, "r")).toEqual({
+      type: "fetchEpisodes",
+      projectKey: LAUNCHED_FROM,
+    });
   });
 
   it("a submitted query searches", () => {
@@ -272,7 +277,11 @@ describe("effects", () => {
     for (const ch of "auth") before = press(before, ch);
     const after = press(before, "", { return: true });
 
-    expect(effectFor(before, after, "")).toEqual({ type: "search", query: "auth" });
+    expect(effectFor(before, after, "")).toEqual({
+      type: "search",
+      query: "auth",
+      projectKey: LAUNCHED_FROM,
+    });
   });
 
   it("y on the confirmation deletes the selected memory", () => {
@@ -356,6 +365,88 @@ describe("Enter, however the terminal sends it", () => {
 
     for (const [, input, key] of forms) {
       expect(press(confirming, input, key).screen).toBe("confirmDelete");
+    }
+  });
+});
+
+
+describe("the Projects menu item", () => {
+  /**
+   * It sat in the menu doing nothing: `onDashboard` had no case for it, so
+   * Enter fell through to `default` and returned the state unchanged. A menu
+   * item that does nothing is a broken promise, and this one is also the only
+   * way to read a project other than the directory you launched from.
+   */
+  const onProjects = () => {
+    const state = { ...loaded(), cursor: ACTIONS.indexOf("Projects") };
+    return press(state, "", { return: true });
+  };
+
+  it("opens a projects screen", () => {
+    expect(onProjects().screen).toBe("projects");
+  });
+
+  it("lists the projects and starts at the first", () => {
+    const state = onProjects();
+    expect(state.projects).toHaveLength(1);
+    expect(state.cursor).toBe(0);
+  });
+
+  it("switching project changes what everything else reads", () => {
+    const before = onProjects();
+    const after = press(before, "", { return: true });
+
+    expect(after.activeProject).toBe("github.com/acme/payments");
+    expect(after.screen).toBe("recent");
+    expect(after.episodes).toEqual([]);
+  });
+
+  it("fetches the chosen project, not the launch directory", () => {
+    const before = onProjects();
+    const after = press(before, "", { return: true });
+
+    expect(effectFor(before, after, "")).toEqual({
+      type: "fetchEpisodes",
+      projectKey: "github.com/acme/payments",
+    });
+  });
+
+  it("a later search stays on the chosen project", () => {
+    let state = press(onProjects(), "", { return: true });
+    state = { ...state, screen: "recent", loading: false };
+    let typing = press(state, "/");
+    for (const ch of "auth") typing = press(typing, ch);
+    const after = press(typing, "", { return: true });
+
+    expect(effectFor(typing, after, "")).toEqual({
+      type: "search",
+      query: "auth",
+      projectKey: "github.com/acme/payments",
+    });
+  });
+
+  it("esc returns to the dashboard", () => {
+    expect(press(onProjects(), "", { escape: true }).screen).toBe("dashboard");
+  });
+
+  it("does not run off the end of a one-project list", () => {
+    let state = onProjects();
+    for (let i = 0; i < 5; i += 1) state = press(state, "j");
+    expect(state.cursor).toBe(0);
+  });
+
+  it("enter on an empty list does nothing", () => {
+    const empty = { ...initialState, screen: "projects" as const, projects: [] };
+    expect(press(empty, "", { return: true }).screen).toBe("projects");
+  });
+
+  it("every menu action now does something", () => {
+    // The bug was one unhandled case; this stops another being added silently.
+    for (const action of ACTIONS) {
+      const state = { ...loaded(), cursor: ACTIONS.indexOf(action) };
+      const after = press(state, "", { return: true });
+      const moved = after.screen !== state.screen || after.exit;
+      expect(moved, `"${action}" did nothing`).toBe(true);
     }
   });
 });

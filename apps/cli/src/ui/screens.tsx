@@ -87,10 +87,43 @@ export function Dashboard({ state }: { state: State }) {
   );
 }
 
+export function Projects({ state }: { state: State }) {
+  return (
+    <Box flexDirection="column">
+      <Header title={`Projects — ${state.projects.length}`} />
+
+      {state.projects.length === 0 ? (
+        <Text color={MUTED}>No projects yet. One appears when a memory is saved.</Text>
+      ) : (
+        state.projects.map((project, index) => {
+          const active = project.project_key === state.activeProject;
+          return (
+            <Box key={project.id} flexDirection="column">
+              <Text>
+                <Cursor selected={index === state.cursor} />
+                <Text color={index === state.cursor ? ACCENT : "yellow"}>
+                  {project.project_key}
+                </Text>
+                {active ? <Text color="green"> ●</Text> : null}
+              </Text>
+              <Text color={MUTED}>
+                {"    "}
+                {project.memory_count} memories · {ratio(project.positive, project.negative)}
+              </Text>
+            </Box>
+          );
+        })
+      )}
+
+      <Footer keys="j/k navigate · enter open · esc back · q quit" />
+    </Box>
+  );
+}
+
 export function Recent({ state }: { state: State }) {
   return (
     <Box flexDirection="column">
-      <Header title={`Recent memories — ${state.episodes.length}`} />
+      <Header title={`${state.activeProject} — ${state.episodes.length} memories`} />
 
       {state.episodes.length === 0 ? (
         <Text color={MUTED}>

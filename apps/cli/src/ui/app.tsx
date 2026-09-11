@@ -13,6 +13,7 @@ import {
   ConfirmDelete,
   Dashboard,
   Detail,
+  Projects,
   Recent,
   Search,
   Searching,
@@ -39,18 +40,24 @@ function message(error: unknown): string {
 
 export function App({ client, projectKey, onState }: AppProps) {
   const { exit } = useApp();
-  const [state, dispatch] = useReducer(reduce, initialState);
+  const [state, dispatch] = useReducer(reduce, {
+    ...initialState,
+    activeProject: projectKey,
+  });
 
   const run = useCallback(
     async (effect: Effect) => {
       try {
         switch (effect.type) {
           case "fetchEpisodes": {
-            dispatch({ type: "episodes", episodes: await client.context(projectKey, 50) });
+            dispatch({
+              type: "episodes",
+              episodes: await client.context(effect.projectKey || projectKey, 50),
+            });
             return;
           }
           case "search": {
-            const facts = await client.search(projectKey, effect.query, 25);
+            const facts = await client.search(effect.projectKey || projectKey, effect.query, 25);
             dispatch({ type: "facts", facts, query: effect.query });
             return;
           }
@@ -123,6 +130,8 @@ function Body({ state }: { state: State }) {
   }
 
   switch (state.screen) {
+    case "projects":
+      return <Projects state={state} />;
     case "recent":
       return <Recent state={state} />;
     case "search":

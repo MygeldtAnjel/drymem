@@ -9,7 +9,14 @@
 
 import type { EpisodeOut, Fact, ProjectOut } from "../client.js";
 
-export type Screen = "dashboard" | "recent" | "search" | "detail" | "searching" | "confirmDelete";
+export type Screen =
+  | "dashboard"
+  | "projects"
+  | "recent"
+  | "search"
+  | "detail"
+  | "searching"
+  | "confirmDelete";
 
 export interface Rating {
   episodeUuid: string;
@@ -19,6 +26,8 @@ export interface Rating {
 export interface State {
   screen: Screen;
   previous: Screen;
+  /** Whose memories are on screen. Starts as the project you launched from. */
+  activeProject: string;
   cursor: number;
   projects: ProjectOut[];
   episodes: EpisodeOut[];
@@ -39,6 +48,7 @@ export const ACTIONS = ["Recent memories", "Search memories", "Projects", "Quit"
 export const initialState: State = {
   screen: "dashboard",
   previous: "dashboard",
+  activeProject: "",
   cursor: 0,
   projects: [],
   episodes: [],
@@ -80,6 +90,8 @@ function listLength(state: State): number {
   switch (state.screen) {
     case "dashboard":
       return ACTIONS.length;
+    case "projects":
+      return state.projects.length;
     case "recent":
       return state.episodes.length;
     case "search":
@@ -144,11 +156,40 @@ function onDashboard(state: State, input: string, key: KeyPress): State {
         return { ...go(state, "recent"), loading: true };
       case "Search memories":
         return { ...go(state, "searching"), previous: "dashboard", draftQuery: "" };
+      case "Projects":
+        return go(state, "projects");
       case "Quit":
         return { ...state, exit: true };
       default:
         return state;
     }
+  }
+  return state;
+}
+
+/**
+ * Picking a project switches what the rest of the UI is looking at.
+ *
+ * Without this the TUI could only ever show the directory you launched from,
+ * which is useless from a home directory or any repo that is not the one you
+ * want to read about.
+ */
+function onProjects(state: State, input: string, key: KeyPress): State {
+  if (isUp(input, key)) return { ...state, cursor: Math.max(0, state.cursor - 1) };
+  if (isDown(input, key)) {
+    return { ...state, cursor: Math.min(state.projects.length - 1, state.cursor + 1) };
+  }
+  if (key.escape) return go(state, "dashboard");
+
+  if (isEnter(input, key)) {
+    const project = state.projects[state.cursor];
+    if (!project) return state;
+    return {
+      ...go(state, "recent"),
+      activeProject: project.project_key,
+      episodes: [],
+      loading: true,
+    };
   }
   return state;
 }
@@ -265,6 +306,8 @@ export function reduce(state: State, action: Action): State {
       switch (state.screen) {
         case "dashboard":
           return onDashboard(state, input, key);
+        case "projects":
+          return onProjects(state, input, key);
         case "recent":
         case "search":
           return onList(state, input, key);
@@ -285,9 +328,11 @@ export function reduce(state: State, action: Action): State {
 /** What the reducer cannot do itself: the side effect a key implies. */
 export function effectFor(before: State, after: State, input: string): Effect | null {
   if (after.screen === "recent" && before.screen !== "recent" && after.loading) {
-    return { type: "fetchEpisodes" };
+    return { type: "fetchEpisodes", projectKey: after.activeProject };
   }
-  if (after.query !== before.query && after.query) return { type: "search", query: after.query };
+  if (after.query !== before.query && after.query) {
+    return { type: "search", query: after.query, projectKey: after.activeProject };
+  }
   if (before.screen === "confirmDelete" && input === "y" && before.selected) {
     return { type: "delete", episodeUuid: before.selected.uuid };
   }
@@ -306,8 +351,8 @@ export function effectFor(before: State, after: State, input: string): Effect | 
 }
 
 export type Effect =
-  | { type: "fetchEpisodes" }
-  | { type: "search"; query: string }
+  | { type: "fetchEpisodes"; projectKey: string }
+  | { type: "search"; query: string; projectKey: string }
   | { type: "delete"; episodeUuid: string }
   | { type: "rate"; episodeUuid: string; rating: 1 | -1; query: string }
   | { type: "promote"; episodeUuid: string };
