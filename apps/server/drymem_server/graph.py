@@ -11,7 +11,7 @@ import asyncio
 
 from graphiti_core import Graphiti
 
-from drymem_server.extraction import build_embedder, build_llm_client
+from drymem_server.extraction import build_cross_encoder, build_embedder, build_llm_client
 from drymem_server.settings import settings
 
 _instance: Graphiti | None = None
@@ -40,6 +40,8 @@ async def get_graphiti() -> Graphiti:
         settings.neo4j_password,
         llm_client=build_llm_client(),
         embedder=build_embedder(),
+        # Never let Graphiti fall back to its OpenAI default — see build_cross_encoder.
+        cross_encoder=build_cross_encoder(),
     )
 
     # Indices live in the database, not the client, so this is once per process.

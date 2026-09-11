@@ -85,3 +85,35 @@ class TestDegradedSave:
         assert result.uuid == "fallback-uuid", "the memory must still be stored"
         assert result.degraded and "ollama is not running" in result.degraded
         assert saved["body"] == "the summary", "the author's text must survive verbatim"
+
+
+def test_env_lookup_does_not_assume_a_repo_layout():
+    """The container crashed on import because this counted parent directories.
+
+    `drymem_server` sits 3 levels below the repo root in the monorepo, at the
+    filesystem root in the image, and elsewhere again when pip-installed.
+    """
+    from drymem_server.settings import find_env_file
+
+    found = find_env_file()
+    assert found is None or found.name == ".env"
+
+
+class TestCrossEncoder:
+    """Graphiti's default reranker points at api.openai.com. Ours must not."""
+
+    def test_is_pinned_to_the_local_endpoint(self, monkeypatch):
+        from drymem_server.extraction import build_cross_encoder
+
+        monkeypatch.setattr(extraction.settings, "local_llm_url", "http://localhost:11434/v1")
+        encoder = build_cross_encoder()
+
+        assert "localhost:11434" in str(encoder.client.base_url)
+        assert "api.openai.com" not in str(encoder.client.base_url)
+
+    def test_does_not_need_an_openai_key(self, monkeypatch):
+        """The server must start with no OPENAI_API_KEY anywhere."""
+        from drymem_server.extraction import build_cross_encoder
+
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        assert build_cross_encoder() is not None

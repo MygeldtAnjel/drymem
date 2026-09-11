@@ -6,8 +6,23 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# .env lives at the monorepo root, two levels above this package's project dir.
-_ENV = Path(__file__).resolve().parents[3] / ".env"
+
+def find_env_file() -> Path | None:
+    """The nearest .env above this package, if there is one.
+
+    Walking up rather than counting parents: the package sits three levels below
+    the repo root in the monorepo, at / in a container, and somewhere else again
+    when pip-installed. A fixed index crashes on import in two of those three.
+    Config comes from the environment in a container, so finding nothing is fine.
+    """
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / ".env"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+_ENV = find_env_file()
 
 
 class Settings(BaseSettings):

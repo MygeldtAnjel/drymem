@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
@@ -30,9 +29,12 @@ from drymem_server.memory_store import (
     MemoryStore,
     Metadata,
 )
+from drymem_server.settings import find_env_file
 
-# .env lives at the monorepo root, two levels above this package's project dir.
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+# Layout-independent: see settings.find_env_file.
+_env = find_env_file()
+if _env is not None:
+    load_dotenv(_env)
 
 mcp = FastMCP(
     "drymem",

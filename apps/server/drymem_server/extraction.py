@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from graphiti_core.cross_encoder.client import CrossEncoderClient
+from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.llm_client.client import LLMClient
 from graphiti_core.llm_client.config import LLMConfig
@@ -141,4 +143,32 @@ def build_embedder(kind: str | None = None) -> OpenAIEmbedder:
             embedding_dim=settings.embedding_dim,
             base_url=settings.local_llm_url,
         )
+    )
+
+
+def build_cross_encoder(kind: str | None = None) -> CrossEncoderClient:
+    """The reranker, pinned to the local endpoint.
+
+    Graphiti defaults this to `OpenAIRerankerClient()` with a bare config — no
+    base_url, so it points at api.openai.com and requires OPENAI_API_KEY. Two
+    problems with letting that default stand:
+
+    1. The server will not start without an OpenAI key, which is absurd for a
+       deployment whose whole point is that no model call leaves the network.
+    2. Today's default search recipe reranks with RRF (pure maths, no model), so
+       nothing is sent anywhere — but a future recipe that does use the cross
+       encoder would start shipping passage text to OpenAI silently.
+
+    Pointing it at the same local server closes both.
+    """
+    kind = (kind or settings.drymem_extractor).lower()
+    base_url = settings.local_llm_url
+    model = settings.local_llm_model
+
+    if kind == ANTHROPIC and settings.anthropic_api_key:
+        # Anthropic has no logprobs endpoint for reranking, so stay local here.
+        pass
+
+    return OpenAIRerankerClient(
+        config=LLMConfig(api_key="not-needed", model=model, base_url=base_url)
     )

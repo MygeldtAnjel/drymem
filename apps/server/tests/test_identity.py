@@ -23,11 +23,7 @@ CANONICAL = "github.com/acme/drymem"
 # cases live in one file neither side can change alone.
 FIXTURES = json.loads(
     (
-        Path(__file__).resolve().parents[3]
-        / "packages"
-        / "api-types"
-        / "fixtures"
-        / "remotes.json"
+        Path(__file__).resolve().parents[3] / "packages" / "api-types" / "fixtures" / "remotes.json"
     ).read_text()
 )
 
@@ -51,9 +47,7 @@ def test_shared_fixture_rejects(url):
     assert normalize_remote(url) is None
 
 
-@pytest.mark.parametrize(
-    "case", FIXTURES["groupIds"], ids=[c["key"] for c in FIXTURES["groupIds"]]
-)
+@pytest.mark.parametrize("case", FIXTURES["groupIds"], ids=[c["key"] for c in FIXTURES["groupIds"]])
 def test_shared_fixture_group_ids(case):
     assert sanitize_group_id(case["key"]) == case["groupId"]
 
