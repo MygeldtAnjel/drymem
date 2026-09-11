@@ -254,6 +254,93 @@ async def migrate_scopes(project_key: str) -> int:
     return 0
 
 
+async def stats(days: int) -> int:
+    """The numbers the pilot is judged on.
+
+    PLAN.md sets the bar at 90% useful on retrievals. That number has to come
+    from somewhere, and until there is a dashboard (step 6) this is where.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import case, func
+
+    from drymem_server.db.models import AuditLog, Memory, MemoryFeedback, ProjectMember
+
+    # Computed here rather than as a SQL interval: asyncpg will not encode a
+    # string into an INTERVAL parameter, and a datetime is portable anyway.
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        totals = (
+            await session.execute(
+                select(
+                    func.count(Memory.id),
+                    func.count(case((Memory.scope == "team", Memory.id))),
+                    func.count(func.distinct(Memory.author_id)),
+                )
+            )
+        ).one()
+
+        feedback = (
+            await session.execute(
+                select(
+                    func.count(case((MemoryFeedback.rating > 0, MemoryFeedback.id))),
+                    func.count(case((MemoryFeedback.rating < 0, MemoryFeedback.id))),
+                )
+            )
+        ).one()
+
+        per_project = (
+            await session.execute(
+                select(Project.project_key, func.count(Memory.id))
+                .outerjoin(Memory, Memory.project_id == Project.id)
+                .group_by(Project.project_key)
+                .order_by(func.count(Memory.id).desc())
+            )
+        ).all()
+
+        recent = (
+            await session.execute(
+                select(func.date(Memory.created_at), func.count(Memory.id))
+                .where(Memory.created_at >= cutoff)
+                .group_by(func.date(Memory.created_at))
+                .order_by(func.date(Memory.created_at).desc())
+            )
+        ).all()
+
+        members = (await session.execute(select(func.count(ProjectMember.id)))).scalar() or 0
+        promotions = (
+            await session.execute(
+                select(func.count(AuditLog.id)).where(AuditLog.action == "memory.promote")
+            )
+        ).scalar() or 0
+
+    total, team, authors = totals
+    up, down = feedback
+    rated = up + down
+
+    print(f"memories      {total}  ({team} shared, {total - team} private)")
+    print(f"authors       {authors}")
+    print(f"memberships   {members}")
+    print(f"promotions    {promotions}")
+    if rated:
+        print(f"useful        {round(up / rated * 100)}%  ({up} up, {down} down, {rated} rated)")
+    else:
+        print("useful        no ratings yet — the 90% bar needs these")
+
+    print("\nper project")
+    for key, count in per_project:
+        print(f"  {count:5}  {key}")
+
+    print(f"\nsaves, last {days} days")
+    if not recent:
+        print("  none")
+    for day, count in recent:
+        print(f"  {day}  {'█' * min(count, 40)} {count}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -277,6 +364,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("migrate-scopes", help="Move pre-3A memories into their author's group")
     p.add_argument("project_key")
 
+    p = sub.add_parser("stats", help="The numbers the pilot is judged on")
+    p.add_argument("--days", type=int, default=14)
+
     args = parser.parse_args(argv)
     if args.command == "user-create":
         return asyncio.run(user_create(args.email, args.org, args.name))
@@ -286,6 +376,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(backfill(args.project_key, args.email))
     if args.command == "migrate-scopes":
         return asyncio.run(migrate_scopes(args.project_key))
+    if args.command == "stats":
+        return asyncio.run(stats(args.days))
     return asyncio.run(token_revoke(args.label))
 
 
