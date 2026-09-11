@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/Icons.tsx","./src/Markdown.tsx","./src/Marks.tsx","./src/SignIn.tsx","./src/api.ts","./src/format.ts","./src/main.tsx"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/Entry.tsx","./src/Icons.tsx","./src/Markdown.tsx","./src/Marks.tsx","./src/Panes.tsx","./src/SignIn.tsx","./src/api.ts","./src/format.ts","./src/main.tsx","./src/memory.ts"],"version":"5.9.3"}

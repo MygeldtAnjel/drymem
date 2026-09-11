@@ -35,10 +35,51 @@ Use a consistent `topic_key` to link related sessions.
 ```
 project_path:  current working directory
 topic_key:     short/descriptive-key  (e.g. "auth/jwt-setup", "db/migration-fix")
-summary:       structured markdown — include problem, solution, affected files, key learnings
+type:          decision | architecture | bugfix | discovery | convention | note
+summary:       markdown under the five headings below
 ```
 
 Do NOT announce that you are saving — just do it silently.
+
+### The shape of a summary
+
+Write these five headings. A teammate arriving six months later reads the
+headings first and the prose only if one of them is the thing they came for.
+
+```markdown
+## Summary
+What happened, in two lines.
+
+## Why
+What forced it — the constraint, the bug, the deadline. Not "we chose X"
+but what made every alternative worse.
+
+## Where
+Files, services, commands, endpoints. Enough to find it again.
+
+## Key details
+The specifics worth keeping: version numbers, flags, exact error text.
+
+## Learned
+What you now know that you did not before. If nothing, say so and cut it.
+```
+
+Prose without headings still saves and still reads. The headings are what make
+a memory scannable in the web UI, where each one becomes a labelled section.
+
+### Choosing a type
+
+| Type | The question it answers |
+|---|---|
+| `decision` | Why is it done this way and not the obvious way? |
+| `architecture` | How is this part put together? |
+| `bugfix` | What broke, why, and what actually fixed it? |
+| `discovery` | What is true about this system that nobody wrote down? |
+| `convention` | How does this team do this recurring thing? |
+| `note` | Anything else worth not losing. |
+
+An unrecognised type becomes `note` rather than failing the save — a taxonomy
+label is never worth losing a memory over.
 
 ---
 

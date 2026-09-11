@@ -19,6 +19,14 @@ class SaveMemoryRequest(BaseModel):
     summary: str = Field(..., min_length=1, description="Markdown body written by the agent")
     topic_key: str = Field("", description="Stable key for cross-session linking")
     tool: str = Field("claude-code", description="Which agent produced this")
+    type: str = Field(
+        "note",
+        description=(
+            "decision · architecture · bugfix · discovery · convention · note. "
+            "An unknown value becomes 'note' rather than failing the save."
+        ),
+    )
+    session_id: str = Field("", description="The agent run this came out of")
 
 
 class UpdateMemoryRequest(BaseModel):
@@ -26,6 +34,8 @@ class UpdateMemoryRequest(BaseModel):
     update_summary: str = Field(..., min_length=1)
     replace: bool = Field(False, description="Delete prior episodes for this topic first")
     tool: str = "claude-code"
+    type: str = "note"
+    session_id: str = ""
 
 
 class SaveMemoryResponse(BaseModel):
@@ -62,6 +72,14 @@ class EpisodeOut(BaseModel):
     created_at: datetime | None = None
     author: str | None = None
     scope: str = "private"
+    # Everything below comes from the index, not the graph. `title` is what a
+    # person wrote; `name` is the topic key a machine keys on.
+    title: str = ""
+    type: str = "note"
+    session_id: str = ""
+    topic_key: str = ""
+    promoted_at: datetime | None = None
+    rating: int | None = Field(None, description="+1, -1, or null when unrated")
 
 
 class ContextResponse(BaseModel):
@@ -153,6 +171,75 @@ class DistillResponse(BaseModel):
     content: str
     model: str
     memory_count: int
+
+
+class SessionOut(BaseModel):
+    session_id: str
+    author: str
+    memory_count: int
+    shared: int = 0
+    started_at: datetime
+    ended_at: datetime
+    titles: list[str] = []
+    synthetic: bool = Field(
+        False, description="Grouped by author and day because no session id was recorded"
+    )
+
+
+class SessionsResponse(BaseModel):
+    project_key: str
+    sessions: list[SessionOut]
+
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    name: str | None = None
+    memory_count: int = 0
+    project_count: int = 0
+    created_at: datetime | None = None
+
+
+class UsersResponse(BaseModel):
+    users: list[UserOut]
+
+
+class SkillOut(BaseModel):
+    id: str
+    name: str
+    topic: str
+    content: str
+    author: str
+    model: str | None = None
+    memory_count: int = 0
+    updated_at: datetime | None = None
+
+
+class SkillsResponse(BaseModel):
+    project_key: str
+    skills: list[SkillOut]
+
+
+class PublishSkillRequest(BaseModel):
+    project_key: str
+    name: str = Field(..., min_length=1, max_length=200)
+    topic: str = Field("", max_length=300)
+    content: str = Field(..., min_length=1)
+    model: str | None = None
+    memory_count: int = 0
+
+
+class MemoryTypeOut(BaseModel):
+    name: str
+    description: str
+
+
+class MemorySchemaResponse(BaseModel):
+    """The shape a well-written memory has. Served so clients need no copy of it."""
+
+    types: list[MemoryTypeOut]
+    sections: list[str]
+    template: str
 
 
 class HealthResponse(BaseModel):

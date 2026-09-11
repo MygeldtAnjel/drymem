@@ -33,6 +33,43 @@ export interface EpisodeOut {
   created_at: string | null;
   author: string | null;
   scope: string;
+  title: string;
+  type: string;
+  session_id: string;
+  topic_key: string;
+  promoted_at: string | null;
+  rating: number | null;
+}
+
+export interface SessionOut {
+  session_id: string;
+  author: string;
+  memory_count: number;
+  shared: number;
+  started_at: string;
+  ended_at: string;
+  titles: string[];
+  synthetic: boolean;
+}
+
+export interface UserOut {
+  id: string;
+  email: string;
+  name: string | null;
+  memory_count: number;
+  project_count: number;
+  created_at: string | null;
+}
+
+export interface SkillOut {
+  id: string;
+  name: string;
+  topic: string;
+  content: string;
+  author: string;
+  model: string | null;
+  memory_count: number;
+  updated_at: string | null;
 }
 
 export interface ProjectOut {
@@ -136,6 +173,8 @@ export class DrymemClient {
     summary: string;
     topic_key?: string;
     tool?: string;
+    type?: string;
+    session_id?: string;
   }): Promise<SaveResult> {
     return this.request<SaveResult>("/v1/memories", {
       method: "POST",
@@ -145,7 +184,14 @@ export class DrymemClient {
 
   update(
     topicKey: string,
-    body: { project_key: string; update_summary: string; replace?: boolean; tool?: string },
+    body: {
+      project_key: string;
+      update_summary: string;
+      replace?: boolean;
+      tool?: string;
+      type?: string;
+      session_id?: string;
+    },
   ): Promise<SaveResult> {
     return this.request<SaveResult>(`/v1/memories/${topicKey}`, {
       method: "PATCH",
@@ -211,6 +257,50 @@ export class DrymemClient {
       method: "POST",
       body: JSON.stringify({ project_key: projectKey, topic }),
     });
+  }
+
+  /** The sittings a project's memories came out of. */
+  async sessions(projectKey: string, limit = 50): Promise<SessionOut[]> {
+    const data = await this.request<{ sessions: SessionOut[] }>(
+      `/v1/sessions?${this.query({ project_key: projectKey, limit })}`,
+    );
+    return data.sessions;
+  }
+
+  /** Everyone in this org. Counts only — never anyone's memories. */
+  async users(): Promise<UserOut[]> {
+    return (await this.request<{ users: UserOut[] }>("/v1/users")).users;
+  }
+
+  /** Skills this project has published. */
+  async skills(projectKey: string): Promise<SkillOut[]> {
+    const data = await this.request<{ skills: SkillOut[] }>(
+      `/v1/skills?${this.query({ project_key: projectKey })}`,
+    );
+    return data.skills;
+  }
+
+  /** Publish a reviewed draft. Publishing the same name again replaces it. */
+  async publishSkill(body: {
+    project_key: string;
+    name: string;
+    topic?: string;
+    content: string;
+    model?: string | null;
+    memory_count?: number;
+  }): Promise<SkillOut> {
+    return this.request<SkillOut>("/v1/skills", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteSkill(projectKey: string, name: string): Promise<boolean> {
+    const data = await this.request<{ deleted: boolean }>(
+      `/v1/skills/${encodeURIComponent(name)}?${this.query({ project_key: projectKey })}`,
+      { method: "DELETE" },
+    );
+    return data.deleted;
   }
 
   async projects(): Promise<ProjectOut[]> {

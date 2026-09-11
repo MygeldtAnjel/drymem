@@ -1,0 +1,77 @@
+{
+  "_comment": [
+    "Read by BOTH apps/server/tests/test_schema.py and apps/web/test/memory.test.ts.",
+    "The two section parsers must agree: the server decides what a memory means,",
+    "the browser decides how it is laid out, and a body that splits one way in",
+    "Python and another way in TypeScript is a memory that reads differently",
+    "depending on where you opened it. Change a case and both suites move."
+  ],
+  "cases": [
+    {
+      "why": "the template",
+      "body": "## Summary\nwhat happened\n\n## Why\nwhat forced it\n\n## Where\nsrc/app.ts\n\n## Key details\nthe specifics\n\n## Learned\nthe lesson",
+      "lead": "",
+      "sections": [
+        { "heading": "Summary", "canonical": "Summary" },
+        { "heading": "Why", "canonical": "Why" },
+        { "heading": "Where", "canonical": "Where" },
+        { "heading": "Key details", "canonical": "Key details" },
+        { "heading": "Learned", "canonical": "Learned" }
+      ]
+    },
+    {
+      "why": "prose with no headings stays prose",
+      "body": "Just a paragraph.\n\nAnd another one.",
+      "lead": "Just a paragraph.\n\nAnd another one.",
+      "sections": []
+    },
+    {
+      "why": "a bold line on its own is a heading",
+      "body": "**Why**\nbecause\n\n**Learned:**\nthings",
+      "lead": "",
+      "sections": [
+        { "heading": "Why", "canonical": "Why" },
+        { "heading": "Learned", "canonical": "Learned" }
+      ]
+    },
+    {
+      "why": "a bold list item is not a heading",
+      "body": "- **Why**: because\n- **Where**: here",
+      "lead": "- **Why**: because\n- **Where**: here",
+      "sections": []
+    },
+    {
+      "why": "a long emphasised sentence is not a heading",
+      "body": "**this is an emphasised sentence that runs on well past any plausible heading length**\nrest",
+      "lead": "**this is an emphasised sentence that runs on well past any plausible heading length**\nrest",
+      "sections": []
+    },
+    {
+      "why": "the headings memories were written with before the template",
+      "body": "# Spec — step 2A\n\nlead-in\n\n## Problem Statement\nit did not work\n\n## Solution\nwe fixed it\n\n## Affected files\nsrc/a.ts\n\n## Key learnings\nrun the real thing",
+      "lead": "",
+      "sections": [
+        { "heading": "Spec — step 2A", "canonical": null },
+        { "heading": "Problem Statement", "canonical": "Why" },
+        { "heading": "Solution", "canonical": "Key details" },
+        { "heading": "Affected files", "canonical": "Where" },
+        { "heading": "Key learnings", "canonical": "Learned" }
+      ]
+    },
+    {
+      "why": "a lead paragraph before the first heading is kept",
+      "body": "Everything worked in the end.\n\n## Learned\nrun it",
+      "lead": "Everything worked in the end.",
+      "sections": [{ "heading": "Learned", "canonical": "Learned" }]
+    },
+    {
+      "why": "the team's own headings survive, just unlabelled",
+      "body": "## Rollout plan\nstep one\n\n## Open questions\nnone",
+      "lead": "",
+      "sections": [
+        { "heading": "Rollout plan", "canonical": null },
+        { "heading": "Open questions", "canonical": null }
+      ]
+    }
+  ]
+}

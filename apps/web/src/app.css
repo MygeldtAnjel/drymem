@@ -153,7 +153,26 @@ select.index__project {
 }
 .entry__name {
   color: var(--paper);
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A register whose subject *is* a machine-named string — a session id, a
+   project key, a skill slug — sets that string in mono. The Two-Voices rule
+   holds whether the string is a title or a subtitle. */
+.entry__name--key {
+  font-family: var(--mono);
   font-size: 0.8125rem;
+}
+
+/* The topic key sits under the title, not in place of it: it is a machine's
+   name for the entry, and a reader scanning a column wants the person's. */
+.entry__key {
+  color: var(--ink-400);
+  font-size: 0.6875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -293,8 +312,16 @@ select.index__project {
 .page__signal .legend {
   color: var(--paper-ink-soft);
 }
+/* Same rule on the page: a key or an id keeps the mono face, at a size that
+   still reads as the title of the page rather than a field value. */
+.page__head h1.mono {
+  font-family: var(--mono);
+  font-size: var(--step-3);
+  letter-spacing: -0.015em;
+}
 .page__head h1 {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.875rem;
+  font-family: var(--serif);
   font-size: var(--step-3);
   font-weight: 400;
   color: var(--paper-ink);
@@ -694,7 +721,11 @@ select.index__project {
 @media (max-width: 760px) {
   .volume {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    /* One row, because only one pane is ever visible. Two rows placed the
+       visible pane in the `auto` track once the other was `display: none`,
+       so a short page was sized to its content and the chrome showed
+       through beneath it. */
+    grid-template-rows: minmax(0, 1fr);
     height: 100vh;
   }
   /* One pane at a time on a phone: the list, or the entry with a way back.
@@ -801,5 +832,204 @@ select.index__project {
   }
   .rail {
     grid-row: 3;
+  }
+}
+
+
+/* ─── the registers ──────────────────────────────────────────────────── */
+
+/*
+ * Five sections, in the index head rather than a sidebar — the one structural
+ * move this world refuses. They read as tab cards on a ledger's edge: quiet
+ * small caps, and the open one stamped with a gilt rule the way a selected
+ * entry is stamped with one.
+ */
+.registers {
+  display: flex;
+  gap: 0.125rem;
+  margin: -0.25rem -0.25rem -0.375rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.registers::-webkit-scrollbar {
+  display: none;
+}
+.registers__tab {
+  padding: 0.375rem 0.5rem 0.5rem;
+  color: var(--ink-400);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.registers__tab:hover {
+  color: var(--ink-200);
+}
+.registers__tab--on {
+  color: var(--paper);
+  border-bottom-color: var(--gilt);
+}
+
+/* ─── the facts about an entry ───────────────────────────────────────── */
+
+/*
+ * What a citation carries besides its prose: type, author, when it was filed,
+ * where it belongs, whether it still stands. Set as a term list rather than a
+ * table, two columns where there is room and one where there is not — a table
+ * of six rows is a grid pretending to be data.
+ */
+.cite {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.5rem 2rem;
+  margin: 0;
+}
+.cite > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+}
+.cite dt {
+  /* `.legend` colours for chrome; on paper that grey measures 1.9:1. */
+  color: var(--paper-ink-soft);
+}
+.cite dd {
+  margin: 0;
+  font-size: var(--step-0);
+  color: var(--paper-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ─── a memory's sections ────────────────────────────────────────────── */
+
+/*
+ * A heading from the template is a *running term* — the standing question this
+ * paragraph answers — so it is set in the small-caps voice above a hairline.
+ * A heading the author invented stays an ordinary prose heading. Neither is
+ * louder than the other; they are simply different kinds of thing, and a
+ * reader can tell the shape of a memory from its writing at a glance.
+ */
+.sect {
+  margin-top: 2.25rem;
+}
+.sect > .prose {
+  margin-top: 0.65rem;
+}
+.sect__term {
+  max-width: var(--measure);
+  margin: 0;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--paper-edge);
+  color: var(--paper-ink-soft);
+}
+.sect__own {
+  max-width: var(--measure);
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--step-3);
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--paper-ink);
+}
+
+/* ─── register pages ─────────────────────────────────────────────────── */
+
+.plain {
+  max-width: var(--measure);
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  line-height: 1.62;
+}
+.plain li {
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--paper-edge);
+  display: flex;
+  gap: 0.625rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.plain .legend {
+  color: var(--paper-ink-soft);
+  flex: none;
+}
+.link {
+  padding: 0;
+  color: var(--oxblood);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: left;
+  font: inherit;
+}
+.link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.sect > p {
+  max-width: var(--measure);
+  margin: 0.65rem 0 0;
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  line-height: 1.62;
+  color: var(--paper-ink);
+}
+.sect > p.muted {
+  font-size: var(--step-1);
+  color: var(--paper-ink-soft);
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  max-width: var(--measure);
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+.field {
+  flex: 1;
+  min-width: 12rem;
+  background: transparent;
+  border: 1px solid var(--paper-edge);
+  border-radius: 3px;
+  padding: 0.4375rem 0.625rem;
+  color: var(--paper-ink);
+  font-family: var(--mono);
+  font-size: var(--step-0);
+}
+.field:focus {
+  border-color: var(--oxblood);
+  outline: none;
+}
+.field::placeholder {
+  color: var(--paper-ink-soft);
+}
+
+/* The primary button on paper: gilt is 1.99:1 there, so the binding acts. */
+.page__sheet .btn--gilt {
+  background: var(--oxblood);
+  color: var(--paper);
+}
+.page__sheet .btn--gilt:disabled {
+  background: transparent;
+  color: var(--paper-ink-soft);
+  border: 1px solid var(--paper-edge);
+}
+
+@media (max-width: 760px) {
+  .registers {
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+  }
+  .cite {
+    grid-template-columns: 1fr;
+  }
+  .plain {
+    font-size: var(--step-1);
+  }
+  .sect > p {
+    font-size: var(--step-1);
   }
 }

@@ -22,10 +22,12 @@ from drymem_server.db.models import (
     Memory,
     MemoryFeedback,
     Project,
+    Skill,
     User,
 )
 from drymem_server.identity import group_id_private, group_id_team, sanitize_group_id
 from drymem_server.memory_store import Episode, Fact, MemoryStore, Metadata
+from drymem_server.schema import DEFAULT_TYPE, normalize_type
 from drymem_server.scrubber import ScrubResult, scrub
 from drymem_server.settings import settings
 
@@ -54,6 +56,40 @@ def _title_from(name: str, body: str) -> str:
         if stripped and stripped != "---":
             return stripped[:_TITLE_LIMIT]
     return name[:_TITLE_LIMIT]
+
+
+@dataclass(frozen=True)
+class Entry:
+    """An episode plus what the index knows about it.
+
+    The graph holds the text; Postgres holds the title a person reads, the kind
+    of memory it is, when it was shared and how it was rated. A reader needs
+    both, and fetching them separately is what made the UI show a topic key
+    where a title belongs.
+    """
+
+    episode: Episode
+    title: str = ""
+    memory_type: str = DEFAULT_TYPE
+    session_id: str = ""
+    topic_key: str = ""
+    promoted_at: datetime | None = None
+    rating: int | None = None
+
+
+@dataclass(frozen=True)
+class SessionSummary:
+    """One sitting: the memories that came out of a single agent run."""
+
+    session_id: str
+    author: str
+    memory_count: int
+    started_at: datetime
+    ended_at: datetime
+    titles: list[str]
+    shared: int = 0
+    # True when the id was derived from author and day rather than recorded.
+    synthetic: bool = False
 
 
 @dataclass
@@ -127,17 +163,22 @@ class MemoryService:
         name: str,
         tool: str,
         topic_key: str | None = None,
+        memory_type: str | None = None,
+        session_id: str | None = None,
     ) -> SavedMemory:
         # Scrub first. Everything after this point either stores the text or
         # sends it to a model, and both are too late to take a secret back.
         cleaned = scrub(body, denylist())
 
+        kind = normalize_type(memory_type)
         project = await ensure_project(self.session, self.principal, project_key)
         metadata = Metadata(
             project_key=project_key,
             author=self.principal.email,
             tool=tool,
             scope=SCOPE_PRIVATE,
+            memory_type=kind,
+            session_id=session_id or "",
         )
 
         result = await self.store.save(
@@ -158,6 +199,8 @@ class MemoryService:
             title=_title_from(name, cleaned.text),
             tool=tool,
             scope=SCOPE_PRIVATE,
+            memory_type=kind,
+            session_id=session_id or None,
         )
         self.session.add(row)
         await self.session.flush()
@@ -177,18 +220,101 @@ class MemoryService:
         )
 
     async def context(self, *, project_key: str, limit: int) -> list[Episode]:
-        """Recent memories, team first.
+        """Recent memories, team first, each appearing once.
 
         The session-start hook has a budget of a few hundred tokens. Spending it
         on your own half-finished note when a teammate has already vouched for
-        an answer is the wrong trade.
+        an answer is the wrong trade — and spending it *twice* on the same note
+        is worse, which is what happened before the dedupe: promotion copies an
+        episode into the team group, so the author read both groups and got the
+        memory back two times.
         """
         episodes = await self.store.recent(
-            group_ids=await self.readable_groups(project_key), limit=limit
+            group_ids=await self.readable_groups(project_key), limit=limit * 2
         )
-        shared = [e for e in episodes if e.metadata and e.metadata.scope == SCOPE_TEAM]
-        own = [e for e in episodes if not (e.metadata and e.metadata.scope == SCOPE_TEAM)]
+
+        # Same name and same text is the same memory. The team copy wins,
+        # because "shared" is the more useful of the two things to be told.
+        by_identity: dict[tuple[str, str], Episode] = {}
+        for episode in episodes:
+            key = (episode.name, episode.content)
+            current = by_identity.get(key)
+            shared = episode.metadata is not None and episode.metadata.scope == SCOPE_TEAM
+            if current is None or (shared and not self._is_shared(current)):
+                by_identity[key] = episode
+
+        unique = sorted(
+            by_identity.values(),
+            key=lambda e: e.created_at or datetime.min.replace(tzinfo=UTC),
+            reverse=True,
+        )
+        shared = [e for e in unique if self._is_shared(e)]
+        own = [e for e in unique if not self._is_shared(e)]
         return (shared + own)[:limit]
+
+    @staticmethod
+    def _is_shared(episode: Episode) -> bool:
+        return episode.metadata is not None and episode.metadata.scope == SCOPE_TEAM
+
+    async def entries(self, *, project_key: str, limit: int) -> list[Entry]:
+        """Recent memories with their index rows attached.
+
+        One query for every uuid in the page rather than one per memory: the
+        list view is the most-hit read in the product and N+1 on it is the
+        difference between instant and noticeable.
+        """
+        episodes = await self.context(project_key=project_key, limit=limit)
+        if not episodes:
+            return []
+
+        uuids = [e.uuid for e in episodes]
+        rows = await self.session.execute(
+            select(
+                Memory,
+                func.coalesce(func.sum(MemoryFeedback.rating), 0),
+            )
+            .outerjoin(MemoryFeedback, MemoryFeedback.memory_id == Memory.id)
+            .where(
+                Memory.org_id == self.principal.org_id,
+                (Memory.episode_uuid.in_(uuids)) | (Memory.team_episode_uuid.in_(uuids)),
+            )
+            .group_by(Memory.id)
+        )
+
+        index: dict[str, tuple[Memory, int]] = {}
+        for memory, score in rows.all():
+            index[memory.episode_uuid] = (memory, score)
+            if memory.team_episode_uuid:
+                index[memory.team_episode_uuid] = (memory, score)
+
+        out: list[Entry] = []
+        for episode in episodes:
+            found = index.get(episode.uuid)
+            meta = episode.metadata
+            if found is None:
+                # Written straight to the graph — a backfill has not run yet.
+                out.append(
+                    Entry(
+                        episode=episode,
+                        title=episode.name,
+                        memory_type=meta.memory_type if meta else DEFAULT_TYPE,
+                        session_id=meta.session_id if meta else "",
+                    )
+                )
+                continue
+            memory, score = found
+            out.append(
+                Entry(
+                    episode=episode,
+                    title=memory.title,
+                    memory_type=memory.memory_type,
+                    session_id=memory.session_id or (meta.session_id if meta else ""),
+                    topic_key=memory.topic_key or "",
+                    promoted_at=memory.promoted_at,
+                    rating=None if score == 0 else (1 if score > 0 else -1),
+                )
+            )
+        return out
 
     async def episodes_for_topic(self, *, project_key: str, topic_key: str) -> list[Episode]:
         recent = await self.context(project_key=project_key, limit=50)
@@ -246,7 +372,7 @@ class MemoryService:
         """
         result = await self.session.execute(
             select(Memory).where(
-                Memory.episode_uuid == episode_uuid,
+                (Memory.episode_uuid == episode_uuid) | (Memory.team_episode_uuid == episode_uuid),
                 Memory.org_id == self.principal.org_id,
             )
         )
@@ -255,6 +381,12 @@ class MemoryService:
             return False
 
         await self.store.delete(episode_uuid)
+        # A promoted memory lives in two groups. Deleting only the one the
+        # caller named would leave the shared copy readable by the whole team
+        # after its author believed they had removed it.
+        for other in (row.episode_uuid, row.team_episode_uuid):
+            if other and other != episode_uuid:
+                await self.store.delete(other)
         await self.session.delete(row)
         await self.session.flush()
         return True
@@ -270,7 +402,7 @@ class MemoryService:
         """
         result = await self.session.execute(
             select(Memory).where(
-                Memory.episode_uuid == episode_uuid,
+                (Memory.episode_uuid == episode_uuid) | (Memory.team_episode_uuid == episode_uuid),
                 Memory.org_id == self.principal.org_id,
                 Memory.author_id == self.principal.user_id,
             )
@@ -292,7 +424,7 @@ class MemoryService:
         if original is None:
             return None
 
-        await self.store.save(
+        copy = await self.store.save(
             name=original.name,
             body=original.content,
             group_id=group_id_team(project.project_key),
@@ -301,9 +433,12 @@ class MemoryService:
                 author=self.principal.email,
                 tool=memory.tool,
                 scope=SCOPE_TEAM,
+                memory_type=memory.memory_type,
+                session_id=memory.session_id or "",
             ),
         )
 
+        memory.team_episode_uuid = copy.uuid
         memory.scope = SCOPE_TEAM
         memory.promoted_at = datetime.now(UTC)
         memory.promoted_by = self.principal.user_id
@@ -319,7 +454,7 @@ class MemoryService:
         """
         result = await self.session.execute(
             select(Memory).where(
-                Memory.episode_uuid == episode_uuid,
+                (Memory.episode_uuid == episode_uuid) | (Memory.team_episode_uuid == episode_uuid),
                 Memory.org_id == self.principal.org_id,
             )
         )
@@ -418,6 +553,157 @@ class MemoryService:
             .order_by(Project.project_key)
         )
         return [tuple(row) for row in result.all()]
+
+    # ---- the management surface: sessions, people, skills -------------------
+
+    async def sessions(self, *, project_key: str, limit: int = 50) -> list[SessionSummary]:
+        """A project's memories grouped into the sittings that produced them.
+
+        Memories saved before sessions existed have no id, so they are grouped
+        by author and day and marked `synthetic`. Inventing a session id for
+        them would make a guess indistinguishable from a fact; saying "grouped
+        by day" costs one boolean and stays true.
+        """
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return []
+
+        rows = await self.session.execute(
+            select(Memory, User.email)
+            .join(User, User.id == Memory.author_id)
+            .where(Memory.project_id == project.id)
+            .order_by(Memory.created_at.desc())
+        )
+
+        groups: dict[str, list[tuple[Memory, str]]] = {}
+        synthetic: set[str] = set()
+        for memory, email in rows.all():
+            if memory.session_id:
+                key = memory.session_id
+            else:
+                key = f"{email}@{memory.created_at.date().isoformat()}"
+                synthetic.add(key)
+            groups.setdefault(key, []).append((memory, email))
+
+        summaries = [
+            SessionSummary(
+                session_id=key,
+                author=items[0][1],
+                memory_count=len(items),
+                started_at=min(m.created_at for m, _ in items),
+                ended_at=max(m.created_at for m, _ in items),
+                titles=[m.title for m, _ in items][:6],
+                shared=sum(1 for m, _ in items if m.scope == SCOPE_TEAM),
+                synthetic=key in synthetic,
+            )
+            for key, items in groups.items()
+        ]
+        summaries.sort(key=lambda x: x.ended_at, reverse=True)
+        return summaries[:limit]
+
+    async def org_users(self) -> list[tuple[User, int, int]]:
+        """Everyone in this org, with what they have contributed.
+
+        Org-wide rather than project-wide because this is the screen you open to
+        add someone to a project, and you cannot add a person you cannot see.
+        Only counts are exposed — never anyone's private memory.
+        """
+        from drymem_server.db.models import ProjectMember
+
+        rows = await self.session.execute(
+            select(
+                User,
+                func.count(func.distinct(Memory.id)),
+                func.count(func.distinct(ProjectMember.project_id)),
+            )
+            .outerjoin(Memory, Memory.author_id == User.id)
+            .outerjoin(ProjectMember, ProjectMember.user_id == User.id)
+            .where(User.org_id == self.principal.org_id)
+            .group_by(User.id)
+            .order_by(User.email)
+        )
+        return [tuple(row) for row in rows.all()]
+
+    async def skills(self, *, project_key: str) -> list[tuple[Skill, str]]:
+        """Skills published to a project, newest first."""
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return []
+        rows = await self.session.execute(
+            select(Skill, User.email)
+            .join(User, User.id == Skill.author_id)
+            .where(Skill.project_id == project.id)
+            .order_by(Skill.updated_at.desc())
+        )
+        return [(skill, email) for skill, email in rows.all()]
+
+    async def publish_skill(
+        self,
+        *,
+        project_key: str,
+        name: str,
+        topic: str,
+        content: str,
+        model: str | None,
+        memory_count: int,
+    ) -> Skill | None:
+        """Publish a distilled draft to the project, or replace the one there.
+
+        Republishing overwrites rather than duplicating: a skill is the team's
+        current answer to a subject, and two answers to one subject is the state
+        the product exists to prevent.
+        """
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return None
+
+        cleaned = scrub(content, denylist())
+        existing = (
+            await self.session.execute(
+                select(Skill).where(Skill.project_id == project.id, Skill.name == name)
+            )
+        ).scalar_one_or_none()
+
+        if existing is not None:
+            existing.content = cleaned.text
+            existing.topic = topic
+            existing.model = model
+            existing.memory_count = memory_count
+            existing.author_id = self.principal.user_id
+            self.audit("skill.update", f"{project_key}:{name}")
+            await self.session.flush()
+            return existing
+
+        skill = Skill(
+            org_id=self.principal.org_id,
+            project_id=project.id,
+            author_id=self.principal.user_id,
+            name=name,
+            topic=topic,
+            content=cleaned.text,
+            model=model,
+            memory_count=memory_count,
+        )
+        self.session.add(skill)
+        self.audit("skill.publish", f"{project_key}:{name}")
+        await self.session.flush()
+        return skill
+
+    async def delete_skill(self, *, project_key: str, name: str) -> bool:
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return False
+        skill = (
+            await self.session.execute(
+                select(Skill).where(Skill.project_id == project.id, Skill.name == name)
+            )
+        ).scalar_one_or_none()
+        if skill is None:
+            return False
+        await self.session.delete(skill)
+        self.audit("skill.delete", f"{project_key}:{name}")
+        await self.session.flush()
+        return True
 
     @staticmethod
     def timestamp() -> str:

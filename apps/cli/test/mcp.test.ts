@@ -109,6 +109,42 @@ describe("stdio lifecycle", () => {
     ]);
   });
 
+  it("asks for the shape a memory now has", async () => {
+    // The tool description is the memory protocol every agent follows. If the
+    // template stops being named here, agents stop writing it.
+    const messages = await talk([
+      rpc(1, "initialize", {
+        protocolVersion: "2024-11-05",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" },
+      }),
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n",
+      rpc(2, "tools/list"),
+    ]);
+
+    const listed = messages.find((m) => m.id === 2) as {
+      result: {
+        tools: Array<{
+          name: string;
+          inputSchema: { properties: Record<string, { description?: string }> };
+        }>;
+      };
+    };
+    const save = listed.result.tools.find((t) => t.name === "mem_finalize_session")!;
+
+    expect(Object.keys(save.inputSchema.properties).sort()).toEqual([
+      "project_path",
+      "session_id",
+      "summary",
+      "topic_key",
+      "type",
+    ]);
+    for (const section of ["Summary", "Why", "Where", "Key details", "Learned"]) {
+      expect(save.inputSchema.properties.summary!.description).toContain(section);
+    }
+    expect(save.inputSchema.properties.type!.description).toContain("decision");
+  });
+
   it("reports an unreachable server as a tool result, not a protocol error", async () => {
     const messages = await talk([
       rpc(1, "initialize", {

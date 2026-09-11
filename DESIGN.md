@@ -199,7 +199,9 @@ occupying the first viewport. What replaced it is a two-column volume — the in
 of entries on the left, the page on the right.
 
 **Key Characteristics:**
-- Two columns, never three: the volume index and the page.
+- Two columns, never three: the volume index and the page. Five registers
+  (entries, sittings, skills, projects, people) switch what the index lists and
+  what the page shows; they live in the index head, never in a sidebar.
 - One lit surface. India paper is where reading happens; everything else is chrome.
 - State is a shape first, a colour second — four SVG marks with a permanent legend.
 - Gilt for standing and selection; oxblood for binding and for striking.
@@ -297,8 +299,11 @@ mono stack is deliberately unpinned to the OS: it sets identifiers, not letterin
 - **Display** (Spectral 600, `clamp(2.5rem, 9vw, 3.5rem)`, line-height 1): the
   frontispiece wordmark, in gilt. One instance in the product.
 - **Headline** (Spectral 400, 1.375rem, line-height 1.25): the entry title and
-  `h2` inside prose. The entry title is set in **mono**, not serif — it is a
-  topic key, not a sentence.
+  `h2` inside prose. The title is a sentence a person wrote, so it takes the
+  serif; a page whose subject *is* a machine-named string — a session id, a
+  project key, a skill slug — sets the same headline in **mono** instead
+  (`h1.mono`, `.entry__name--key`). The topic key moved out of the heading and
+  into the citation block, where machine-named strings belong.
 - **Title** (Spectral 400, 1.0625rem): the index heading ("12 entries",
   "4 citing …").
 - **Body** (Spectral 400, 1.0625rem, line-height 1.62, measure 66ch): memory
@@ -328,7 +333,28 @@ it is.
 **The Space-Above Rule.** Every prose heading carries far more space above it
 than below (`2.25em` / `0.65em`), so a heading binds to the text it introduces.
 
+**The Running-Term Rule.** A memory's body splits into sections, and the two
+kinds of heading are set differently: a heading from the template (Summary, Why,
+Where, Key details, Learned) is a *running term* — the standing question that
+section answers — so it takes the small-caps label voice above a `paper-edge`
+hairline. A heading the author invented stays an ordinary serif prose heading.
+Neither is louder; they are different kinds of thing, and a reader can see the
+shape of a memory before reading a word of it. `.legend` recolours to
+`paper-ink-soft` wherever it lands on paper — the chrome grey measures 1.9:1
+there.
+
 ## Layout
+
+**The registers.** A row of small-caps tabs directly under the wordmark in the
+index head, horizontally scrollable, the open one stamped with a gilt bottom
+rule exactly as a selected entry is stamped with a gilt left rule. Five of them:
+Entries, Sittings, Skills, Projects, People. Each swaps the index's list and the
+page's content; the two-column frame never moves.
+
+**The citation block.** What a memory carries besides its prose — type, author,
+filed, project, topic, session, standing — as a `dl` in
+`repeat(auto-fit, minmax(13rem, 1fr))`, one column below 760px. A term list, not
+a table: six rows of facts is a grid pretending to be data.
 
 **The volume.** A full-viewport CSS grid, two columns:
 `minmax(21rem, 29rem) 1fr` — the index, then the page. Below 1100px the index
@@ -351,8 +377,12 @@ edge. Insets step down to 2rem at 1100px and 1.75rem / 1.25rem at 760px.
 appearing where a control needed an optical rather than a nominal value. Panel
 padding is 1.25rem, list-row padding 0.625rem × 0.75rem, icon-to-label gap 0.5rem.
 
-**Phone (≤760px).** The two panes become exclusive, driven by `data-pane` on the
-volume: the index *or* the entry, never both stacked — stacking meant scrolling
+**Phone (≤760px).** The volume becomes a **single** row
+(`grid-template-rows: minmax(0, 1fr)`), not two: with the hidden pane removed
+from layout, a two-row template placed the visible pane in the `auto` track, so
+a short page was sized to its content and the chrome showed through beneath it.
+The two panes are exclusive, driven by `data-pane` on the volume: the index *or*
+the entry, never both stacked — stacking meant scrolling
 past a dozen entries to reach the memory, and the actions never came into view.
 A back bar appears above the sheet, the margin rail becomes a bottom action bar
 (row direction, icon over uppercase label, larger icons at full opacity), the
@@ -464,6 +494,16 @@ references* column, showing facts rather than documents. Each fact is a treatmen
 mark, the fact text, and a metadata line; a superseded fact also carries the
 paper-on-oxblood "superseded" chip. Rows are divided by a 1px `ink-800` line
 rather than boxed.
+
+### Register Pages
+
+Sittings, skills, projects and people all open on the same sheet an entry does:
+a small-caps term, a title, a citation block, then content. A skill is a
+document, a project is a short one, a person is shorter still — none of them
+needed the table the dashboard reflex reaches for. Each carries its own back
+control, because on a phone the panes are exclusive and a page with no exit
+strands the reader. The one place gilt cannot follow is the primary button on
+paper (1.99:1), so `.page__sheet .btn--gilt` takes the binding instead.
 
 ### The Page (reading sheet)
 

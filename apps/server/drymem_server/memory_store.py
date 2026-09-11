@@ -29,6 +29,10 @@ class Metadata:
     author: str
     tool: str = "claude-code"
     scope: str = "private"
+    memory_type: str = "note"
+    # Empty rather than None so an episode written by a tool that does not
+    # track sessions still round-trips through `encode`/`decode` unchanged.
+    session_id: str = ""
     schema_version: int = SCHEMA_VERSION
 
     def encode(self) -> str:
@@ -39,6 +43,8 @@ class Metadata:
                 "author": self.author,
                 "tool": self.tool,
                 "scope": self.scope,
+                "type": self.memory_type,
+                "session_id": self.session_id,
             },
             separators=(",", ":"),
         )
@@ -59,6 +65,8 @@ class Metadata:
             author=data.get("author", ""),
             tool=data.get("tool", ""),
             scope=data.get("scope", "private"),
+            memory_type=data.get("type", "note"),
+            session_id=data.get("session_id", ""),
             schema_version=data.get("drymem", 0),
         )
 

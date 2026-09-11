@@ -253,6 +253,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/memories/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Memory Schema
+         * @description What a well-written memory looks like.
+         *
+         *     Served rather than duplicated in each client: the UI, the CLI and any future
+         *     editor plugin all need the same list, and three hand-copied lists drift.
+         */
+        get: operations["memory_schema_v1_memories_schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The sittings this project's memories came out of.
+         */
+        get: operations["list_sessions_v1_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description Everyone in this org, with counts only — never anyone's memories.
+         */
+        get: operations["list_users_v1_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Skills
+         * @description Skills this project has published.
+         */
+        get: operations["list_skills_v1_skills_get"];
+        put?: never;
+        /**
+         * Publish Skill
+         * @description Publish a reviewed draft to the project. Publishing twice replaces it.
+         */
+        post: operations["publish_skill_v1_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/skills/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Skill */
+        delete: operations["delete_skill_v1_skills__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -347,6 +451,33 @@ export interface components {
              * @default private
              */
             scope: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Type
+             * @default note
+             */
+            type: string;
+            /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
+            /**
+             * Topic Key
+             * @default
+             */
+            topic_key: string;
+            /** Promoted At */
+            promoted_at?: string | null;
+            /**
+             * Rating
+             * @description +1, -1, or null when unrated
+             */
+            rating?: number | null;
         };
         /** FactOut */
         FactOut: {
@@ -425,6 +556,25 @@ export interface components {
             /** Members */
             members: components["schemas"]["MemberOut"][];
         };
+        /**
+         * MemorySchemaResponse
+         * @description The shape a well-written memory has. Served so clients need no copy of it.
+         */
+        MemorySchemaResponse: {
+            /** Types */
+            types: components["schemas"]["MemoryTypeOut"][];
+            /** Sections */
+            sections: string[];
+            /** Template */
+            template: string;
+        };
+        /** MemoryTypeOut */
+        MemoryTypeOut: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+        };
         /** ProjectOut */
         ProjectOut: {
             /** Id */
@@ -463,6 +613,27 @@ export interface components {
             /** Promoted At */
             promoted_at?: string | null;
         };
+        /** PublishSkillRequest */
+        PublishSkillRequest: {
+            /** Project Key */
+            project_key: string;
+            /** Name */
+            name: string;
+            /**
+             * Topic
+             * @default
+             */
+            topic: string;
+            /** Content */
+            content: string;
+            /** Model */
+            model?: string | null;
+            /**
+             * Memory Count
+             * @default 0
+             */
+            memory_count: number;
+        };
         /** SaveMemoryRequest */
         SaveMemoryRequest: {
             /**
@@ -487,6 +658,18 @@ export interface components {
              * @default claude-code
              */
             tool: string;
+            /**
+             * Type
+             * @description decision · architecture · bugfix · discovery · convention · note. An unknown value becomes 'note' rather than failing the save.
+             * @default note
+             */
+            type: string;
+            /**
+             * Session Id
+             * @description The agent run this came out of
+             * @default
+             */
+            session_id: string;
         };
         /** SaveMemoryResponse */
         SaveMemoryResponse: {
@@ -525,6 +708,77 @@ export interface components {
             /** Results */
             results: components["schemas"]["FactOut"][];
         };
+        /** SessionOut */
+        SessionOut: {
+            /** Session Id */
+            session_id: string;
+            /** Author */
+            author: string;
+            /** Memory Count */
+            memory_count: number;
+            /**
+             * Shared
+             * @default 0
+             */
+            shared: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /**
+             * Titles
+             * @default []
+             */
+            titles: string[];
+            /**
+             * Synthetic
+             * @description Grouped by author and day because no session id was recorded
+             * @default false
+             */
+            synthetic: boolean;
+        };
+        /** SessionsResponse */
+        SessionsResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Sessions */
+            sessions: components["schemas"]["SessionOut"][];
+        };
+        /** SkillOut */
+        SkillOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Topic */
+            topic: string;
+            /** Content */
+            content: string;
+            /** Author */
+            author: string;
+            /** Model */
+            model?: string | null;
+            /**
+             * Memory Count
+             * @default 0
+             */
+            memory_count: number;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** SkillsResponse */
+        SkillsResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Skills */
+            skills: components["schemas"]["SkillOut"][];
+        };
         /** TopicsResponse */
         TopicsResponse: {
             /** Project Key */
@@ -549,6 +803,42 @@ export interface components {
              * @default claude-code
              */
             tool: string;
+            /**
+             * Type
+             * @default note
+             */
+            type: string;
+            /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
+        };
+        /** UserOut */
+        UserOut: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Memory Count
+             * @default 0
+             */
+            memory_count: number;
+            /**
+             * Project Count
+             * @default 0
+             */
+            project_count: number;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /** UsersResponse */
+        UsersResponse: {
+            /** Users */
+            users: components["schemas"]["UserOut"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -1006,6 +1296,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    memory_schema_v1_memories_schema_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemorySchemaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_v1_sessions_get: {
+        parameters: {
+            query: {
+                project_key: string;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_v1_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_skills_v1_skills_get: {
+        parameters: {
+            query: {
+                project_key: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_skill_v1_skills_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishSkillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_skill_v1_skills__name__delete: {
+        parameters: {
+            query: {
+                project_key: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteResponse"];
                 };
             };
             /** @description Validation Error */

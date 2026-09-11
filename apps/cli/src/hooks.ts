@@ -21,7 +21,7 @@ RULE 2 — PROACTIVE RETRIEVAL: Before starting any task, silently call mem_sear
 
 RULE 3 — PROACTIVE SAVING: Call mem_finalize_session silently after completing meaningful work (bug fixed, feature added, decision made). Do NOT wait for the user to ask. Do NOT announce that you are saving.
 
-RULE 4 — WHEN SAVING: Use mem_finalize_session with a clear topic_key (e.g. "auth/jwt-setup") and structured content: problem, solution, affected files, key learnings.
+RULE 4 — WHEN SAVING: Use mem_finalize_session with a clear topic_key (e.g. "auth/jwt-setup"), a type (decision | architecture | bugfix | discovery | convention | note), and a body under these headings: ## Summary, ## Why, ## Where, ## Key details, ## Learned.
 
 RULE 5 — SEARCH TIPS: Use single short keywords. "test" not "test structure testing".
 

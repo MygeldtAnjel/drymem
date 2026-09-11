@@ -40,7 +40,14 @@ IDE (Claude Code / Roo Code)
 | `mem_context` | Load recent episodes for a project |
 | `mem_search` | Search the knowledge graph by keyword |
 | `mem_finalize_session` | Save a session summary — Graphiti extracts entities & relationships |
+| `mem_update` | Add to a topic, or replace it |
 | `mem_delete` | Delete an episode by UUID |
+
+A saved memory carries a **type** — `decision`, `architecture`, `bugfix`,
+`discovery`, `convention` or `note` — and a body under five headings: *Summary*,
+*Why*, *Where*, *Key details*, *Learned*. Both are conventions, not requirements:
+an unknown type becomes `note` and an unstructured body still saves and still
+reads. The server serves the current shape at `GET /v1/memories/schema`.
 
 ---
 

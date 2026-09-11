@@ -21,6 +21,55 @@ export interface Episode {
   created_at: string | null;
   author: string | null;
   scope: string;
+  title: string;
+  type: string;
+  session_id: string;
+  topic_key: string;
+  promoted_at: string | null;
+  rating: number | null;
+}
+
+export interface Session {
+  session_id: string;
+  author: string;
+  memory_count: number;
+  shared: number;
+  started_at: string;
+  ended_at: string;
+  titles: string[];
+  synthetic: boolean;
+}
+
+export interface Person {
+  id: string;
+  email: string;
+  name: string | null;
+  memory_count: number;
+  project_count: number;
+  created_at: string | null;
+}
+
+export interface Member {
+  user_id: string;
+  email: string;
+  role: string;
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  topic: string;
+  content: string;
+  author: string;
+  model: string | null;
+  memory_count: number;
+  updated_at: string | null;
+}
+
+export interface Cluster {
+  topic: string;
+  memory_count: number;
+  facts: string[];
 }
 
 export interface Fact {
@@ -121,4 +170,61 @@ export const api = {
     request<{ scope: string }>(`/v1/memories/${uuid}/promote`, { method: "POST" }),
 
   remove: (uuid: string) => request(`/v1/memories/${uuid}`, { method: "DELETE" }),
+
+  sessions: async (projectKey: string): Promise<Session[]> => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    return (await request<{ sessions: Session[] }>(`/v1/sessions?${q}`)).sessions;
+  },
+
+  people: async (): Promise<Person[]> => (await request<{ users: Person[] }>("/v1/users")).users,
+
+  members: async (projectKey: string): Promise<Member[]> => {
+    const data = await request<{ members: Member[] }>(
+      `/v1/projects/${projectKey}/members`,
+    );
+    return data.members;
+  },
+
+  addMember: async (projectKey: string, email: string): Promise<Member[]> => {
+    const data = await request<{ members: Member[] }>(`/v1/projects/${projectKey}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    return data.members;
+  },
+
+  skills: async (projectKey: string): Promise<Skill[]> => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    return (await request<{ skills: Skill[] }>(`/v1/skills?${q}`)).skills;
+  },
+
+  publishSkill: (body: {
+    project_key: string;
+    name: string;
+    topic: string;
+    content: string;
+    model?: string | null;
+    memory_count?: number;
+  }) => request<Skill>("/v1/skills", { method: "POST", body: JSON.stringify(body) }),
+
+  removeSkill: (projectKey: string, name: string) => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    return request(`/v1/skills/${encodeURIComponent(name)}?${q}`, { method: "DELETE" });
+  },
+
+  /** Subjects the project's memories keep returning to. */
+  discover: async (projectKey: string, minMemories = 2): Promise<Cluster[]> => {
+    const q = new URLSearchParams({
+      project_key: projectKey,
+      min_memories: String(minMemories),
+    });
+    return (await request<{ clusters: Cluster[] }>(`/v1/skills/discover?${q}`)).clusters;
+  },
+
+  /** Draft a SKILL.md from the memories about a subject. Always a draft. */
+  distill: (projectKey: string, topic: string) =>
+    request<{ topic: string; name: string; content: string; model: string; memory_count: number }>(
+      "/v1/skills/distill",
+      { method: "POST", body: JSON.stringify({ project_key: projectKey, topic }) },
+    ),
 };

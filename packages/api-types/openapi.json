@@ -836,6 +836,361 @@
         }
       }
     },
+    "/v1/memories/schema": {
+      "get": {
+        "tags": [
+          "memories"
+        ],
+        "summary": "Memory Schema",
+        "description": "What a well-written memory looks like.\n\nServed rather than duplicated in each client: the UI, the CLI and any future\neditor plugin all need the same list, and three hand-copied lists drift.",
+        "operationId": "memory_schema_v1_memories_schema_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemorySchemaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "List Sessions",
+        "description": "The sittings this project's memories came out of.",
+        "operationId": "list_sessions_v1_sessions_get",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List Users",
+        "description": "Everyone in this org, with counts only \u2014 never anyone's memories.",
+        "operationId": "list_users_v1_users_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/skills": {
+      "get": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "List Skills",
+        "description": "Skills this project has published.",
+        "operationId": "list_skills_v1_skills_get",
+        "parameters": [
+          {
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Publish Skill",
+        "description": "Publish a reviewed draft to the project. Publishing twice replaces it.",
+        "operationId": "publish_skill_v1_skills_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishSkillRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/skills/{name}": {
+      "delete": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Delete Skill",
+        "operationId": "delete_skill_v1_skills__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -1040,6 +1395,50 @@
             "type": "string",
             "title": "Scope",
             "default": "private"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "note"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "default": ""
+          },
+          "topic_key": {
+            "type": "string",
+            "title": "Topic Key",
+            "default": ""
+          },
+          "promoted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promoted At"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating",
+            "description": "+1, -1, or null when unrated"
           }
         },
         "type": "object",
@@ -1228,6 +1627,54 @@
         ],
         "title": "MembersResponse"
       },
+      "MemorySchemaResponse": {
+        "properties": {
+          "types": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryTypeOut"
+            },
+            "type": "array",
+            "title": "Types"
+          },
+          "sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sections"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "types",
+          "sections",
+          "template"
+        ],
+        "title": "MemorySchemaResponse",
+        "description": "The shape a well-written memory has. Served so clients need no copy of it."
+      },
+      "MemoryTypeOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "MemoryTypeOut"
+      },
       "ProjectOut": {
         "properties": {
           "id": {
@@ -1318,6 +1765,54 @@
         ],
         "title": "PromoteResponse"
       },
+      "PublishSkillRequest": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Topic",
+            "default": ""
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Content"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "memory_count": {
+            "type": "integer",
+            "title": "Memory Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "name",
+          "content"
+        ],
+        "title": "PublishSkillRequest"
+      },
       "SaveMemoryRequest": {
         "properties": {
           "project_key": {
@@ -1342,6 +1837,18 @@
             "title": "Tool",
             "description": "Which agent produced this",
             "default": "claude-code"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "decision \u00b7 architecture \u00b7 bugfix \u00b7 discovery \u00b7 convention \u00b7 note. An unknown value becomes 'note' rather than failing the save.",
+            "default": "note"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "The agent run this came out of",
+            "default": ""
           }
         },
         "type": "object",
@@ -1438,6 +1945,163 @@
         ],
         "title": "SearchResponse"
       },
+      "SessionOut": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "memory_count": {
+            "type": "integer",
+            "title": "Memory Count"
+          },
+          "shared": {
+            "type": "integer",
+            "title": "Shared",
+            "default": 0
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "titles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Titles",
+            "default": []
+          },
+          "synthetic": {
+            "type": "boolean",
+            "title": "Synthetic",
+            "description": "Grouped by author and day because no session id was recorded",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "author",
+          "memory_count",
+          "started_at",
+          "ended_at"
+        ],
+        "title": "SessionOut"
+      },
+      "SessionsResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionOut"
+            },
+            "type": "array",
+            "title": "Sessions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "sessions"
+        ],
+        "title": "SessionsResponse"
+      },
+      "SkillOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "memory_count": {
+            "type": "integer",
+            "title": "Memory Count",
+            "default": 0
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "topic",
+          "content",
+          "author"
+        ],
+        "title": "SkillOut"
+      },
+      "SkillsResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillOut"
+            },
+            "type": "array",
+            "title": "Skills"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "skills"
+        ],
+        "title": "SkillsResponse"
+      },
       "TopicsResponse": {
         "properties": {
           "project_key": {
@@ -1480,6 +2144,16 @@
             "type": "string",
             "title": "Tool",
             "default": "claude-code"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "note"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "default": ""
           }
         },
         "type": "object",
@@ -1488,6 +2162,73 @@
           "update_summary"
         ],
         "title": "UpdateMemoryRequest"
+      },
+      "UserOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "memory_count": {
+            "type": "integer",
+            "title": "Memory Count",
+            "default": 0
+          },
+          "project_count": {
+            "type": "integer",
+            "title": "Project Count",
+            "default": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "UserOut"
+      },
+      "UsersResponse": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/UserOut"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users"
+        ],
+        "title": "UsersResponse"
       },
       "ValidationError": {
         "properties": {

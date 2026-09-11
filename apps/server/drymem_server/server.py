@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import sys
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
@@ -29,6 +30,7 @@ from drymem_server.memory_store import (
     MemoryStore,
     Metadata,
 )
+from drymem_server.schema import normalize_type
 from drymem_server.settings import find_env_file
 
 # Layout-independent: see settings.find_env_file.
@@ -53,10 +55,16 @@ def _timestamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
 
 
-def _metadata_for(project_path: str) -> Metadata:
+# One process per agent run, so the process is the session. See mcp.ts.
+SESSION_ID = f"s-{datetime.now(UTC).strftime('%Y%m%dT%H%M')}-{uuid4().hex[:6]}"
+
+
+def _metadata_for(project_path: str, memory_type: str = "note", session_id: str = "") -> Metadata:
     return Metadata(
         project_key=resolve_project_key(project_path),
         author=resolve_author(project_path),
+        memory_type=normalize_type(memory_type),
+        session_id=session_id or SESSION_ID,
     )
 
 
@@ -68,8 +76,11 @@ def _format_fact(fact: Fact) -> str:
 
 def _format_episode(episode: Episode) -> str:
     when = episode.created_at.strftime("%Y-%m-%d %H:%M") if episode.created_at else "?"
-    who = f" · {episode.metadata.author}" if episode.metadata else ""
-    return f"### {episode.name} ({when}{who})\n{episode.content[:_PREVIEW]}\n"
+    meta = episode.metadata
+    facts = [f for f in (meta.memory_type if meta else "", meta.author if meta else "", when) if f]
+    if meta and meta.scope == "team":
+        facts.append("shared")
+    return f"### {episode.name}\n{' · '.join(facts)}\n{episode.content[:_PREVIEW]}\n"
 
 
 # ---------------------------------------------------------------------------
@@ -80,15 +91,19 @@ async def mem_finalize_session(
     project_path: str,
     summary: str,
     topic_key: str = "",
+    type: str = "note",
+    session_id: str = "",
 ) -> str:
     """Save a structured session summary as a knowledge-graph episode.
 
     Args:
         project_path: Absolute path of the project (used for isolation).
-        summary: Markdown body — include problem, solution, affected files, learnings.
+        summary: Markdown body — Summary, Why, Where, Key details, Learned.
         topic_key: Optional stable key like 'auth/jwt-setup' for cross-session linking.
+        type: decision · architecture · bugfix · discovery · convention · note.
+        session_id: The agent run this came out of. Defaults to this session.
     """
-    metadata = _metadata_for(project_path)
+    metadata = _metadata_for(project_path, type, session_id)
     name = topic_key or f"session-{_timestamp()}"
 
     result = await store.save(

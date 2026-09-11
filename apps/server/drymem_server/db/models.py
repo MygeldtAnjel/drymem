@@ -28,6 +28,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from drymem_server.schema import DEFAULT_TYPE
+
 # Scope of a memory. Step 2A writes only PRIVATE; step 3A introduces promotion.
 SCOPE_PRIVATE = "private"
 SCOPE_TEAM = "team"
@@ -146,6 +148,7 @@ class Memory(Base, TimestampMixin):
         Index("ix_memories_project_created", "project_id", "created_at"),
         Index("ix_memories_project_scope", "project_id", "scope"),
         Index("ix_memories_topic", "project_id", "topic_key"),
+        Index("ix_memories_session", "project_id", "session_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=_uuid)
@@ -164,10 +167,19 @@ class Memory(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     tool: Mapped[str] = mapped_column(String(50), nullable=False, default="claude-code")
     scope: Mapped[str] = mapped_column(String(20), nullable=False, default=SCOPE_PRIVATE)
+    # What kind of memory this is — see drymem_server.schema.MEMORY_TYPES.
+    memory_type: Mapped[str] = mapped_column(String(30), nullable=False, default=DEFAULT_TYPE)
+    # The agent run that produced it. Several memories from one sitting share it,
+    # which is the only way to answer "what came out of Tuesday afternoon?".
+    session_id: Mapped[str | None] = mapped_column(String(64))
     promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     promoted_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Promotion copies the episode into the team group, so a shared memory has
+    # two uuids. Recording the copy is what lets a reader who finds either one
+    # land on the same index row instead of seeing the memory twice.
+    team_episode_uuid: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
 
     @property
     def shared(self) -> bool:
@@ -192,6 +204,39 @@ class MemoryFeedback(Base, TimestampMixin):
     rating: Mapped[int] = mapped_column(nullable=False)  # +1 or -1
     # The query that surfaced it — a rating without it cannot be learned from.
     query: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+
+
+class Skill(Base, TimestampMixin):
+    """A skill distilled from memories and published to a project.
+
+    The content is kept here rather than on disk because a skill is the team's
+    answer, not one machine's: a teammate who has never run `skills distill`
+    still has to be able to install it.
+    """
+
+    __tablename__ = "skills"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_skills_project_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    topic: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Which model drafted it, and from how many memories. A skill written from
+    # two memories deserves more scepticism than one written from twenty.
+    model: Mapped[str | None] = mapped_column(String(100))
+    memory_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, server_default=func.now()
+    )
 
 
 class AuditLog(Base, TimestampMixin):

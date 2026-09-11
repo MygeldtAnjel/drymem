@@ -19,7 +19,7 @@ from pathlib import Path
 
 # Bumped when the shape of stored episode metadata changes, so a later step can
 # find and migrate episodes written by an earlier one.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _MAX_GROUP_ID = 60
 _CREDENTIALS = re.compile(r"^[^/@]*@")

@@ -11,6 +11,7 @@ dev: db-up          ## Start Neo4j + Postgres, then the server in reload mode
 test:               ## Python tests, then TypeScript tests
 	uv --directory $(SERVER) run pytest
 	pnpm --filter drymem run test
+	pnpm --filter @drymem/web run test
 
 types:              ## Regenerate packages/api-types from the server's OpenAPI schema
 	@DRYMEM_EXTRACTOR=fake uv --directory $(SERVER) run python -c \
