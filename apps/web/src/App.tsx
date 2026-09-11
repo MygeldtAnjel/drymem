@@ -101,8 +101,11 @@ export function App() {
     } catch {
       /* nothing to resume */
     }
+    // Every door leads to Overview once it is open. Checking only for the
+    // sign-in page left a freshly accepted invite sitting on the invite form,
+    // signed in, with nothing to say so.
     if (after) window.location.hash = `#/${after}`;
-    else if (route.page === "signin") go("overview");
+    else go("overview");
   };
 
   const signedOut = () => {
