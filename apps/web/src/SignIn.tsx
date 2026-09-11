@@ -1,46 +1,55 @@
 /**
- * The front door.
+ * The front door: sign in, or — on a server nobody has used yet — create the
+ * organisation and become its owner.
  *
- * There is no signup, no password and no email here — just the token the CLI
- * already uses. So this page's real job is to say where that token comes from,
- * because someone who does not know is stuck with nowhere to look.
- *
- * The token is verified before it is stored: a bad token kept in the session
- * fails later, deeper in the app, where the cause is much harder to see.
+ * Which of the two it shows is the server's decision (`/auth/bootstrap`), not
+ * the visitor's: once anyone exists, the only way in is an invitation, and the
+ * page says so instead of offering a sign-up that would be refused.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 import { CatMark } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { api, setToken } from "@/api";
+import { Skeleton } from "@/components/ui/skeleton";
+import { auth, type Bootstrap, type Session } from "@/api";
 
-export function SignIn({ onDone }: { onDone: () => void }) {
-  const [token, setValue] = useState("");
+export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
+  const [state, setState] = useState<Bootstrap | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    auth
+      .bootstrap()
+      .then(setState)
+      .catch(() => setState({ needs_setup: false, org_name: null, smtp_enabled: false }));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = token.trim();
-    if (!trimmed) return;
-
-    setChecking(true);
+    setBusy(true);
     setError(null);
-    setToken(trimmed);
     try {
-      await api.me();
-      onDone();
+      const session = state?.needs_setup
+        ? await auth.signup({ org_name: orgName, email, password, name })
+        : await auth.login(email, password);
+      onDone(session);
     } catch (err) {
-      setToken(null);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setChecking(false);
+      setBusy(false);
     }
   };
+
+  const creating = state?.needs_setup === true;
 
   return (
     <div className="flex min-h-full items-center justify-center bg-background p-4">
@@ -48,51 +57,90 @@ export function SignIn({ onDone }: { onDone: () => void }) {
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <CatMark className="size-12 text-foreground" />
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">drymem</h1>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {creating ? "Set up drymem" : state?.org_name || "drymem"}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              What your team has learned, in one place.
+              {creating
+                ? "Nobody has used this server yet. Create your organisation — you will be its owner."
+                : "What your team has learned, in one place."}
             </p>
           </div>
         </div>
 
-        <form className="flex flex-col gap-4" onSubmit={submit}>
-          <Field data-invalid={error ? true : undefined}>
-            <FieldLabel htmlFor="token">Access token</FieldLabel>
-            <Input
-              id="token"
-              value={token}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="drymem_…"
-              autoComplete="off"
-              spellCheck={false}
-              aria-invalid={Boolean(error)}
-              autoFocus
-              className="font-mono"
-            />
-            {error && <FieldDescription className="text-destructive">{error}</FieldDescription>}
-          </Field>
+        {state === null ? (
+          <Skeleton className="h-40" />
+        ) : (
+          <form className="flex flex-col gap-5" onSubmit={submit}>
+            <FieldGroup>
+              {creating && (
+                <Field>
+                  <FieldLabel htmlFor="org">Organisation</FieldLabel>
+                  <Input
+                    id="org"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="Acme"
+                    autoFocus
+                    required
+                  />
+                </Field>
+              )}
+              <Field>
+                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  autoComplete="username"
+                  autoFocus={!creating}
+                  required
+                />
+              </Field>
+              {creating && (
+                <Field>
+                  <FieldLabel htmlFor="name">Your name</FieldLabel>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Optional"
+                    autoComplete="name"
+                  />
+                </Field>
+              )}
+              <Field data-invalid={error ? true : undefined}>
+                <FieldLabel htmlFor="password">Password</FieldLabel>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={creating ? "new-password" : "current-password"}
+                  aria-invalid={Boolean(error)}
+                  required
+                />
+                {creating && <FieldDescription>At least 10 characters.</FieldDescription>}
+                {error && <FieldDescription className="text-destructive">{error}</FieldDescription>}
+              </Field>
+            </FieldGroup>
 
-          <Button type="submit" disabled={checking || !token.trim()}>
-            {checking ? "Checking…" : "Sign in"}
-            {!checking && <ArrowRight data-icon="inline-end" />}
-          </Button>
-        </form>
+            <Button type="submit" disabled={busy || !email || !password || (creating && !orgName)}>
+              {busy ? "One moment…" : creating ? "Create organisation" : "Sign in"}
+              {!busy && <ArrowRight data-icon="inline-end" />}
+            </Button>
+          </form>
+        )}
 
-        <div className="mt-8 flex flex-col gap-3 rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-          <p>
-            <span className="font-medium text-foreground">Already set up the CLI?</span> Run{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">drymem token</code> —
-            it prints the one this machine is using.
+        {state && !creating && (
+          <p className="mt-8 rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">No account yet?</span> Ask an admin of{" "}
+            {state.org_name ?? "your organisation"} to invite you — they send you a link and you
+            choose a password. There is no self-service sign-up on purpose.
           </p>
-          <p>
-            <span className="font-medium text-foreground">Nothing set up yet?</span> Whoever runs
-            the server issues you one with{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-              drymem-admin token-create &lt;your-email&gt;
-            </code>
-            . It is shown once.
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );

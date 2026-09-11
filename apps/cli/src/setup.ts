@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 
 import { DrymemClient } from "./client.js";
 import { DEFAULT_SERVER, loadConfig, saveConfig, type Config } from "./config.js";
+import { runLogin } from "./login.js";
 
 const HOOK_EVENTS = ["SessionStart", "Stop", "SubagentStop"] as const;
 
@@ -114,13 +115,25 @@ async function ask(question: string, fallback: string): Promise<string> {
   }
 }
 
-export async function runSetup(options: { global?: boolean } = {}): Promise<number> {
+export async function runSetup(
+  options: { global?: boolean; serverUrl?: string } = {},
+): Promise<number> {
   const current = loadConfig();
-  const serverUrl = await ask("drymem server URL", current?.serverUrl ?? DEFAULT_SERVER);
-  const token = await ask("API token (from `drymem-admin token-create`)", current?.token ?? "");
+  const serverUrl =
+    options.serverUrl ??
+    (current?.serverUrl ?? (await ask("drymem server URL", DEFAULT_SERVER)));
 
+  // Sign in through the browser unless this machine already has a token for
+  // this server. Nobody types a token; `DRYMEM_TOKEN` in the environment still
+  // works for CI, where there is no browser.
+  let token = current?.serverUrl === serverUrl ? current.token : process.env.DRYMEM_TOKEN;
   if (!token) {
-    console.error("A token is required. Ask whoever runs the server for one.");
+    const code = await runLogin({ serverUrl });
+    if (code !== 0) return code;
+    token = loadConfig()?.token;
+  }
+  if (!token) {
+    console.error("Sign-in did not produce a token. Run `drymem login` and try again.");
     return 1;
   }
 
@@ -152,7 +165,7 @@ export async function runSetup(options: { global?: boolean } = {}): Promise<numb
   writeJson(mcpPath, mcpConfig);
 
   console.log(`\nConfigured.`);
-  console.log(`  token    -> ${join(homedir(), ".drymem", "config.json")} (0600)`);
+  console.log(`  signed in as this machine -> ${join(homedir(), ".drymem", "config.json")} (0600)`);
   console.log(`  hooks    -> ${settingsPath}`);
   console.log(`  mcp      -> ${mcpPath}`);
   console.log(`\nRestart Claude Code to pick this up.`);

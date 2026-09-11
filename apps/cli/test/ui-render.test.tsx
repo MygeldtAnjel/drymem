@@ -29,6 +29,12 @@ const episode: EpisodeOut = {
   created_at: "2026-09-11T10:00:00Z",
   author: "miguel@ciudadela.eu",
   scope: "private",
+    title: "",
+    type: "note",
+    session_id: "",
+    topic_key: "",
+    promoted_at: null,
+    rating: null,
 };
 
 const superseded: Fact = {

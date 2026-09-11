@@ -4,6 +4,323 @@
  */
 
 export interface paths {
+    "/auth/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bootstrap State
+         * @description Unauthenticated on purpose: the sign-in page needs to know whether to
+         *     offer 'create your organisation' or 'sign in'.
+         */
+        get: operations["bootstrap_state_auth_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signup
+         * @description Only while the server is empty. The first person owns the organisation.
+         */
+        post: operations["signup_auth_signup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign In */
+        post: operations["sign_in_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign Out */
+        post: operations["sign_out_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whoami */
+        get: operations["whoami_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description Set or change your own password. A user who has none yet (created by
+         *     `drymem-admin` before identity existed) may set one without a current.
+         */
+        post: operations["change_password_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending Invites */
+        get: operations["pending_invites_auth_invites_get"];
+        put?: never;
+        /** Invite */
+        post: operations["invite_auth_invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/invites/{invite_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Invite */
+        delete: operations["revoke_invite_auth_invites__invite_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/invites/{token}/public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Invite Public
+         * @description What the invite page shows before the person has an account.
+         */
+        get: operations["invite_public_auth_invites__token__public_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/invites/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept */
+        post: operations["accept_auth_invites__token__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Sessions */
+        get: operations["my_sessions_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke My Session */
+        delete: operations["revoke_my_session_auth_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Tokens */
+        get: operations["my_tokens_auth_tokens_get"];
+        put?: never;
+        /**
+         * New Token
+         * @description For CI and other machines. Shown once; `drymem login` is the human path.
+         */
+        post: operations["new_token_auth_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Token */
+        delete: operations["revoke_token_auth_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/device": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Start
+         * @description Step one of `drymem login`. Unauthenticated: the CLI has nothing yet.
+         */
+        post: operations["device_start_auth_device_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/device/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Approve
+         * @description Step two, in the browser, signed in.
+         */
+        post: operations["device_approve_auth_device_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/device/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Poll
+         * @description Step three: the CLI collects its token. Handed over exactly once.
+         */
+        post: operations["device_poll_auth_device_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/memories": {
         parameters: {
             query?: never;
@@ -472,6 +789,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptRequest */
+        AcceptRequest: {
+            /** Password */
+            password: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+        };
+        /** BootstrapOut */
+        BootstrapOut: {
+            /** Needs Setup */
+            needs_setup: boolean;
+            /** Org Name */
+            org_name?: string | null;
+            /**
+             * Smtp Enabled
+             * @default false
+             */
+            smtp_enabled: boolean;
+        };
         /** ClusterOut */
         ClusterOut: {
             /** Topic */
@@ -497,6 +836,50 @@ export interface components {
             episode_uuid: string;
             /** Deleted */
             deleted: boolean;
+        };
+        /** DeviceApprove */
+        DeviceApprove: {
+            /** User Code */
+            user_code: string;
+        };
+        /** DevicePoll */
+        DevicePoll: {
+            /** Device Code */
+            device_code: string;
+        };
+        /** DevicePollOut */
+        DevicePollOut: {
+            /** Status */
+            status: string;
+            /** Token */
+            token?: string | null;
+        };
+        /** DeviceStart */
+        DeviceStart: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+        };
+        /** DeviceStartOut */
+        DeviceStartOut: {
+            /** Device Code */
+            device_code: string;
+            /** User Code */
+            user_code: string;
+            /** Verification Url */
+            verification_url: string;
+            /**
+             * Expires In
+             * @default 900
+             */
+            expires_in: number;
+            /**
+             * Interval
+             * @default 3
+             */
+            interval: number;
         };
         /** DiscoverResponse */
         DiscoverResponse: {
@@ -623,6 +1006,60 @@ export interface components {
             /** Extractor */
             extractor: string;
         };
+        /** InviteOut */
+        InviteOut: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Role */
+            role: string;
+            /** Project Key */
+            project_key?: string | null;
+            /** Invited By */
+            invited_by?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Invite Url */
+            invite_url?: string | null;
+        };
+        /** InvitePublicOut */
+        InvitePublicOut: {
+            /** Email */
+            email: string;
+            /** Org Name */
+            org_name: string;
+            /** Project Key */
+            project_key?: string | null;
+            /** Invited By */
+            invited_by?: string | null;
+        };
+        /** InviteRequest */
+        InviteRequest: {
+            /** Email */
+            email: string;
+            /**
+             * Role
+             * @description member or admin
+             * @default member
+             */
+            role: string;
+            /**
+             * Project Key
+             * @description Also add them to this project
+             */
+            project_key?: string | null;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
         /** MeOut */
         MeOut: {
             /** Id */
@@ -733,6 +1170,16 @@ export interface components {
             by_type: {
                 [key: string]: number;
             };
+        };
+        /** PasswordRequest */
+        PasswordRequest: {
+            /**
+             * Current
+             * @default
+             */
+            current: string;
+            /** New */
+            new: string;
         };
         /** ProjectOut */
         ProjectOut: {
@@ -883,47 +1330,26 @@ export interface components {
             /** Results */
             results: components["schemas"]["FactOut"][];
         };
-        /** SessionOut */
-        SessionOut: {
-            /** Session Id */
-            session_id: string;
-            /** Author */
-            author: string;
-            /** Memory Count */
-            memory_count: number;
-            /**
-             * Shared
-             * @default 0
-             */
-            shared: number;
-            /**
-             * Started At
-             * Format: date-time
-             */
-            started_at: string;
-            /**
-             * Ended At
-             * Format: date-time
-             */
-            ended_at: string;
-            /**
-             * Titles
-             * @default []
-             */
-            titles: string[];
-            /**
-             * Synthetic
-             * @description Grouped by author and day because no session id was recorded
-             * @default false
-             */
-            synthetic: boolean;
-        };
         /** SessionsResponse */
         SessionsResponse: {
             /** Project Key */
             project_key: string;
             /** Sessions */
-            sessions: components["schemas"]["SessionOut"][];
+            sessions: components["schemas"]["drymem_server__api__schemas__SessionOut"][];
+        };
+        /** SignupRequest */
+        SignupRequest: {
+            /** Org Name */
+            org_name: string;
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
         };
         /** SkillOut */
         SkillOut: {
@@ -953,6 +1379,30 @@ export interface components {
             project_key: string;
             /** Skills */
             skills: components["schemas"]["SkillOut"][];
+        };
+        /** TokenOut */
+        TokenOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Token */
+            token?: string | null;
+        };
+        /** TokenRequest */
+        TokenRequest: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
         };
         /** TopicsResponse */
         TopicsResponse: {
@@ -1028,6 +1478,72 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** WebSessionOut */
+        WebSessionOut: {
+            /** Id */
+            id: string;
+            /** User Agent */
+            user_agent: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** Current */
+            current: boolean;
+        };
+        /** SessionOut */
+        drymem_server__api__auth_routes__SessionOut: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name: string | null;
+            /** Role */
+            role: string;
+            /** Org Id */
+            org_id: string;
+            /** Org Name */
+            org_name: string;
+        };
+        /** SessionOut */
+        drymem_server__api__schemas__SessionOut: {
+            /** Session Id */
+            session_id: string;
+            /** Author */
+            author: string;
+            /** Memory Count */
+            memory_count: number;
+            /**
+             * Shared
+             * @default 0
+             */
+            shared: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Ended At
+             * Format: date-time
+             */
+            ended_at: string;
+            /**
+             * Titles
+             * @default []
+             */
+            titles: string[];
+            /**
+             * Synthetic
+             * @description Grouped by author and day because no session id was recorded
+             * @default false
+             */
+            synthetic: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -1037,6 +1553,617 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    bootstrap_state_auth_bootstrap_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapOut"];
+                };
+            };
+        };
+    };
+    signup_auth_signup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_in_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_out_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    whoami_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_password_auth_password_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_invites_auth_invites_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_auth_invites_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invite_auth_invites__invite_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                invite_id: string;
+            };
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invite_public_auth_invites__token__public_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitePublicOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_auth_invites__token__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_sessions_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_my_session_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_tokens_auth_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_token_auth_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_token_auth_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                token_id: string;
+            };
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_start_auth_device_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_approve_auth_device_approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    device_poll_auth_device_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicePoll"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicePollOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_memory_v1_memories_post: {
         parameters: {
             query?: never;
@@ -1044,7 +2171,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1081,7 +2210,9 @@ export interface operations {
             path: {
                 topic_key: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1120,7 +2251,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1154,7 +2287,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1187,7 +2322,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1220,7 +2357,9 @@ export interface operations {
             path: {
                 episode_uuid: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1253,7 +2392,9 @@ export interface operations {
             path: {
                 episode_uuid: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1290,7 +2431,9 @@ export interface operations {
             path: {
                 episode_uuid: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1323,7 +2466,9 @@ export interface operations {
             path: {
                 project_key: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1356,7 +2501,9 @@ export interface operations {
             path: {
                 project_key: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1394,7 +2541,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1425,7 +2574,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1460,7 +2611,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1491,7 +2644,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1525,7 +2680,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1556,7 +2713,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1589,7 +2748,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1620,7 +2781,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1659,7 +2822,9 @@ export interface operations {
             path: {
                 name: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1690,7 +2855,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1721,7 +2888,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1759,7 +2928,9 @@ export interface operations {
                 project_key: string;
                 email: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {
@@ -1793,7 +2964,9 @@ export interface operations {
                 project_key: string;
                 email: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1830,7 +3003,9 @@ export interface operations {
             path: {
                 project_key: string;
             };
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -1867,7 +3042,9 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
-            cookie?: never;
+            cookie?: {
+                drymem_session?: string | null;
+            };
         };
         requestBody?: never;
         responses: {

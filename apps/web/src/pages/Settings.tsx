@@ -9,7 +9,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { Copy, KeyRound, Save, Server } from "lucide-react";
+import { Copy, KeyRound, LogOut, Plus, Save, Server, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { TypeChip } from "@/components/Bits";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,22 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Health, Me, MemorySchema, Project } from "@/api";
+import {
+  auth,
+  type ApiToken,
+  type Health,
+  type Me,
+  type MemorySchema,
+  type Project,
+  type Session,
+  type WebSession,
+} from "@/api";
 import { MEMORY_TYPES } from "@/memory";
-import { when } from "@/format";
+import { relative, when } from "@/format";
 
 export function SettingsPage({
   me,
+  session,
   health,
   schema,
   project,
@@ -41,6 +52,7 @@ export function SettingsPage({
   onCopy,
 }: {
   me: Me | null;
+  session: Session;
   health: Health | null;
   schema: MemorySchema | null;
   project?: Project;
@@ -79,6 +91,17 @@ export function SettingsPage({
           <CardContent>
             <FieldGroup>
               <Field>
+                <FieldLabel htmlFor="role">Role</FieldLabel>
+                <Input id="role" value={session.role} readOnly disabled className="capitalize" />
+                <FieldDescription>
+                  {session.role === "owner"
+                    ? "You created this organisation. Owners cannot be removed."
+                    : session.role === "admin"
+                      ? "You can invite people and manage every project."
+                      : "You can read and write in the projects you are on. An admin can change this."}
+                </FieldDescription>
+              </Field>
+              <Field>
                 <FieldLabel htmlFor="display-name">Display name</FieldLabel>
                 <Input
                   id="display-name"
@@ -107,34 +130,9 @@ export function SettingsPage({
           </CardFooter>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Access</CardTitle>
-            <CardDescription>
-              This browser holds your token for the session only — closing the tab signs you out.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              Lost your token? Run <code className="font-mono text-xs">drymem token</code> on a
-              machine where the CLI is set up — it prints the one already in use. With nothing
-              set up, whoever runs the server issues one with{" "}
-              <code className="font-mono text-xs">drymem-admin token-create &lt;email&gt;</code>.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onCopy("drymem token", "command")}
-              >
-                <Copy data-icon="inline-start" /> Copy command
-              </Button>
-              <Button variant="destructive" size="sm" onClick={onSignOut}>
-                <KeyRound data-icon="inline-start" /> Sign out
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <PasswordCard />
+        <SessionsCard onSignOut={onSignOut} />
+        <TokensCard onCopy={onCopy} />
       </TabsContent>
 
       <TabsContent value="project" className="flex max-w-3xl flex-col gap-4">
@@ -280,5 +278,256 @@ function Line({ label, value, ok }: { label: string; value: string; ok?: boolean
         )}
       </span>
     </div>
+  );
+}
+
+
+function PasswordCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await auth.changePassword(current, next);
+      toast.success("Password changed");
+      setCurrent("");
+      setNext("");
+    } catch (err) {
+      toast.error("Could not change the password", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <form onSubmit={save}>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+          <CardDescription>
+            If your account was created before drymem had passwords, leave the current one empty.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="current">Current password</FieldLabel>
+              <Input
+                id="current"
+                type="password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+                autoComplete="current-password"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="next">New password</FieldLabel>
+              <Input
+                id="next"
+                type="password"
+                value={next}
+                onChange={(e) => setNext(e.target.value)}
+                autoComplete="new-password"
+              />
+              <FieldDescription>At least 10 characters.</FieldDescription>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+        <CardFooter className="justify-end">
+          <Button type="submit" disabled={busy || next.length < 10}>
+            <KeyRound data-icon="inline-start" /> Change password
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}
+
+function SessionsCard({ onSignOut }: { onSignOut: () => void }) {
+  const [sessions, setSessions] = useState<WebSession[]>([]);
+  const refresh = () => auth.sessions().then(setSessions).catch(() => setSessions([]));
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const revoke = async (s: WebSession) => {
+    try {
+      await auth.revokeSession(s.id);
+      if (s.current) {
+        onSignOut();
+        return;
+      }
+      toast.success("Signed that browser out");
+      void refresh();
+    } catch (err) {
+      toast.error("Could not sign it out", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <CardTitle>Where you are signed in</CardTitle>
+        <CardDescription>Every browser with an open session. Sign any of them out.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ul className="divide-y border-t">
+          {sessions.map((s) => (
+            <li key={s.id} className="flex items-center gap-3 px-5 py-3 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">
+                  {s.user_agent ? shortAgent(s.user_agent) : "Unknown browser"}
+                  {s.current && (
+                    <Badge className="ml-2 bg-primary/15 text-primary">This one</Badge>
+                  )}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  signed in {relative(s.created_at)}
+                  {s.last_seen_at && ` · last seen ${relative(s.last_seen_at)}`}
+                </span>
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => revoke(s)}>
+                <LogOut data-icon="inline-start" /> {s.current ? "Sign out" : "Sign out there"}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** "Chrome on Linux", not the 120-character user-agent string. */
+function shortAgent(ua: string): string {
+  const browser = /Firefox\//.test(ua)
+    ? "Firefox"
+    : /Edg\//.test(ua)
+      ? "Edge"
+      : /Chrome\//.test(ua)
+        ? "Chrome"
+        : /Safari\//.test(ua)
+          ? "Safari"
+          : "Browser";
+  const os = /Windows/.test(ua)
+    ? "Windows"
+    : /Mac OS/.test(ua)
+      ? "macOS"
+      : /Android/.test(ua)
+        ? "Android"
+        : /iPhone|iPad/.test(ua)
+          ? "iOS"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : "";
+  return os ? `${browser} on ${os}` : browser;
+}
+
+function TokensCard({ onCopy }: { onCopy: (text: string, what: string) => void }) {
+  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [label, setLabel] = useState("");
+  const [fresh, setFresh] = useState<ApiToken | null>(null);
+  const refresh = () => auth.tokens().then(setTokens).catch(() => setTokens([]));
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const created = await auth.createToken(label.trim());
+      setFresh(created);
+      setLabel("");
+      void refresh();
+    } catch (err) {
+      toast.error("Could not create a token", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  const revoke = async (t: ApiToken) => {
+    try {
+      await auth.revokeToken(t.id);
+      toast.success(`Revoked ${t.label ?? "token"}`);
+      if (fresh?.id === t.id) setFresh(null);
+      void refresh();
+    } catch (err) {
+      toast.error("Could not revoke", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader>
+        <CardTitle>API tokens</CardTitle>
+        <CardDescription>
+          What the CLI, the hooks and the MCP proxy use. <code className="font-mono text-xs">drymem login</code>{" "}
+          makes one per machine automatically; create one here for CI or a server.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <form className="flex flex-wrap items-center gap-2" onSubmit={create}>
+          <Input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="What is this for? e.g. ci-github-actions"
+            className="min-w-56 flex-1"
+            aria-label="Token label"
+          />
+          <Button type="submit" variant="outline">
+            <Plus data-icon="inline-start" /> New token
+          </Button>
+        </form>
+
+        {fresh?.token && (
+          <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <p className="text-sm">
+              Copy it now — it is shown once.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input readOnly value={fresh.token} className="font-mono text-xs" />
+              <Button variant="outline" size="sm" onClick={() => onCopy(fresh.token!, "token")}>
+                <Copy data-icon="inline-start" /> Copy
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+      <CardContent className="p-0">
+        <ul className="divide-y border-t">
+          {tokens.length === 0 && (
+            <li className="px-5 py-3 text-sm text-muted-foreground">No tokens yet.</li>
+          )}
+          {tokens.map((t) => (
+            <li key={t.id} className="flex items-center gap-3 px-5 py-3 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{t.label ?? "Unlabelled"}</span>
+                <span className="block text-xs text-muted-foreground">
+                  created {relative(t.created_at)}
+                  {t.last_used_at ? ` · last used ${relative(t.last_used_at)}` : " · never used"}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Revoke ${t.label ?? "token"}`}
+                onClick={() => revoke(t)}
+              >
+                <Trash2 />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

@@ -14,9 +14,9 @@ from datetime import UTC, datetime
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from drymem_server.auth import Principal, ensure_project, project_for
+from drymem_server.auth import Principal, ensure_project, project_for, role_in
 from drymem_server.db.models import (
-    ROLE_ADMIN,
+    ROLE_LEAD,
     ROLE_MEMBER,
     SCOPE_PRIVATE,
     SCOPE_TEAM,
@@ -81,6 +81,14 @@ class Entry:
 
 class LastMemberError(Exception):
     """Raised rather than leaving a project nobody can open."""
+
+
+class Forbidden(Exception):
+    """The caller is who they say they are and still may not do this.
+
+    Raised from the service, not checked in the UI: a hidden button is not a
+    permission (PLAN.md D31).
+    """
 
 
 @dataclass(frozen=True)
@@ -164,6 +172,16 @@ class MemoryService:
             select(func.count(ProjectMember.id)).where(ProjectMember.project_id == project.id)
         )
         return (count.scalar() or 0) <= 1
+
+    async def _require_lead(self, project: Project) -> None:
+        """Changing what a project uses or who is on it takes a lead or an org admin."""
+        role = await role_in(self.session, self.principal, project)
+        if role != ROLE_LEAD:
+            raise Forbidden("Only a project lead or an organisation admin can do that.")
+
+    def _require_admin(self) -> None:
+        if not self.principal.is_admin:
+            raise Forbidden("Only an organisation admin can do that.")
 
     def audit(self, action: str, target: str) -> None:
         self.session.add(
@@ -527,6 +545,7 @@ class MemoryService:
         project = await project_for(self.session, self.principal, project_key)
         if project is None:
             return None
+        await self._require_lead(project)
 
         invitee = (
             await self.session.execute(
@@ -636,6 +655,7 @@ class MemoryService:
         project = await project_for(self.session, self.principal, project_key)
         if project is None:
             return None
+        await self._require_lead(project)
         project.display_name = display_name.strip() or None
         self.audit("project.rename", f"{project_key}:{display_name}")
         await self.session.flush()
@@ -647,8 +667,9 @@ class MemoryService:
         from drymem_server.db.models import ProjectMember
 
         project = await project_for(self.session, self.principal, project_key)
-        if project is None or role not in (ROLE_MEMBER, ROLE_ADMIN):
+        if project is None or role not in (ROLE_MEMBER, ROLE_LEAD):
             return None
+        await self._require_lead(project)
 
         member = (
             await self.session.execute(
@@ -676,6 +697,7 @@ class MemoryService:
         project = await project_for(self.session, self.principal, project_key)
         if project is None:
             return None
+        await self._require_lead(project)
 
         current = await self.members(project_key=project_key) or []
         if len(current) <= 1:
@@ -804,6 +826,7 @@ class MemoryService:
         project = await project_for(self.session, self.principal, project_key)
         if project is None:
             return None
+        await self._require_lead(project)
 
         cleaned = scrub(content, denylist())
         existing = (
@@ -841,6 +864,7 @@ class MemoryService:
         project = await project_for(self.session, self.principal, project_key)
         if project is None:
             return False
+        await self._require_lead(project)
         skill = (
             await self.session.execute(
                 select(Skill).where(Skill.project_id == project.id, Skill.name == name)

@@ -6,8 +6,9 @@
  * second list, adding someone means knowing how to spell their email.
  */
 
-import { useState } from "react";
-import { Trash2, UserPlus, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Mail, Trash2, UserPlus, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { Blank, RowsSkeleton } from "@/components/Bits";
 import { Button } from "@/components/ui/button";
@@ -29,14 +30,17 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Member, Person } from "@/api";
-import { count, when } from "@/format";
+import { Input } from "@/components/ui/input";
+import { auth, type Invite, type Member, type Person } from "@/api";
+import { count, relative, when } from "@/format";
 
 export function MembersPage({
   members,
   people,
   loading,
   busy,
+  isAdmin,
+  projectKey,
   onAdd,
   onRole,
   onRemove,
@@ -45,6 +49,8 @@ export function MembersPage({
   people: Person[];
   loading: boolean;
   busy: boolean;
+  isAdmin: boolean;
+  projectKey: string;
   onAdd: (email: string) => void;
   onRole: (email: string, role: string) => void;
   onRemove: (email: string) => void;
@@ -56,6 +62,8 @@ export function MembersPage({
 
   return (
     <div className="flex flex-col gap-4">
+      {isAdmin && <InviteCard projectKey={projectKey} />}
+
       <Card className="overflow-hidden p-0">
         <CardHeader className="border-b p-4">
           <CardTitle className="text-sm">On this project</CardTitle>
@@ -192,6 +200,162 @@ export function MembersPage({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Invite someone who is not in the organisation yet.
+ *
+ * The link is shown to the admin rather than emailed: on a laptop there is no
+ * mail server, and a link you can paste into Slack beats an email that never
+ * left. When SMTP is configured the server will send it as well.
+ */
+function InviteCard({ projectKey }: { projectKey: string }) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("member");
+  const [toProject, setToProject] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState<Invite | null>(null);
+  const [pending, setPending] = useState<Invite[]>([]);
+
+  const refresh = () => auth.invites().then(setPending).catch(() => setPending([]));
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const created = await auth.invite({
+        email: email.trim(),
+        role,
+        project_key: toProject ? projectKey : null,
+      });
+      setLink(created);
+      setEmail("");
+      toast.success(`Invitation created for ${created.email}`, {
+        description: "Copy the link and send it to them. It works once and expires in 7 days.",
+      });
+      void refresh();
+    } catch (err) {
+      toast.error("Could not invite", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Could not copy — select the link and copy it by hand.");
+    }
+  };
+
+  const revoke = async (invite: Invite) => {
+    try {
+      await auth.revokeInvite(invite.id);
+      toast.success(`Invitation for ${invite.email} revoked`);
+      void refresh();
+      if (link?.id === invite.id) setLink(null);
+    } catch (err) {
+      toast.error("Could not revoke", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <CardHeader className="border-b p-4">
+        <CardTitle className="text-sm">Invite someone</CardTitle>
+        <CardDescription>
+          They get a link, choose a password, and are in. No self-service sign-up exists — every
+          account on this server was invited by an admin.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 p-4">
+        <form className="flex flex-wrap items-end gap-2" onSubmit={send}>
+          <div className="min-w-56 flex-1">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="teammate@company.com"
+              aria-label="Email to invite"
+              required
+            />
+          </div>
+          <Select value={role} onValueChange={setRole}>
+            <SelectTrigger className="w-36" aria-label="Organisation role">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={toProject}
+              onChange={(e) => setToProject(e.target.checked)}
+              className="accent-primary"
+            />
+            Add to this project
+          </label>
+          <Button type="submit" disabled={busy || !email.trim()}>
+            <Mail data-icon="inline-start" /> {busy ? "Creating…" : "Create invitation"}
+          </Button>
+        </form>
+
+        {link?.invite_url && (
+          <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <p className="text-sm">
+              Send this to <span className="font-medium">{link.email}</span>:
+            </p>
+            <div className="flex items-center gap-2">
+              <Input readOnly value={link.invite_url} className="font-mono text-xs" />
+              <Button variant="outline" size="sm" onClick={() => copy(link.invite_url!)}>
+                <Copy data-icon="inline-start" /> Copy
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Shown once. It works one time and expires {relative(link.expires_at).replace("ago", "from now")}.
+            </p>
+          </div>
+        )}
+
+        {pending.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-medium text-muted-foreground">Waiting to be accepted</p>
+            <ul className="flex flex-col divide-y rounded-lg border">
+              {pending.map((invite) => (
+                <li key={invite.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1 truncate">{invite.email}</span>
+                  <span className="text-xs text-muted-foreground">{invite.role}</span>
+                  <span className="text-xs text-muted-foreground">
+                    expires {when(invite.expires_at)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Revoke invitation for ${invite.email}`}
+                    onClick={() => revoke(invite)}
+                  >
+                    <Trash2 />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

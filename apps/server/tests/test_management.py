@@ -327,11 +327,11 @@ async def test_member_routes_are_not_swallowed_by_the_project_route(client):
     response = await client.patch(
         f"/v1/projects/{PROJECT}/members/jose@acme.test",
         headers=auth(client),
-        json={"role": "admin"},
+        json={"role": "lead"},
     )
     assert response.status_code == 200, response.text
     roles = {m["email"]: m["role"] for m in response.json()["members"]}
-    assert roles["jose@acme.test"] == "admin"
+    assert roles["jose@acme.test"] == "lead"
 
     # And the project's own name was not touched by that call.
     projects = (await client.get("/v1/projects", headers=auth(client))).json()["projects"]

@@ -3,8 +3,11 @@
  * there is no CORS, no base URL, and nothing to configure but the token.
  */
 
-const TOKEN_KEY = "drymem.token";
 const PROJECT_KEY = "drymem.project";
+
+/** Marks a request as ours. With SameSite=Lax this is what stops a cross-site
+ * form from posting into the API with the visitor's cookie. */
+const CLIENT_HEADER = { "X-Drymem-Client": "web" };
 
 /** The last project you were looking at. A convenience, never a source of truth. */
 export function rememberedProject(): string | null {
@@ -47,7 +50,7 @@ export interface Episode {
   rating: number | null;
 }
 
-export interface Session {
+export interface AgentSession {
   session_id: string;
   author: string;
   memory_count: number;
@@ -82,6 +85,54 @@ export interface Skill {
   model: string | null;
   memory_count: number;
   updated_at: string | null;
+}
+
+export interface Session {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  org_id: string;
+  org_name: string;
+}
+
+export interface Bootstrap {
+  needs_setup: boolean;
+  org_name: string | null;
+  smtp_enabled: boolean;
+}
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: string;
+  project_key: string | null;
+  invited_by: string | null;
+  expires_at: string;
+  invite_url?: string | null;
+}
+
+export interface InvitePublic {
+  email: string;
+  org_name: string;
+  project_key: string | null;
+  invited_by: string | null;
+}
+
+export interface WebSession {
+  id: string;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  current: boolean;
+}
+
+export interface ApiToken {
+  id: string;
+  label: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  token?: string | null;
 }
 
 export interface Me {
@@ -139,30 +190,14 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken(): string | null {
-  try {
-    return sessionStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setToken(token: string | null): void {
-  try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
-  } catch {
-    /* private browsing: the session simply will not persist */
-  }
-}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
   const response = await fetch(path, {
     ...init,
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...CLIENT_HEADER,
       ...(init.headers ?? {}),
     },
   });
@@ -176,12 +211,52 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       /* keep the status text */
     }
     if (response.status === 401) {
-      throw new ApiError("That token was not accepted.", 401);
+      throw new ApiError("Your session has ended. Sign in again.", 401);
     }
     throw new ApiError(detail, response.status);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
+
+export const auth = {
+  bootstrap: () => request<Bootstrap>("/auth/bootstrap"),
+  session: () => request<Session>("/auth/session"),
+  signup: (body: { org_name: string; email: string; password: string; name: string }) =>
+    request<Session>("/auth/signup", { method: "POST", body: JSON.stringify(body) }),
+  login: (email: string, password: string) =>
+    request<Session>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+  changePassword: (current: string, next: string) =>
+    request<void>("/auth/password", {
+      method: "POST",
+      body: JSON.stringify({ current, new: next }),
+    }),
+
+  invite: (body: { email: string; role: string; project_key?: string | null }) =>
+    request<Invite>("/auth/invites", { method: "POST", body: JSON.stringify(body) }),
+  invites: () => request<Invite[]>("/auth/invites"),
+  revokeInvite: (id: string) => request<void>(`/auth/invites/${id}`, { method: "DELETE" }),
+  invitePublic: (token: string) => request<InvitePublic>(`/auth/invites/${token}/public`),
+  accept: (token: string, password: string, name: string) =>
+    request<Session>(`/auth/invites/${token}/accept`, {
+      method: "POST",
+      body: JSON.stringify({ password, name }),
+    }),
+
+  sessions: () => request<WebSession[]>("/auth/sessions"),
+  revokeSession: (id: string) => request<void>(`/auth/sessions/${id}`, { method: "DELETE" }),
+  tokens: () => request<ApiToken[]>("/auth/tokens"),
+  createToken: (label: string) =>
+    request<ApiToken>("/auth/tokens", { method: "POST", body: JSON.stringify({ label }) }),
+  revokeToken: (id: string) => request<void>(`/auth/tokens/${id}`, { method: "DELETE" }),
+
+  approveDevice: (userCode: string) =>
+    request<void>("/auth/device/approve", {
+      method: "POST",
+      body: JSON.stringify({ user_code: userCode }),
+    }),
+};
 
 export const api = {
   health: () => request<Health>("/healthz"),
@@ -231,9 +306,9 @@ export const api = {
 
   remove: (uuid: string) => request(`/v1/memories/${uuid}`, { method: "DELETE" }),
 
-  sessions: async (projectKey: string): Promise<Session[]> => {
+  sessions: async (projectKey: string): Promise<AgentSession[]> => {
     const q = new URLSearchParams({ project_key: projectKey });
-    return (await request<{ sessions: Session[] }>(`/v1/sessions?${q}`)).sessions;
+    return (await request<{ sessions: AgentSession[] }>(`/v1/sessions?${q}`)).sessions;
   },
 
   people: async (): Promise<Person[]> => (await request<{ users: Person[] }>("/v1/users")).users,

@@ -17,10 +17,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   ApiError,
   api,
-  getToken,
+  auth,
   rememberProject,
   rememberedProject,
-  setToken,
+  type AgentSession,
   type Cluster,
   type Episode,
   type Fact,
@@ -34,6 +34,7 @@ import {
   type Session,
   type Skill,
 } from "./api";
+import { AcceptInvite, ApproveDevice } from "@/pages/Gate";
 import { Shell } from "@/components/Shell";
 import { Blank } from "@/components/Bits";
 import { MemoriesPage, MemoryDetail } from "@/pages/Memories";
@@ -79,17 +80,55 @@ const TITLES: Record<string, { title: string; description?: string }> = {
 };
 
 export function App() {
-  const [authed, setAuthed] = useState(() => Boolean(getToken()));
-  if (!authed) return <SignIn onDone={() => setAuthed(true)} />;
+  const route = useRoute();
+  // `undefined` = not asked yet; `null` = asked, nobody signed in.
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  useEffect(() => {
+    auth
+      .session()
+      .then(setSession)
+      .catch(() => setSession(null));
+  }, []);
+
+  const signedIn = (s: Session) => {
+    setSession(s);
+    // A device approval interrupted by sign-in resumes where it was going.
+    let after: string | null = null;
+    try {
+      after = sessionStorage.getItem("drymem.after");
+      sessionStorage.removeItem("drymem.after");
+    } catch {
+      /* nothing to resume */
+    }
+    if (after) window.location.hash = `#/${after}`;
+    else if (route.page === "signin") go("overview");
+  };
+
+  const signedOut = () => {
+    setSession(null);
+    go("signin");
+  };
+
+  if (session === undefined) return null;
+
+  if (route.page === "invite" && route.id) {
+    return <AcceptInvite token={route.id} onDone={signedIn} />;
+  }
+  if (route.page === "device" && route.id) {
+    return <ApproveDevice code={route.id} session={session} />;
+  }
+  if (session === null) return <SignIn onDone={signedIn} />;
+
   return (
     <TooltipProvider delayDuration={200}>
-      <Workspace onSignOut={() => setAuthed(false)} />
+      <Workspace session={session} onSignOut={signedOut} />
       <Toaster position="bottom-right" theme="dark" richColors closeButton />
     </TooltipProvider>
   );
 }
 
-function Workspace({ onSignOut }: { onSignOut: () => void }) {
+function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
   const route = useRoute();
 
   const [me, setMe] = useState<Me | null>(null);
@@ -100,7 +139,7 @@ function Workspace({ onSignOut }: { onSignOut: () => void }) {
 
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [stats, setStats] = useState<Overview | null>(null);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -117,7 +156,7 @@ function Workspace({ onSignOut }: { onSignOut: () => void }) {
   const [busy, setBusy] = useState(false);
 
   const signOut = useCallback(() => {
-    setToken(null);
+    void auth.logout().catch(() => {});
     onSignOut();
   }, [onSignOut]);
 
@@ -374,6 +413,8 @@ function Workspace({ onSignOut }: { onSignOut: () => void }) {
       <Screen
         route={route}
         openMemory={openMemory}
+        session={session}
+        isAdmin={session.role === "owner" || session.role === "admin"}
         loading={loading}
         busy={busy}
         active={active}
@@ -421,6 +462,8 @@ function Workspace({ onSignOut }: { onSignOut: () => void }) {
 function Screen(props: {
   route: { page: string; id: string };
   openMemory?: Episode;
+  session: Session;
+  isAdmin: boolean;
   loading: boolean;
   busy: boolean;
   active: string;
@@ -430,7 +473,7 @@ function Screen(props: {
   schema: MemorySchema | null;
   stats: Overview | null;
   episodes: Episode[];
-  sessions: Session[];
+  sessions: AgentSession[];
   skills: Skill[];
   clusters: Cluster[];
   people: Person[];
@@ -533,6 +576,8 @@ function Screen(props: {
           people={props.people}
           loading={props.loading}
           busy={props.busy}
+          isAdmin={props.isAdmin}
+          projectKey={props.active}
           onAdd={props.onAddMember}
           onRole={props.onRole}
           onRemove={props.onRemoveMember}
@@ -542,6 +587,7 @@ function Screen(props: {
       return (
         <SettingsPage
           me={props.me}
+          session={props.session}
           health={props.health}
           schema={props.schema}
           project={props.project}

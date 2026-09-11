@@ -10,6 +10,7 @@ import type { Source } from "./import.js";
 import { requireConfig } from "./config.js";
 import { HOOKS, readPayload, type HookName } from "./hooks.js";
 import { resolveProjectKey } from "./identity.js";
+import { runLogin } from "./login.js";
 import { runSetup } from "./setup.js";
 
 /** Stamped into the lock file so a team can see what produced their skills. */
@@ -18,7 +19,8 @@ const VERSION = "2.1.0";
 const USAGE = `drymem — shared long-term memory for AI coding agents
 
 Usage
-  npx drymem setup [--global]     Configure this machine (server URL, token, hooks, MCP)
+  npx drymem login [--server URL] Sign in through the browser; stores a token for this machine
+  npx drymem setup [--global]     Configure this repo (signs in if needed, installs hooks + MCP)
   npx drymem save <summary>       Save a memory for the current project
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
@@ -52,8 +54,17 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
+  if (command === "login") {
+    const at = rest.indexOf("--server");
+    return runLogin({ serverUrl: at >= 0 ? rest[at + 1] : undefined });
+  }
+
   if (command === "setup") {
-    return runSetup({ global: rest.includes("--global") });
+    const at = rest.indexOf("--server");
+    return runSetup({
+      global: rest.includes("--global"),
+      serverUrl: at >= 0 ? rest[at + 1] : undefined,
+    });
   }
 
   if (command === "ui") {

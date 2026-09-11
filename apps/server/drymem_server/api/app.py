@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from drymem_server.api.auth_routes import router as auth_router
 from drymem_server.api.routes import router
+from drymem_server.auth import AuthError
+from drymem_server.service import Forbidden
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
@@ -27,7 +30,18 @@ def create_app() -> FastAPI:
         description=DESCRIPTION.strip(),
         openapi_url="/openapi.json",
     )
+    app.include_router(auth_router)
     app.include_router(router)
+
+    # Raised from the service layer, where permissions actually live (D31).
+    @app.exception_handler(Forbidden)
+    async def forbidden(_: Request, exc: Forbidden) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=403)
+
+    @app.exception_handler(AuthError)
+    async def auth_error(_: Request, exc: AuthError) -> JSONResponse:
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
     _serve_web(app)
     return app
 

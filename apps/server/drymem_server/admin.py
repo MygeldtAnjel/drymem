@@ -427,6 +427,47 @@ async def user_delete(email: str) -> int:
     return 0
 
 
+async def invite_link(email: str, role: str, org_name: str | None) -> int:
+    """Print an invitation link for someone to set a password with.
+
+    The break-glass for a server whose users predate identity: they exist, have
+    tokens, and cannot sign in to the web because they have no password. An
+    invite for their own email claims the existing row instead of making a new
+    one. Also how the very first admin gets a second admin in without SMTP.
+    """
+    from drymem_server.auth import Principal, create_invite
+
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        if org_name:
+            org = await _org(session, org_name)
+        else:
+            org = (await session.execute(select(Org).limit(1))).scalar_one_or_none()
+            if org is None:
+                print("No organisation yet. Open the web UI and create one.", file=sys.stderr)
+                return 1
+        owner = (
+            await session.execute(
+                select(User).where(User.org_id == org.id).order_by(User.created_at).limit(1)
+            )
+        ).scalar_one_or_none()
+        inviter = Principal(
+            user_id=owner.id if owner else None,
+            org_id=org.id,
+            email=owner.email if owner else "drymem-admin",
+            role="owner",
+        )
+        raw, invite = await create_invite(
+            session, inviter=inviter, email=email, role=role, project=None
+        )
+        await session.commit()
+
+    base = (settings.public_url or "http://127.0.0.1:8080").rstrip("/")
+    print(f"{base}/#/invite/{raw}")
+    print(f"  for {invite.email} as {invite.role}, valid until {invite.expires_at:%Y-%m-%d %H:%M}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -442,6 +483,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("user-delete", help="Remove a user, their tokens and their index rows")
     p.add_argument("email")
+
+    p = sub.add_parser("invite-link", help="Print an invitation link (sets or resets a password)")
+    p.add_argument("email")
+    p.add_argument("--role", default="member", choices=["member", "admin"])
+    p.add_argument("--org", help="Org name; defaults to the only one")
 
     p = sub.add_parser("token-create", help="Issue an API token (shown once)")
     p.add_argument("email")
@@ -467,6 +513,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(user_rename(args.old, args.new))
     if args.command == "user-delete":
         return asyncio.run(user_delete(args.email))
+    if args.command == "invite-link":
+        return asyncio.run(invite_link(args.email, args.role, args.org))
     if args.command == "token-create":
         return asyncio.run(token_create(args.email, args.label))
     if args.command == "backfill":

@@ -34,8 +34,20 @@ from drymem_server.schema import DEFAULT_TYPE
 SCOPE_PRIVATE = "private"
 SCOPE_TEAM = "team"
 
+# Project roles. A lead decides what the project uses; a member uses it.
 ROLE_MEMBER = "member"
-ROLE_ADMIN = "admin"
+ROLE_LEAD = "lead"
+ROLE_ADMIN = ROLE_LEAD  # the pre-identity name for the same thing
+
+# Organisation roles. Owner is the first user and cannot be removed.
+ORG_OWNER = "owner"
+ORG_ADMIN = "admin"
+ORG_MEMBER = "member"
+
+# What happens at the end of an agent session — see PLAN.md D38.
+CAPTURE_AUTOMATIC = "automatic"
+CAPTURE_ASK = "ask"
+CAPTURE_MANUAL = "manual"
 
 
 def _uuid() -> uuid.UUID:
@@ -79,11 +91,74 @@ class User(Base, TimestampMixin):
     )
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     name: Mapped[str | None] = mapped_column(String(200))
+    # Null until the person sets one: users created by `drymem-admin` before
+    # identity existed, and invitees who have not accepted yet.
+    password_hash: Mapped[str | None] = mapped_column(String(300))
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default=ORG_MEMBER)
 
     org: Mapped[Org] = relationship(back_populates="users")
     tokens: Mapped[list[ApiToken]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+
+
+class WebSession(Base, TimestampMixin):
+    """A browser login. Revocable, so 'sign out everywhere' means something."""
+
+    __tablename__ = "web_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Invite(Base, TimestampMixin):
+    """An invitation to join the org — and, optionally, one project.
+
+    The link carries a random token; only its hash is stored, so a database
+    dump does not let anyone accept someone else's invitation.
+    """
+
+    __tablename__ = "invites"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=_uuid)
+    org_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default=ORG_MEMBER)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL")
+    )
+    invited_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DeviceCode(Base, TimestampMixin):
+    """`drymem login`: the CLI holds the device code, the browser approves the
+    short user code, the CLI collects a token. Nobody types a token."""
+
+    __tablename__ = "device_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=_uuid)
+    device_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    user_code: Mapped[str] = mapped_column(String(12), nullable=False, unique=True, index=True)
+    label: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Set on approval; read once by the CLI, then cleared.
+    issued_token: Mapped[str | None] = mapped_column(String(200))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class ApiToken(Base, TimestampMixin):
@@ -117,6 +192,7 @@ class Project(Base, TimestampMixin):
     # The normalised git remote, e.g. github.com/acme/payments.
     project_key: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
     display_name: Mapped[str | None] = mapped_column(String(200))
+    capture_mode: Mapped[str] = mapped_column(String(20), nullable=False, default=CAPTURE_AUTOMATIC)
 
     org: Mapped[Org] = relationship(back_populates="projects")
     members: Mapped[list[ProjectMember]] = relationship(

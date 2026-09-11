@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Session } from "@/api";
+import type { AgentSession as Session } from "@/api";
 import { clock, count, relative, when } from "@/format";
 
 export function sessionLabel(session: Session): string {

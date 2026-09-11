@@ -50,5 +50,19 @@ class Settings(BaseSettings):
     # Extra literals to redact, e.g. client names or internal hostnames.
     scrub_denylist: str = ""
 
+    # Where the UI is reached from, for links in invites and device-login
+    # prompts. Empty means "use the host of the request that asked".
+    public_url: str = ""
+    # Off on a laptop over http; on behind TLS.
+    cookie_secure: bool = False
+    session_days: int = 30
+    invite_days: int = 7
+    # Invites are printed for the admin to forward unless SMTP is configured.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+
 
 settings = Settings()
