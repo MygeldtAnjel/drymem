@@ -24,6 +24,7 @@ import {
   type Cluster,
   type Episode,
   type Fact,
+  type Graph,
   type Health,
   type Me,
   type Member,
@@ -42,6 +43,7 @@ import { MembersPage } from "@/pages/Members";
 import { OverviewPage } from "@/pages/Overview";
 import { ProjectsPage } from "@/pages/Projects";
 import { SessionsPage } from "@/pages/Sessions";
+import { GraphPage } from "@/pages/Graph";
 import { SkillsPage, type Draft } from "@/pages/Skills";
 import { SettingsPage } from "@/pages/Settings";
 import { SignIn } from "./SignIn";
@@ -56,6 +58,10 @@ const TITLES: Record<string, { title: string; description?: string }> = {
   memories: {
     title: "Memories",
     description: "Everything your agents have written down, newest first.",
+  },
+  graph: {
+    title: "Graph & Ask",
+    description: "What this project knows, how it connects, and answers with citations.",
   },
   sessions: {
     title: "Sessions",
@@ -151,6 +157,8 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [graph, setGraph] = useState<Graph | null>(null);
+  const [graphLoading, setGraphLoading] = useState(false);
 
   const [facts, setFacts] = useState<Fact[] | null>(null);
   const [query, setQuery] = useState("");
@@ -248,6 +256,27 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     setDrafts({});
     void load(active);
   }, [active, load]);
+
+  /**
+   * The graph is fetched on demand, not with everything else.
+   *
+   * It is the one read that walks Neo4j, and most visits never open the screen.
+   */
+  const loadGraph = useCallback(
+    async (kinds: string[], minMentions: number) => {
+      if (!active) return;
+      setGraphLoading(true);
+      try {
+        setGraph(await api.graph(active, { kinds, limit: 120, minMentions }));
+      } catch (e) {
+        fail(e, "Loading the graph");
+        setGraph(null);
+      } finally {
+        setGraphLoading(false);
+      }
+    },
+    [active, fail],
+  );
 
   const chooseProject = (key: string) => {
     setActive(key);
@@ -432,6 +461,9 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         stats={stats}
         episodes={episodes}
         sessions={sessions}
+        graph={graph}
+        graphLoading={graphLoading}
+        onLoadGraph={loadGraph}
         skills={skills}
         clusters={clusters}
         people={people}
@@ -481,6 +513,9 @@ function Screen(props: {
   stats: Overview | null;
   episodes: Episode[];
   sessions: AgentSession[];
+  graph: Graph | null;
+  graphLoading: boolean;
+  onLoadGraph: (kinds: string[], minMentions: number) => void;
   skills: Skill[];
   clusters: Cluster[];
   people: Person[];
@@ -546,6 +581,15 @@ function Screen(props: {
           onQuery={props.setQuery}
           onSearch={props.onSearch}
           onClearSearch={props.onClearSearch}
+        />
+      );
+    case "graph":
+      return (
+        <GraphPage
+          projectKey={props.active}
+          loading={props.graphLoading}
+          graph={props.graph}
+          onReload={props.onLoadGraph}
         />
       );
     case "sessions":

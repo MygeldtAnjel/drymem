@@ -594,13 +594,46 @@ class MemoryService:
         return [tuple(row) for row in result.all()]
 
     async def graph(
-        self, *, project_key: str, limit: int, kinds: list[str] | None, author: str | None
+        self,
+        *,
+        project_key: str,
+        limit: int,
+        kinds: list[str] | None,
+        author: str | None,
+        min_mentions: int,
     ):
         """The knowledge graph, for the canvas. Only groups this caller may read."""
         from drymem_server import graph_view
 
         groups = await self.readable_groups(project_key)
-        return await graph_view.build(groups=groups, limit=limit, kinds=kinds, author=author)
+        view = await graph_view.build(
+            groups=groups,
+            limit=limit,
+            kinds=kinds,
+            author=author,
+            min_mentions=min_mentions,
+        )
+
+        # The graph stores the topic key as an episode's name. A person wants
+        # the title they wrote, which lives in the index — so the labels are
+        # swapped here rather than teaching the Cypher about Postgres.
+        uuids = [n.id for n in view.nodes if n.kind == "memory"]
+        if uuids:
+            rows = await self.session.execute(
+                select(Memory.episode_uuid, Memory.team_episode_uuid, Memory.title).where(
+                    Memory.org_id == self.principal.org_id,
+                    (Memory.episode_uuid.in_(uuids)) | (Memory.team_episode_uuid.in_(uuids)),
+                )
+            )
+            titles: dict[str, str] = {}
+            for own, shared, title in rows.all():
+                titles[own] = title
+                if shared:
+                    titles[shared] = title
+            for node in view.nodes:
+                if node.kind == "memory":
+                    node.label = titles.get(node.id) or node.label
+        return view
 
     async def ask(self, *, project_key: str, question: str, limit: int = 6):
         """Answer from this project's memories, with citations.

@@ -171,6 +171,52 @@ export interface MemorySchema {
   template: string;
 }
 
+export interface GraphNode {
+  id: string;
+  kind: "memory" | "entity";
+  label: string;
+  type: string;
+  author: string;
+  scope: string;
+  created_at: string | null;
+  mentions: number;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: "mentions" | "fact";
+  label: string;
+  superseded: boolean;
+}
+
+export interface Graph {
+  project_key: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  truncated: boolean;
+  total_memories: number;
+}
+
+export interface AskSource {
+  index: number;
+  uuid: string;
+  title: string;
+  author: string;
+  created_at: string | null;
+  type: string;
+  scope: string;
+}
+
+export interface AskResult {
+  question: string;
+  answer: string;
+  model: string;
+  sources: AskSource[];
+  grounded: boolean;
+}
+
 export interface Cluster {
   topic: string;
   memory_count: number;
@@ -383,6 +429,25 @@ export const api = {
     const q = new URLSearchParams({ project_key: projectKey });
     return request(`/v1/skills/${encodeURIComponent(name)}?${q}`, { method: "DELETE" });
   },
+
+  graph: (
+    projectKey: string,
+    opts: { limit?: number; kinds?: string[]; author?: string; minMentions?: number } = {},
+  ) => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    if (opts.limit) q.set("limit", String(opts.limit));
+    if (opts.author) q.set("author", opts.author);
+    if (opts.minMentions) q.set("min_mentions", String(opts.minMentions));
+    for (const kind of opts.kinds ?? []) q.append("kind", kind);
+    return request<Graph>(`/v1/graph?${q}`);
+  },
+
+  /** A grounded answer, or an honest "nothing here mentions that". */
+  ask: (projectKey: string, question: string) =>
+    request<AskResult>("/v1/ask", {
+      method: "POST",
+      body: JSON.stringify({ project_key: projectKey, question }),
+    }),
 
   /** Subjects the project's memories keep returning to. */
   discover: async (projectKey: string, minMemories = 2): Promise<Cluster[]> => {

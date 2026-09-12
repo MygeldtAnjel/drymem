@@ -30,6 +30,12 @@ from drymem_server.memory_store import Metadata
 DEFAULT_LIMIT = 120
 MAX_LIMIT = 400
 
+# A subject only one memory mentions is a leaf: it adds a node and tells you
+# nothing about how anything connects. Drawing all of them turned the first
+# render of this into 173 nodes and 447 edges — technically the whole graph,
+# and useless. Two is the point at which a subject starts joining things up.
+DEFAULT_MIN_MENTIONS = 2
+
 
 @dataclass
 class Node:
@@ -77,6 +83,7 @@ async def build(
     limit: int = DEFAULT_LIMIT,
     kinds: list[str] | None = None,
     author: str | None = None,
+    min_mentions: int = DEFAULT_MIN_MENTIONS,
 ) -> GraphView:
     """The graph as nodes and edges, newest memories first.
 
@@ -167,15 +174,22 @@ async def build(
                 )
             )
 
-    for entity_id, name in entity_names.items():
+    # Keep the subjects that join memories together; drop the leaves, and the
+    # edges that only ever pointed at them.
+    kept = {
+        entity_id for entity_id, count in mention_counts.items() if count >= max(1, min_mentions)
+    }
+    view.edges = [e for e in view.edges if e.kind != "mentions" or e.target in kept]
+    for entity_id in kept:
         view.nodes.append(
             Node(
                 id=entity_id,
                 kind="entity",
-                label=name,
-                mentions=mention_counts.get(entity_id, 0),
+                label=entity_names[entity_id],
+                mentions=mention_counts[entity_id],
             )
         )
+    entity_names = {k: v for k, v in entity_names.items() if k in kept}
 
     if entity_names:
         facts, _, _ = await graphiti.driver.execute_query(

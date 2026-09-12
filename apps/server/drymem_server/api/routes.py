@@ -309,6 +309,9 @@ async def project_graph(
     limit: int = Query(120, ge=1, le=400),
     kind: Annotated[list[str], Query(description="Filter to these memory kinds")] = [],  # noqa: B006
     author: str = Query("", description="Filter to one person's memories"),
+    min_mentions: int = Query(
+        2, ge=1, le=20, description="Drop subjects fewer than this many memories mention"
+    ),
 ) -> GraphResponse:
     """The knowledge graph, as nodes and edges.
 
@@ -316,7 +319,11 @@ async def project_graph(
     node on somebody else's canvas. Layout belongs to the browser.
     """
     view = await service.graph(
-        project_key=project_key, limit=limit, kinds=list(kind), author=author or None
+        project_key=project_key,
+        limit=limit,
+        kinds=list(kind),
+        author=author or None,
+        min_mentions=min_mentions,
     )
     return GraphResponse(
         project_key=project_key,
