@@ -275,7 +275,10 @@ class TestUpdating:
         assert r.json()["name"].startswith("payments/provider/update-")
         assert store.deleted == []
 
-    async def test_replacing_removes_the_prior_episodes(self, client, store):
+    async def test_replacing_records_what_it_replaced_instead_of_deleting(self, client, store):
+        # It used to delete. "We changed our mind, and here is what from" is the
+        # most useful thing the decision tree shows, and deleting the old
+        # episode is the one way to make that unanswerable (D45).
         first = (await save(client, topic_key="payments/provider")).json()
 
         r = await client.patch(
@@ -283,9 +286,37 @@ class TestUpdating:
             json={"project_key": PROJECT, "update_summary": "Moved to Stripe.", "replace": True},
             headers=auth(client),
         )
+        newer = r.json()
 
-        assert r.json()["name"] == "payments/provider"
-        assert first["episode_uuid"] in store.deleted
+        assert newer["name"] == "payments/provider"
+        assert first["episode_uuid"] not in store.deleted
+        assert (newer["episode_uuid"], [first["episode_uuid"]]) in store.superseded
+
+    async def test_the_replacement_is_audited(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import AuditLog
+
+        await save(client, topic_key="payments/retry")
+        await client.patch(
+            "/v1/memories/payments/retry",
+            json={"project_key": PROJECT, "update_summary": "Cap at 60s.", "replace": True},
+            headers=auth(client),
+        )
+
+        async with sessionmaker() as session:
+            rows = (await session.execute(select(AuditLog))).scalars().all()
+        assert [r.action for r in rows if r.action == "memory.supersede"] == ["memory.supersede"]
+
+    async def test_appending_supersedes_nothing(self, client, store):
+        await save(client, topic_key="payments/limits")
+        await client.patch(
+            "/v1/memories/payments/limits",
+            json={"project_key": PROJECT, "update_summary": "Also cap refunds."},
+            headers=auth(client),
+        )
+        # An append adds to the topic; it does not contradict what came before.
+        assert store.superseded == []
 
 
 class TestHealth:

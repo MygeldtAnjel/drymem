@@ -106,10 +106,6 @@ async def update_memory(
     of a decision readable.
     """
     matching = await service.episodes_for_topic(project_key=body.project_key, topic_key=topic_key)
-    if body.replace:
-        for episode in matching:
-            await service.delete(episode_uuid=episode.uuid)
-
     name = topic_key if body.replace else f"{topic_key}/update-{MemoryService.timestamp()}"
     try:
         saved = await service.save(
@@ -123,6 +119,13 @@ async def update_memory(
         )
     except PrivateKeyFound as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+
+    if body.replace and matching:
+        # Replacing used to delete what came before. It now records what it
+        # replaced instead: "we changed our mind, and here is what we changed it
+        # from" is the most useful thing a decision tree can show, and deleting
+        # it is the one way to make that unanswerable (D45).
+        await service.supersede(newer=saved.episode_uuid, older=[e.uuid for e in matching])
 
     return _saved_response(saved, body.project_key, service.principal.email, name)
 

@@ -41,6 +41,13 @@ class InMemoryStore:
         self.facts: list[Fact] = []
         self.deleted: list[str] = []
         self.saved_bodies: list[str] = []
+        self.superseded: list[tuple[str, list[str]]] = []
+
+    async def link_supersedes(self, *, newer: str, older: list[str]) -> int:
+        kept = [o for o in older if o != newer]
+        if kept:
+            self.superseded.append((newer, kept))
+        return len(kept)
 
     async def save(self, *, name, body, group_id, metadata) -> SaveResult:
         episode_uuid = str(uuid.uuid4())

@@ -637,6 +637,22 @@ class MemoryService:
         )
         return [tuple(row) for row in result.all()]
 
+    async def supersede(self, *, newer: str, older: list[str]) -> int:
+        """Record that `newer` replaced `older`. Best effort, never fatal.
+
+        The memory is already saved by the time this runs; losing the link is a
+        gap in the tree, while raising here would lose the write the person
+        actually asked for.
+        """
+        try:
+            linked = await self.store.link_supersedes(newer=newer, older=older)
+        except Exception as exc:  # noqa: BLE001 - logged, never raised
+            logger.warning("supersedes link not written for %s: %s", newer, exc)
+            return 0
+        if linked:
+            self.audit("memory.supersede", f"{newer}<-{linked}")
+        return linked
+
     async def decision_tree(
         self,
         *,

@@ -152,6 +152,28 @@ class GraphitiMemoryStore:
             edge_count=len(result.edges or []),
         )
 
+    async def link_supersedes(self, *, newer: str, older: list[str]) -> int:
+        """Record that one memory replaced others.
+
+        Written, never inferred (D45). The decision tree draws a memory as
+        replaced only when this edge exists, so guessing it from similar text
+        would put invented history in front of someone deciding from it.
+        """
+        if not older:
+            return 0
+        graphiti = await self._graphiti()
+        records, _, _ = await graphiti.driver.execute_query(
+            """
+            MATCH (new:Episodic {uuid: $newer})
+            MATCH (old:Episodic) WHERE old.uuid IN $older AND old.uuid <> $newer
+            MERGE (new)-[:SUPERSEDES]->(old)
+            RETURN count(old) AS n
+            """,
+            newer=newer,
+            older=older,
+        )
+        return int(records[0]["n"]) if records else 0
+
     async def _save_episode_only(
         self, name: str, body: str, group_id: str, metadata: Metadata, exc: Exception
     ) -> SaveResult:
