@@ -1,26 +1,48 @@
 ---
 name: drymem
-description: A dark operator's console for a team's shared memory — one warm light, a black cat, and every state named in words as well as colour.
+description: A Geist console for a team's shared memory — light by default, dark on request, a black cat for a mark, and every state named in words as well as colour.
 colors:
-  background: "#0b0d10"
-  foreground: "#e8eaed"
-  card: "#111419"
-  popover: "#171b21"
-  secondary: "#1e232b"
-  muted: "#171b21"
-  muted-foreground: "#98a1ad"
-  primary: "#f2a93b"
-  primary-foreground: "#1a1305"
-  destructive: "#f0596b"
-  success: "#3fb27f"
-  border: "#232932"
-  input: "#525c6b"
-  ring: "#f2a93b"
-  chart-1: "#a98bf5"
-  chart-2: "#5b9cf5"
-  chart-3: "#f0596b"
-  chart-4: "#f2a93b"
-  chart-5: "#3fb27f"
+  background: "#fafafa"
+  foreground: "#0a0a0a"
+  card: "#ffffff"
+  popover: "#ffffff"
+  secondary: "#f5f5f5"
+  muted: "#f5f5f5"
+  muted-foreground: "#666666"
+  primary: "#0a0a0a"
+  primary-foreground: "#ffffff"
+  destructive: "#c81e2b"
+  success: "#067a4e"
+  brand: "#b45309"
+  border: "#e5e5e5"
+  input: "#949494"
+  ring: "#0a0a0a"
+  chart-1: "#5b21b6"
+  chart-2: "#1d4ed8"
+  chart-3: "#be123c"
+  chart-4: "#a16207"
+  chart-5: "#047857"
+darkColors:
+  background: "#0a0a0a"
+  foreground: "#ededed"
+  card: "#0f0f0f"
+  popover: "#141414"
+  secondary: "#1c1c1c"
+  muted: "#171717"
+  muted-foreground: "#a1a1a1"
+  primary: "#ededed"
+  primary-foreground: "#0a0a0a"
+  destructive: "#ff6169"
+  success: "#3fce8f"
+  brand: "#f2a93b"
+  border: "#262626"
+  input: "#6b6b6b"
+  ring: "#ededed"
+  chart-1: "#c4b5fd"
+  chart-2: "#93c5fd"
+  chart-3: "#fda4af"
+  chart-4: "#fcd34d"
+  chart-5: "#6ee7b7"
 typography:
   display:
     fontFamily: "Geist Variable, ui-sans-serif, system-ui, sans-serif"
@@ -114,7 +136,8 @@ components:
 
 ## Overview
 
-**Creative North Star: a dark operator's room with one warm light in it.**
+**Creative North Star: Geist. An off-white room with hairlines instead of
+shadows, and a black cat on the door.**
 
 drymem is a team's shared memory, and the thing that makes shared memory worth
 having is that *anyone on the team* can open it, read it, and run it. So this
@@ -122,9 +145,15 @@ surface is an admin console, not a reading room: a rail of destinations, cards
 and tables, and every management action — members, roles, projects, skills, your
 own profile — reachable without touching a terminal.
 
-The room is a cool near-black in four steps. There is exactly one accent, amber
-`#f2a93b`, and it is the eye of the black cat that serves as the product's mark.
-Everything else earns attention by position and value, not by colour.
+The ground is off-white and the cards are white; depth is the 1px between them,
+not elevation, so nothing here has a drop shadow except the things that
+genuinely float. The primary action is the ground inverted — near-black on
+light, near-white on dark. Amber `#f2a93b` survives as the mark, the eye of the
+black cat, and not as a button fill: on white it cannot carry text at small
+sizes, and a product that fills its buttons with it reads as a warning.
+
+Dark exists and is a class on the root, not a second design. Every component
+reads the same token names; only the values change.
 
 **The anti-reference is the previous build of this same screen**, which dressed
 the product as a law-library reference volume: serif prose on India paper, drawn
@@ -139,29 +168,34 @@ seven jobs, not the whole product.
   central mistake.
 - Cards and tables. Dense, scannable, familiar — the shapes people already know
   from every console they use.
-- One accent. Amber marks the primary action, the active destination, and
-  nothing else.
+- The primary action is the ground inverted. Amber marks the product, not the
+  buttons.
+- A breadcrumb on every detail page. "Back" offers one destination; a trail
+  offers the middle of the path, which is usually the one you want.
 - Every state is a word first. Colour confirms it.
 - shadcn/ui components live as source in the repo, so the design system is
   editable rather than imported.
 
 ## Colors
 
-Dark-only, defined once on `:root`. There is no light mode and no `.dark` class
-to toggle, which is why no component in this app carries a `dark:` override.
+Two value sets for one set of names. Light lives on `:root`, dark on `.dark`,
+and the switch is a class on `<html>` written before the bundle loads — reading
+the stored choice in an effect paints light first and then flips, which is a
+white flash for exactly the people who chose dark. No component carries a
+`dark:` override of its own.
+
+Every ratio below is measured.
 
 ### Primary
-- **Amber** (`{colors.primary}`): the one light in the room. 9.24:1 on a card.
-  The primary button, the active rail item's icon, the focus ring, the "Useful"
-  stamp, the cat's eye in the mark. Its scarcity is the whole point — the moment
-  amber appears on more than a few elements per screen it stops reading as *the*
-  action and becomes decoration.
-- **Amber ink** (`{colors.primary-foreground}`): 9.23:1 on amber. The only thing
-  ever set on an amber field.
+- **Near-black** (`{colors.primary}`) on light, **near-white** on dark, both
+  19.8:1 and 16.9:1 against their own label. It is the one filled shape on a
+  screen, which is what makes it findable without colour.
+- **Amber** (`{colors.brand}`): the mark. The logo, and anything that has to say
+  "this is ours". Never a button fill, never a 12px label on white.
 
 ### Semantic
-- **Destructive** (`{colors.destructive}`): 5.58:1. Delete, unpublish, remove,
-  sign out, and an unreachable service. Never a hover state on its own.
+- **Destructive** (`{colors.destructive}`): 5.71:1 on a card. Delete, unpublish,
+  remove, sign out, and an unreachable service. Never a hover state on its own.
 - **Success** (`{colors.success}`): 6.93:1. A connected service and a shared
   memory — always beside the word "Connected" or "Shared", never alone.
 
@@ -196,9 +230,15 @@ and in the mix bar on Overview.
 
 ### Named Rules
 
-**The One-Light Rule.** Amber marks the primary action and the current
-destination. It is never a container fill, never a hover state, never a decorative
-tint, and never two things on one screen competing to be the point.
+**The One-Filled-Shape Rule.** Exactly one filled button per view is the thing
+you came to do; everything else is outlined or quiet. A secondary action still
+has to look like a control, so it takes `--input` and not `--border` — a
+hairline is for separating things, and on a button it leaves a shape you can
+barely find.
+
+**The Amber-Is-The-Mark Rule.** Amber is the product's signature, not its
+primary action. The logo and anything saying "this is ours". Never a button
+fill, never a 12px label on white.
 
 **The Colour-Never-Alone Rule.** No state is carried by hue. "Shared", "Private",
 "Connected", "Superseded", "Useful" and every memory type print their word next
