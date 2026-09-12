@@ -56,7 +56,7 @@ export const GROUPS: Record<string, string[]> = {
     "skill.update",
     "skill.delete",
   ],
-  memories: ["memory.promote", "memory.rejected", "memory.scrubbed"],
+  memories: ["memory.promote", "memory.supersede", "memory.rejected", "memory.scrubbed"],
   projects: ["project.create", "project.rename", "project.capture_mode"],
   access: [
     "user.login",

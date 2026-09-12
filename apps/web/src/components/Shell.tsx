@@ -48,7 +48,7 @@ type Destination = { page: string; label: string; icon: LucideIcon };
 export const WORK: Destination[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
   { page: "memories", label: "Memories", icon: NotebookPen },
-  { page: "graph", label: "Graph & Ask", icon: Network },
+  { page: "graph", label: "Decisions", icon: Network },
   { page: "sessions", label: "Sessions", icon: Boxes },
   { page: "skills", label: "Skills", icon: Sparkles },
 ];

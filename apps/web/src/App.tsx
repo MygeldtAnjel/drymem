@@ -66,8 +66,8 @@ const TITLES: Record<string, { title: string; description?: string }> = {
     description: "Everything your agents have written down, newest first.",
   },
   graph: {
-    title: "Graph & Ask",
-    description: "What this project knows, how it connects, and answers with citations.",
+    title: "Decisions",
+    description: "Ask a question, or walk what was decided and where it landed.",
   },
   audit: {
     title: "Audit",
