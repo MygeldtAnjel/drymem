@@ -102,6 +102,27 @@ export interface EnabledSkill extends CatalogueSkill {
   findings: { rule: string; severity: string; detail: string }[];
 }
 
+export interface SkillVersion {
+  version: number;
+  sha256: string;
+  content: string;
+  model: string | null;
+  memory_count: number;
+  findings: { rule: string; severity: string; detail: string }[];
+  note: string | null;
+  author: string | null;
+  created_at: string;
+}
+
+export interface SkillUsage {
+  name: string;
+  source: string;
+  uses: number;
+  readers: number;
+  agents: string[];
+  last_used_at: string | null;
+}
+
 export interface ProjectOut {
   id: string;
   project_key: string;
@@ -330,6 +351,22 @@ export class DrymemClient {
   async catalogue(projectKey?: string): Promise<CatalogueSkill[]> {
     const data = await this.request<{ skills: CatalogueSkill[] }>(
       `/v1/skills/catalogue?${this.query({ project_key: projectKey })}`,
+    );
+    return data.skills;
+  }
+
+  /** Every version of one skill, newest first, with its content. */
+  async skillVersions(name: string): Promise<SkillVersion[]> {
+    const data = await this.request<{ versions: SkillVersion[] }>(
+      `/v1/skills/${encodeURIComponent(name)}/versions`,
+    );
+    return data.versions;
+  }
+
+  /** Aggregate reads per skill. Counts of people, never their names. */
+  async skillUsage(projectKey: string): Promise<SkillUsage[]> {
+    const data = await this.request<{ skills: SkillUsage[] }>(
+      `/v1/skills/usage?${this.query({ project_key: projectKey })}`,
     );
     return data.skills;
   }

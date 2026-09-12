@@ -12,6 +12,7 @@ __pycache__/
 apps/server/.venv/
 node_modules/
 apps/cli/dist/
+apps/api/dist/
 
 # Skill drafts are working files. `.drymem/skills.lock` is NOT ignored: it is
 # the committed record of what this project enabled, and how a teammate gets

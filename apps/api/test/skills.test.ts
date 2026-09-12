@@ -69,6 +69,30 @@ afterAll(async () => {
   await scratch?.drop();
 });
 
+describe("the catalogue a new organisation starts with", () => {
+  it("is seeded from the bundled skills, published but not enabled anywhere", async () => {
+    const { body } = await h.client.get("/v1/skills/catalogue");
+    const base = body.skills.filter((s: { source: string }) => s.source === "base");
+    // The point is that it is not empty on day one.
+    expect(base.length).toBeGreaterThan(5);
+    expect(base.every((s: { state: string }) => s.state === "published")).toBe(true);
+    expect(base.every((s: { enabled_here: boolean }) => !s.enabled_here)).toBe(true);
+
+    const named = base.find((s: { name: string }) => s.name === "code-review");
+    expect(named).toBeDefined();
+    // The description is what the list shows, so it has to survive the seed.
+    expect(named.description).toBeTruthy();
+  });
+
+  it("enabling one takes no extra publish step", async () => {
+    const { status } = await h.client.post("/v1/skills/code-review/enable", {
+      project_key: PROJECT,
+    });
+    expect(status).toBe(200);
+    await h.client.del(`/v1/skills/code-review/enable?project_key=${PROJECT}`);
+  });
+});
+
 describe("publishing", () => {
   it("creates a catalogue entry with version 1", async () => {
     const { status, body } = await h.client.post("/v1/skills", {
@@ -164,6 +188,24 @@ describe("the scanner", () => {
     const rules = body.findings.map((f: { rule: string }) => f.rule);
     expect(rules).toContain("hidden-text");
     expect(rules).toContain("ignore-instructions");
+  });
+
+  it("does not mistake `process.env` for a credential file", async () => {
+    // It did, and it held a third of the skills we ship ourselves for review.
+    const { body } = await h.client.post("/v1/skills", {
+      name: "mocking",
+      content: `${SKILL}\n\`\`\`ts\nconst c = new StripeClient(process.env.STRIPE_KEY);\n\`\`\`\n`,
+    });
+    expect(body.findings.map((f: { rule: string }) => f.rule)).not.toContain("reads-credentials");
+    expect(body.state).toBe("published");
+  });
+
+  it("still catches a real one", async () => {
+    const { body } = await h.client.post("/v1/skills", {
+      name: "deploy-guide",
+      content: `${SKILL}\nRead the token from .env before deploying.\n`,
+    });
+    expect(body.findings.map((f: { rule: string }) => f.rule)).toContain("reads-credentials");
   });
 
   it("lints a file that is not shaped like a skill", async () => {
@@ -300,6 +342,28 @@ describe("telemetry", () => {
     const find = (body: { skills: { name: string; uses: number }[] }) =>
       body.skills.find((s) => s.name === "retry-backoff")!.uses;
     expect(find(after.body)).toBe(find(before.body) + 1);
+  });
+
+  it("reports reads per skill without naming anyone", async () => {
+    const { status, body } = await h.client.get(`/v1/skills/usage?project_key=${PROJECT}`);
+    expect(status).toBe(200);
+
+    const retry = body.skills.find((s: { name: string }) => s.name === "retry-backoff");
+    expect(retry.uses).toBeGreaterThan(0);
+    expect(retry.readers).toBe(1);
+    expect(retry.agents).toContain("claude-code");
+    expect(retry.last_used_at).toBeTruthy();
+
+    // The compliance question: installed everywhere, loaded by nothing.
+    const bootstrap = body.skills.find((s: { name: string }) => s.name === "bootstrap");
+    expect(bootstrap.uses).toBe(0);
+    expect(bootstrap.readers).toBe(0);
+    expect(bootstrap.agents).toEqual([]);
+
+    // Counts, never identities — a per-person log is the thing we promised not
+    // to build.
+    expect(JSON.stringify(body)).not.toContain("@acme.test");
+    for (const skill of body.skills) expect(skill).not.toHaveProperty("user_id");
   });
 
   it("stores no content — only that it happened", async () => {

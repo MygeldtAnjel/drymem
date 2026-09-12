@@ -14,6 +14,7 @@ import { z } from "zod";
 import { db, schema } from "../db/client.js";
 import { emailEnabled, env } from "../env.js";
 import { record } from "../lib/audit.js";
+import { seedCatalogue } from "../lib/seed.js";
 import { hashPassword, hashToken, randomToken, verifyPassword, WeakPassword } from "../lib/crypto.js";
 import { badRequest, conflict, limiter, notFound, unauthorized } from "../lib/errors.js";
 import { link, sendReset } from "../lib/email.js";
@@ -103,7 +104,11 @@ authRouter.post("/signup", async (req, res) => {
   await startSession(user!.id, req.get("user-agent"), res);
   await record({ orgId: org!.id, userId: user!.id }, "org.create", org!.name);
   await record({ orgId: org!.id, userId: user!.id }, "user.signup", user!.email);
-  res.json(await sessionBody(user!.id));
+
+  // A catalogue with something in it, so the first visit is not an empty page.
+  // Published, not enabled: a lead still chooses what runs on the team's laptops.
+  const seeded = await seedCatalogue({ orgId: org!.id, userId: user!.id });
+  res.json({ ...(await sessionBody(user!.id)), base_skills: seeded.published.length });
 });
 
 // ---- sign in and out ---------------------------------------------------------------

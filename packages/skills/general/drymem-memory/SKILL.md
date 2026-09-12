@@ -1,3 +1,8 @@
+---
+name: drymem-memory
+description: The memory protocol for this project — when to search memory, what to save, and what never to save. Active in every session.
+---
+
 # drymem Memory Protocol
 
 **ALWAYS ACTIVE** — This protocol is active for every session. You MUST follow it without the user asking.

@@ -26,8 +26,8 @@ Usage
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
   npx drymem skills <cmd>         list | catalogue | add | remove | pull | publish
-                                  | import owner/repo@skill | status
-                                  | discover | distill <topic>
+                                  | import owner/repo@skill | usage | diff <name>
+                                  | status | discover | distill <topic>
   npx drymem import <source>      Backfill memories the team already wrote down
                                   (claude-memory, git, docs, ecc, engram; --dry-run to preview)
   npx drymem promote <episode-id> Share a memory with the project's members
@@ -423,6 +423,58 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
 
+      if (sub === "usage") {
+        const rows = await client.skillUsage(projectKey);
+        if (rows.length === 0) {
+          console.log("Nothing is enabled here, so there is nothing to have read.");
+          return 0;
+        }
+        const unread = rows.filter((r) => r.uses === 0);
+        for (const row of rows) {
+          const detail =
+            row.uses === 0
+              ? "never read"
+              : `${row.uses} read(s) by ${row.readers} person(s) · ${row.agents.join(", ")} · last ${when(row.last_used_at)}`;
+          console.log(`  ${row.name.padEnd(28)} ${detail}`);
+        }
+        if (unread.length > 0) {
+          console.log(
+            `\n  ${unread.length} installed on every machine here and never loaded once.`,
+          );
+        }
+        // Say the limit out loud: a lead reading this should not think it is a
+        // per-person log, because it deliberately is not.
+        console.log("  Counts of people, not names.");
+        return 0;
+      }
+
+      if (sub === "diff") {
+        const { lineDiff, unified, changed } = await import("./diff.js");
+        const name = rest[1];
+        if (!name) fail("Which skill? npx drymem skills diff <name> [<from> <to>]");
+
+        const versions = await client.skillVersions(name);
+        if (versions.length < 2) {
+          console.log(`${name} has only one version; there is nothing to compare.`);
+          return 0;
+        }
+        // Default to the two most recent, which is the question people mean.
+        const to = rest[3] ? Number(rest[3]) : rest[2] ? Number(rest[2]) : versions[0]!.version;
+        const from = rest[3] ? Number(rest[2]) : to - 1;
+        const a = versions.find((v) => v.version === from);
+        const b = versions.find((v) => v.version === to);
+        if (!a || !b) {
+          fail(`No such version. ${name} has: ${versions.map((v) => v.version).join(", ")}`);
+        }
+
+        const hunks = lineDiff(a!.content, b!.content);
+        const counts = changed(hunks);
+        console.log(`  ${name}  v${from} → v${to}   +${counts.added} −${counts.removed}`);
+        console.log(`  v${to} by ${b!.author ?? "unknown"} on ${when(b!.created_at)}${b!.note ? ` — ${b!.note}` : ""}\n`);
+        for (const line of unified(hunks)) console.log(line);
+        return 0;
+      }
+
       if (sub === "status") {
         const lock = readLockfile(root);
         const platforms = chosenPlatforms(rest, root);
@@ -474,7 +526,8 @@ async function main(argv: string[]): Promise<number> {
 
       fail(
         `Unknown skills command: ${sub}.\n` +
-          "  list · catalogue · add · remove · pull · publish · import · status · discover · distill",
+          "  list · catalogue · add · remove · pull · publish · import\n" +
+          "  usage · diff · status · discover · distill",
       );
       return 1;
     }

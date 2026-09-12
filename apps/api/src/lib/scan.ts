@@ -89,7 +89,9 @@ const BEHAVIOUR: Rule[] = [
   {
     name: "reads-credentials",
     severity: "review",
-    pattern: /(?:~\/\.(?:aws|ssh|config\/gcloud|npmrc|netrc)|\.env\b|id_rsa)\b/,
+    // `.env` only when nothing precedes the dot: `process.env.KEY` is an
+    // object, and matching it flagged a third of the skills we ship ourselves.
+    pattern: /(?:~\/\.(?:aws|ssh|config\/gcloud|npmrc|netrc)|(?<![A-Za-z0-9_])\.env\b|id_rsa)\b/,
     detail: "Reaches for credential files on the developer's machine.",
   },
   {

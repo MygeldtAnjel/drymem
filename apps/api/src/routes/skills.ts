@@ -13,8 +13,6 @@
  * router answers them.
  */
 
-import { createHash } from "node:crypto";
-
 import { Router } from "express";
 import { and, desc, eq, inArray, sql as raw } from "drizzle-orm";
 import { z } from "zod";
@@ -24,25 +22,11 @@ import { record } from "../lib/audit.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 import { param } from "../lib/params.js";
 import { isAdmin, type Principal } from "../lib/principal.js";
-import { rejects, scan } from "../lib/scan.js";
+import { publishVersion, slug } from "../lib/publish.js";
 import { principalOf, requireUser } from "../middleware/auth.js";
 
 export const skillRouter = Router();
 skillRouter.use(requireUser);
-
-const sha = (content: string, files: Record<string, string>) =>
-  createHash("sha256")
-    .update(content)
-    .update(JSON.stringify(Object.entries(files).sort()))
-    .digest("hex");
-
-/** A name a filesystem and an agent will both accept. */
-const slug = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
 
 async function projectFor(principal: Principal, key: string) {
   const [row] = await db
@@ -234,6 +218,46 @@ skillRouter.get("/lock", async (req, res) => {
   });
 });
 
+/**
+ * Who is actually reading the skills this project installed.
+ *
+ * Deliberately aggregate. `skill_uses` has a `user_id`, but answering "which
+ * skills did Ana's agent read on Tuesday" is surveillance, and drymem is
+ * already the tool that says it stores summaries and not transcripts. The
+ * question this answers is the compliance one — is anything installed on every
+ * laptop here that nothing has ever loaded — so it counts distinct readers
+ * rather than naming them.
+ */
+skillRouter.get("/usage", async (req, res) => {
+  const principal = principalOf(req);
+  const query = z.object({ project_key: z.string().max(500) }).parse(req.query);
+  const { project } = await projectFor(principal, query.project_key);
+
+  const rows = await db
+    .select({
+      name: schema.skills.name,
+      source: schema.skills.source,
+      uses: raw<number>`count(${schema.skillUses.id})::int`,
+      readers: raw<number>`count(distinct ${schema.skillUses.userId})::int`,
+      agents: raw<string[]>`coalesce(array_agg(distinct ${schema.skillUses.agent}) filter (where ${schema.skillUses.agent} is not null), '{}')`,
+      last_used_at: raw<string | null>`max(${schema.skillUses.createdAt})`,
+    })
+    .from(schema.projectSkills)
+    .innerJoin(schema.skills, eq(schema.skills.id, schema.projectSkills.skillId))
+    .leftJoin(
+      schema.skillUses,
+      and(
+        eq(schema.skillUses.skillId, schema.skills.id),
+        eq(schema.skillUses.projectId, project.id),
+      ),
+    )
+    .where(eq(schema.projectSkills.projectId, project.id))
+    .groupBy(schema.skills.name, schema.skills.source)
+    .orderBy(schema.skills.name);
+
+  res.json({ project: project.projectKey, skills: rows });
+});
+
 skillRouter.get("/:name/versions", async (req, res) => {
   const principal = principalOf(req);
   const [skill] = await db
@@ -295,8 +319,7 @@ const publishSchema = z.object({
 skillRouter.post("/", async (req, res) => {
   const principal = principalOf(req);
   const body = publishSchema.parse(req.body);
-  const name = slug(body.name);
-  if (!name) throw badRequest("That name has no usable characters in it.");
+  if (!slug(body.name)) throw badRequest("That name has no usable characters in it.");
 
   if (body.source === "imported" && !isAdmin(principal)) {
     // An imported skill runs on every laptop on the project; that is an
@@ -304,106 +327,46 @@ skillRouter.post("/", async (req, res) => {
     throw forbidden("Only an organisation admin can import a skill from outside.");
   }
 
-  const findings = scan(body.content, body.files);
-  if (rejects(findings)) {
+  const result = await publishVersion(principal, body);
+  if (result.outcome === "rejected") {
     res.status(422).json({
       detail: "That skill contains a credential. Rotate it and publish again.",
-      findings,
+      findings: result.findings,
     });
     return;
   }
-
-  const [existing] = await db
-    .select()
-    .from(schema.skills)
-    .where(and(eq(schema.skills.orgId, principal.orgId), eq(schema.skills.name, name)))
-    .limit(1);
-
-  const state = findings.length > 0 ? "pending" : "published";
-  let skill = existing;
-  if (!skill) {
-    [skill] = await db
-      .insert(schema.skills)
-      .values({
-        orgId: principal.orgId,
-        authorId: principal.userId,
-        name,
-        topic: body.topic,
-        description: body.description || body.topic || null,
-        scope: "org",
-        source: body.source,
-        origin: body.origin ?? null,
-        state,
-      })
-      .returning();
-  } else {
-    [skill] = await db
-      .update(schema.skills)
-      .set({
-        topic: body.topic || skill.topic,
-        description: body.description || skill.description,
-        // A skill that was deprecated and is published again is alive.
-        state: skill.state === "deprecated" ? state : skill.state === "pending" ? state : state,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.skills.id, skill.id))
-      .returning();
-  }
-
-  const previous = await latest(skill!.id);
-  const digest = sha(body.content, body.files);
-  if (previous?.sha256 === digest) {
-    // Identical bytes are the same version. Publishing twice by accident
-    // should not litter the history with copies.
-    res.json({ name: skill!.name, version: previous.version, unchanged: true, findings });
+  if (result.outcome === "unchanged") {
+    res.json({ name: result.name, version: result.version, unchanged: true, findings: result.findings });
     return;
   }
 
-  const [version] = await db
-    .insert(schema.skillVersions)
-    .values({
-      skillId: skill!.id,
-      version: (previous?.version ?? 0) + 1,
-      content: body.content,
-      files: body.files,
-      sha256: digest,
-      model: body.model ?? null,
-      memoryCount: body.memory_count,
-      findings,
-      createdBy: principal.userId,
-      note: body.note || null,
-    })
-    .returning();
-
-  await record(principal, "skill.publish", `${skill!.name}@${version!.version}`);
-
-  if (body.project_key && state === "published") {
+  if (body.project_key && result.state === "published") {
     const project = await asLead(principal, body.project_key);
     await db
       .insert(schema.projectSkills)
       .values({
         projectId: project.id,
-        skillId: skill!.id,
-        versionId: version!.id,
+        skillId: result.skillId,
+        versionId: result.versionId,
         enabledBy: principal.userId,
       })
       .onConflictDoUpdate({
         target: [schema.projectSkills.projectId, schema.projectSkills.skillId],
-        set: { versionId: version!.id, enabledBy: principal.userId },
+        set: { versionId: result.versionId, enabledBy: principal.userId },
       });
-    await record(principal, "skill.enable", `${skill!.name} in ${body.project_key}`);
+    await record(principal, "skill.enable", `${result.name} in ${body.project_key}`);
   }
 
   res.json({
-    id: skill!.id,
-    name: skill!.name,
-    version: version!.version,
-    sha256: version!.sha256,
-    state,
-    findings,
+    id: result.skillId,
+    name: result.name,
+    version: result.version,
+    sha256: result.sha256,
+    state: result.state,
+    findings: result.findings,
     // Say it plainly rather than leaving a "published" that is not installed.
     detail:
-      state === "pending"
+      result.state === "pending"
         ? "Stored for review. An organisation admin has to approve it before a project can use it."
         : undefined,
   });

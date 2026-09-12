@@ -1,12 +1,12 @@
 {
   "lockfileVersion": 1,
   "project": "github.com/mygeldtanjel/drymem",
-  "generatedAt": "2026-09-12T05:06:27.862Z",
+  "generatedAt": "2026-09-12T05:40:12.351Z",
   "skills": [
     {
       "name": "graphiti",
-      "version": 1,
-      "sha256": "af9bae9d4256e5db37d18c25e544dfdc95ede157de6bc33f263ebf18c131f298",
+      "version": 2,
+      "sha256": "9f7ba5b186fc693cff8cd51da885b86a3d683b70d1260c6b53501ce1facb7114",
       "source": "distilled"
     }
   ]
