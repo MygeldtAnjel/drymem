@@ -13,8 +13,6 @@ import { resolveProjectKey } from "./identity.js";
 import { runLogin } from "./login.js";
 import { runSetup } from "./setup.js";
 
-/** Stamped into the lock file so a team can see what produced their skills. */
-const VERSION = "2.1.0";
 
 const USAGE = `drymem — shared long-term memory for AI coding agents
 
@@ -27,7 +25,8 @@ Usage
   npx drymem ask "<question>"     A grounded answer from this project's memory
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
-  npx drymem skills <cmd>         list | status | sync | discover | distill <topic>
+  npx drymem skills <cmd>         list | catalogue | add | remove | pull | publish
+                                  | status | discover | distill <topic>
   npx drymem import <source>      Backfill memories the team already wrote down
                                   (claude-memory, git, docs, ecc, engram; --dry-run to preview)
   npx drymem promote <episode-id> Share a memory with the project's members
@@ -98,11 +97,12 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  // `skills` works offline: the skills ship in this package, so a developer can
-  // install them before they have a server or a token.
-  const needsServer = command !== "skills";
-  const client = needsServer ? new DrymemClient(requireConfig()) : (null as never);
-  const projectKey = needsServer ? resolveProjectKey(process.cwd()) : "";
+  // The catalogue lives on the server now, so every command needs one — except
+  // `skills pull`, which falls back to the committed lockfile when it cannot
+  // reach it. That fallback is inside `pull`, which needs a client object to
+  // try with, so the config is still required here.
+  const client = new DrymemClient(requireConfig());
+  const projectKey = resolveProjectKey(process.cwd());
 
   switch (command) {
     case "token": {
@@ -240,69 +240,178 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
 
+    /**
+     * The catalogue, from a terminal.
+     *
+     * `add` and `remove` are the lead's; `pull` is everyone's and runs from the
+     * session hook. `list`, `catalogue` and `usage` are for looking.
+     */
     case "skills": {
       const {
-        SKILLS_DIR,
-        availableSkills,
-        bundledSkillsDir,
-        statusOf,
-        sync: syncSkills,
-      } = await import("./skills.js");
-      const sub = rest[0] ?? "status";
-      const version = VERSION;
+        pull: pullSkills,
+        describePull,
+        chosenPlatforms,
+      } = await import("./catalogue.js");
+      const { readLockfile } = await import("./lockfile.js");
+      const sub = rest[0] ?? "list";
+      const root = process.cwd();
 
       if (sub === "list") {
-        const bundled = bundledSkillsDir();
-        const names = availableSkills(bundled);
-        if (names.length === 0) fail("No bundled skills found.");
-        const states = new Map(statusOf(process.cwd(), version, bundled).map((s) => [s.name, s.state]));
-        for (const name of names) console.log(`  ${name.padEnd(28)} ${states.get(name) ?? "missing"}`);
+        const skills = await client.enabledSkills(projectKey);
+        if (skills.length === 0) {
+          console.log("Nothing enabled here yet.");
+          console.log("  See what the team has:   npx drymem skills catalogue");
+          return 0;
+        }
+        for (const skill of skills) {
+          const flags = [
+            skill.outdated ? `v${skill.version} (v${skill.latest_version} available)` : `v${skill.version}`,
+            skill.state === "deprecated" ? "DEPRECATED" : "",
+            skill.uses > 0 ? `${skill.uses} uses` : "never used",
+          ].filter(Boolean);
+          console.log(`  ${skill.name.padEnd(28)} ${flags.join(" · ")}`);
+        }
+        return 0;
+      }
+
+      if (sub === "catalogue" || sub === "available") {
+        const skills = await client.catalogue(projectKey);
+        if (skills.length === 0) {
+          console.log("The catalogue is empty. Distil one from your memories:");
+          console.log('  npx drymem skills distill "payments"');
+          return 0;
+        }
+        for (const skill of skills) {
+          const mark = skill.enabled_here ? "*" : " ";
+          const note = [skill.source, skill.state === "published" ? "" : skill.state]
+            .filter(Boolean)
+            .join(" · ");
+          console.log(`${mark} ${skill.name.padEnd(28)} ${note}`);
+        }
+        console.log("\n  * already enabled here.  Add one: npx drymem skills add <name>");
+        return 0;
+      }
+
+      if (sub === "add") {
+        const spec = rest[1];
+        if (!spec) fail("Which skill? npx drymem skills add <name>[@version]");
+        const [name, at] = spec.split("@");
+        const enabled = await client.enableSkill(
+          name!,
+          projectKey,
+          at ? Number(at) : undefined,
+        );
+        console.log(`Enabled ${enabled.name}@${enabled.version} for this project.`);
+        const after = await pullSkills(client, projectKey, root, rest);
+        for (const line of describePull(after.results)) console.log(line);
+        console.log(`\n  Commit .drymem/skills.lock so your team gets it on \`git pull\`.`);
+        return 0;
+      }
+
+      if (sub === "remove") {
+        const name = rest[1];
+        if (!name) fail("Which skill? npx drymem skills remove <name>");
+        await client.disableSkill(name, projectKey);
+        console.log(`Disabled ${name} for this project.`);
+        const after = await pullSkills(client, projectKey, root, rest);
+        for (const line of describePull(after.results)) console.log(line);
+        console.log(`\n  Commit .drymem/skills.lock.`);
+        return 0;
+      }
+
+      if (sub === "pull" || sub === "sync") {
+        const result = await pullSkills(client, projectKey, root, rest);
+        if (result.offline) {
+          const lock = result.lock;
+          console.log(
+            lock
+              ? `Could not reach the server. ${lock.skills.length} skill(s) in the lockfile stay as they are.`
+              : "Could not reach the server, and there is no lockfile to fall back on.",
+          );
+          return lock ? 0 : 1;
+        }
+        const lines = describePull(result.results);
+        if (lines.length === 0) {
+          const names = chosenPlatforms(rest, root);
+          console.log(
+            names.length === 0
+              ? "No coding agent found here. Name one: --claude-code, --opencode, --cursor, --codex."
+              : "Nothing to do.",
+          );
+          return 0;
+        }
+        for (const line of lines) console.log(line);
+        return 0;
+      }
+
+      if (sub === "publish") {
+        const { readFileSync, existsSync, readdirSync, statSync } = await import("node:fs");
+        const { join, basename } = await import("node:path");
+        const path = rest[1];
+        if (!path) fail("Which folder or file? npx drymem skills publish ./my-skill");
+
+        // A folder with a SKILL.md, or the SKILL.md itself.
+        const isDir = existsSync(path) && statSync(path).isDirectory();
+        const mdPath = isDir ? join(path, "SKILL.md") : path;
+        if (!existsSync(mdPath)) fail(`No SKILL.md at ${mdPath}`);
+
+        const content = readFileSync(mdPath, "utf8");
+        const files: Record<string, string> = {};
+        if (isDir) {
+          for (const entry of readdirSync(path, { withFileTypes: true })) {
+            if (entry.isFile() && entry.name !== "SKILL.md" && !entry.name.startsWith(".")) {
+              files[entry.name] = readFileSync(join(path, entry.name), "utf8");
+            }
+          }
+        }
+        const name = rest.includes("--name")
+          ? rest[rest.indexOf("--name") + 1]!
+          : isDir
+            ? basename(path)
+            : basename(path, ".md");
+
+        const published = await client.publishSkillVersion({
+          name,
+          content,
+          files,
+          source: "authored",
+          project_key: rest.includes("--enable") ? projectKey : undefined,
+        });
+        if (published.unchanged) {
+          console.log(`${published.name} is already at v${published.version}; nothing changed.`);
+          return 0;
+        }
+        console.log(`Published ${published.name}@${published.version} (${published.state}).`);
+        for (const finding of published.findings) {
+          console.log(`  ${finding.severity}: ${finding.rule} — ${finding.detail}`);
+        }
+        if (published.detail) console.log(`\n  ${published.detail}`);
         return 0;
       }
 
       if (sub === "status") {
-        const statuses = statusOf(process.cwd(), version);
-        if (statuses.length === 0) {
-          console.log("No skills installed. Run `drymem skills sync`.");
-          return 0;
-        }
-        for (const s of statuses) console.log(`  ${s.name.padEnd(28)} ${s.state}`);
-        console.log(`\n  ${SKILLS_DIR} · modified and unknown skills are never overwritten`);
-        return 0;
-      }
-
-      if (sub === "sync") {
-        const result = syncSkills(process.cwd(), version, {
-          force: rest.includes("--force"),
-          dryRun: rest.includes("--dry-run"),
-        });
-        const say = (label: string, names: string[]) => {
-          if (names.length > 0) console.log(`  ${label}: ${names.join(", ")}`);
-        };
-        say("installed", result.installed);
-        say("updated", result.updated);
-        say("already current", result.untouched);
-        if (result.skipped.length > 0) {
-          console.log(`  skipped (edited locally): ${result.skipped.join(", ")}`);
-          console.log("  Run with --force to replace them with ours.");
-        }
-        if (result.installed.length + result.updated.length === 0 && result.skipped.length === 0) {
-          console.log("  Everything is current.");
-        }
+        const lock = readLockfile(root);
+        const platforms = chosenPlatforms(rest, root);
+        console.log(`  project: ${projectKey}`);
+        console.log(
+          `  agents:  ${platforms.length > 0 ? platforms.map((p) => p.label).join(", ") : "none detected"}`,
+        );
+        console.log(
+          lock
+            ? `  lockfile: ${lock.skills.length} skill(s), generated ${when(lock.generatedAt)}`
+            : "  lockfile: none yet — run `npx drymem skills pull`",
+        );
         return 0;
       }
 
       if (sub === "discover") {
         const { gaps } = await import("./skills.js");
-        const client = new DrymemClient(requireConfig());
-        const key = resolveProjectKey(process.cwd());
-        const clusters = await client.discover(key, Number(rest[1] ?? 2));
-
+        const clusters = await client.discover(projectKey, Number(rest[1] ?? 2));
         if (clusters.length === 0) {
           console.log("Nothing recurs yet. Discover needs memories to work from.");
           return 0;
         }
-        const missing = gaps(clusters, process.cwd());
+        const missing = gaps(clusters, root);
         console.log(`  ${clusters.length} recurring subject(s), ${missing.length} with no skill:\n`);
         for (const c of missing) {
           console.log(`  ${String(c.memory_count).padStart(3)} memories  ${c.topic}`);
@@ -318,20 +427,21 @@ async function main(argv: string[]): Promise<number> {
         const topic = rest.slice(1).filter((a) => !a.startsWith("--")).join(" ").trim();
         if (!topic) fail('Which subject? e.g. npx drymem skills distill "payments"');
 
-        const client = new DrymemClient(requireConfig());
-        const key = resolveProjectKey(process.cwd());
         console.log(`Drafting a skill for "${topic}"…`);
-        const draft = await client.distill(key, topic);
-        const path = writeDraft(process.cwd(), draft.name, draft.content);
+        const draft = await client.distill(projectKey, topic);
+        const path = writeDraft(root, draft.name, draft.content);
 
         console.log(`\n  Drafted from ${draft.memory_count} memories using ${draft.model}`);
         console.log(`  ${path}`);
-        console.log(`\n  This is a draft, not an installed skill. Read it, edit it, and`);
-        console.log(`  move it to ${SKILLS_DIR}/${draft.name}/SKILL.md if it earns its place.`);
+        console.log(`\n  A draft, not a published skill. Read it, edit it, then:`);
+        console.log(`    npx drymem skills publish ${path.replace(/\/SKILL\.md$/, "")} --enable`);
         return 0;
       }
 
-      fail(`Unknown skills command: ${sub}. Try list, status, sync, discover or distill.`);
+      fail(
+        `Unknown skills command: ${sub}.\n` +
+          "  list · catalogue · add · remove · pull · publish · status · discover · distill",
+      );
       return 1;
     }
 

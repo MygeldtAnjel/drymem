@@ -32,7 +32,13 @@ export type Action =
   | "token.create"
   | "token.revoke"
   | "session.revoke"
-  | "device.approve";
+  | "device.approve"
+  | "skill.publish"
+  | "skill.enable"
+  | "skill.disable"
+  | "skill.approve"
+  | "skill.deprecate"
+  | "skill.import";
 
 export async function record(
   principal: Pick<Principal, "orgId" | "userId"> | { orgId: string; userId: string | null },

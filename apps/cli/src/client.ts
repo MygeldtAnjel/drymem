@@ -79,15 +79,27 @@ export interface UserOut {
   created_at: string | null;
 }
 
-export interface SkillOut {
-  id: string;
+export interface CatalogueSkill {
   name: string;
   topic: string;
+  description: string | null;
+  author: string | null;
+  scope: string;
+  source: string;
+  state: string;
+  origin: string | null;
+  latest_version: number;
+  uses: number;
+  enabled_here: boolean;
+}
+
+export interface EnabledSkill extends CatalogueSkill {
   content: string;
-  author: string;
-  model: string | null;
-  memory_count: number;
-  updated_at: string | null;
+  files: Record<string, string>;
+  version: number;
+  sha256: string;
+  outdated: boolean;
+  findings: { rule: string; severity: string; detail: string }[];
 }
 
 export interface ProjectOut {
@@ -306,36 +318,66 @@ export class DrymemClient {
     return (await this.request<{ users: UserOut[] }>("/v1/users")).users;
   }
 
-  /** Skills this project has published. */
-  async skills(projectKey: string): Promise<SkillOut[]> {
-    const data = await this.request<{ skills: SkillOut[] }>(
+  /** What this project has enabled, with the version it is pinned to. */
+  async enabledSkills(projectKey: string): Promise<EnabledSkill[]> {
+    const data = await this.request<{ skills: EnabledSkill[] }>(
       `/v1/skills?${this.query({ project_key: projectKey })}`,
     );
     return data.skills;
   }
 
-  /** Publish a reviewed draft. Publishing the same name again replaces it. */
-  async publishSkill(body: {
-    project_key: string;
+  /** Everything the organisation has, enabled here or not. */
+  async catalogue(projectKey?: string): Promise<CatalogueSkill[]> {
+    const data = await this.request<{ skills: CatalogueSkill[] }>(
+      `/v1/skills/catalogue?${this.query({ project_key: projectKey })}`,
+    );
+    return data.skills;
+  }
+
+  enableSkill(name: string, projectKey: string, version?: number) {
+    return this.request<{ name: string; version: number; sha256: string }>(
+      `/v1/skills/${encodeURIComponent(name)}/enable`,
+      { method: "POST", body: JSON.stringify({ project_key: projectKey, version }) },
+    );
+  }
+
+  disableSkill(name: string, projectKey: string) {
+    return this.request<{ name: string }>(
+      `/v1/skills/${encodeURIComponent(name)}/enable?${this.query({ project_key: projectKey })}`,
+      { method: "DELETE" },
+    );
+  }
+
+  publishSkillVersion(body: {
     name: string;
-    topic?: string;
     content: string;
-    model?: string | null;
-    memory_count?: number;
-  }): Promise<SkillOut> {
-    return this.request<SkillOut>("/v1/skills", {
+    files?: Record<string, string>;
+    topic?: string;
+    description?: string;
+    source?: string;
+    origin?: string;
+    note?: string;
+    project_key?: string;
+  }) {
+    return this.request<{
+      name: string;
+      version: number;
+      state: string;
+      findings: { rule: string; severity: string; detail: string; line?: number }[];
+      detail?: string;
+      unchanged?: boolean;
+    }>("/v1/skills", { method: "POST", body: JSON.stringify(body) });
+  }
+
+  /** Tell the server which skills an agent read. Never what it did with them. */
+  reportSkillUse(projectKey: string, agent: string, names: string[]) {
+    return this.request<void>("/v1/skills/used", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ project_key: projectKey, agent, names }),
     });
   }
 
-  async deleteSkill(projectKey: string, name: string): Promise<boolean> {
-    const data = await this.request<{ deleted: boolean }>(
-      `/v1/skills/${encodeURIComponent(name)}?${this.query({ project_key: projectKey })}`,
-      { method: "DELETE" },
-    );
-    return data.deleted;
-  }
+
 
   async projects(): Promise<ProjectOut[]> {
     const data = await this.request<{ projects: Partial<ProjectOut>[] }>("/v1/projects");

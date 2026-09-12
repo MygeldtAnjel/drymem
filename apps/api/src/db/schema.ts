@@ -27,6 +27,7 @@ import {
   boolean,
   index,
   integer,
+  json,
   pgTable,
   text,
   timestamp,
@@ -197,26 +198,118 @@ export const memoryFeedback = pgTable("memory_feedback", {
 
 // ---- skills ----------------------------------------------------------------------
 
-/** Alembic created this; it becomes the catalogue in Step C. */
-export const skills = pgTable("skills", {
-  id: uuid("id").primaryKey().$defaultFn(randomUUID),
-  orgId: uuid("org_id")
-    .notNull()
-    .references(() => orgs.id, { onDelete: "cascade" }),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  authorId: uuid("author_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 200 }).notNull(),
-  topic: varchar("topic", { length: 300 }).notNull().default(""),
-  content: text("content").notNull(),
-  model: varchar("model", { length: 100 }),
-  memoryCount: integer("memory_count").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+/**
+ * The catalogue. One row per skill the organisation has, whatever its source.
+ *
+ * Content lives on the *version*, never here: a second copy on the skill is how
+ * the two drift, and what a project pins is a version rather than a name.
+ */
+export const skills = pgTable(
+  "skills",
+  {
+    id: uuid("id").primaryKey().$defaultFn(randomUUID),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => orgs.id, { onDelete: "cascade" }),
+    /** Set only for a project-scoped skill; null for one the whole org can use. */
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    topic: varchar("topic", { length: 300 }).notNull().default(""),
+    description: text("description"),
+    /** org | project */
+    scope: varchar("scope", { length: 20 }).notNull().default("org"),
+    /** base | distilled | imported | authored */
+    source: varchar("source", { length: 20 }).notNull().default("distilled"),
+    /** draft | pending | published | deprecated */
+    state: varchar("state", { length: 20 }).notNull().default("published"),
+    /** Where an imported skill came from, verbatim. */
+    origin: varchar("origin", { length: 300 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_skills_org_name").on(t.orgId, t.name)],
+);
+
+/**
+ * An immutable version of a skill.
+ *
+ * Content-addressed, so "is this the same skill the lockfile pinned?" is a
+ * string comparison rather than a diff. Nothing ever edits one; publishing
+ * again adds the next.
+ */
+export const skillVersions = pgTable(
+  "skill_versions",
+  {
+    id: uuid("id").primaryKey().$defaultFn(randomUUID),
+    skillId: uuid("skill_id")
+      .notNull()
+      .references(() => skills.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    content: text("content").notNull(),
+    files: json("files").$type<Record<string, string>>().notNull().default({}),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    model: varchar("model", { length: 100 }),
+    memoryCount: integer("memory_count").notNull().default(0),
+    /** What the scanner found. An empty list is a clean bill. */
+    findings: json("findings").$type<Finding[]>().notNull().default([]),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    note: varchar("note", { length: 300 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_skill_version").on(t.skillId, t.version)],
+);
+
+export interface Finding {
+  rule: string;
+  severity: "reject" | "review";
+  detail: string;
+  line?: number;
+}
+
+/** What a project has turned on, pinned to one version. */
+export const projectSkills = pgTable(
+  "project_skills",
+  {
+    id: uuid("id").primaryKey().$defaultFn(randomUUID),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    skillId: uuid("skill_id")
+      .notNull()
+      .references(() => skills.id, { onDelete: "cascade" }),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => skillVersions.id),
+    enabledBy: uuid("enabled_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("uq_project_skill").on(t.projectId, t.skillId)],
+);
+
+/**
+ * Which skill an agent actually read.
+ *
+ * The difference between "we have forty skills" and "these six are the ones
+ * anyone uses" — and what shows a lead that the skill they enabled never fired.
+ * It records *that* a skill was read, never what the agent then did with it;
+ * the latter would be a transcript (PLAN.md D35).
+ */
+export const skillUses = pgTable(
+  "skill_uses",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    orgId: uuid("org_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    skillId: uuid("skill_id").notNull(),
+    userId: uuid("user_id"),
+    agent: varchar("agent", { length: 40 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ix_skill_uses_skill").on(t.skillId, t.createdAt)],
+);
 
 // ---- billing -------------------------------------------------------------------------
 

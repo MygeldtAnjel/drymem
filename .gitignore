@@ -13,8 +13,16 @@ apps/server/.venv/
 node_modules/
 apps/cli/dist/
 
-# Skill drafts are working files; the lock file is not
+# Skill drafts are working files. `.drymem/skills.lock` is NOT ignored: it is
+# the committed record of what this project enabled, and how a teammate gets
+# the same skills from a `git pull`.
 .drymem/drafts/
+
+# Installed skills are generated from the lockfile by `drymem skills pull`.
+# Committing them would put the same content in the repo twice and let the two
+# drift; the lockfile and its hashes are the record.
+.opencode/skill/
+.cursor/rules/*.drymem.mdc
 
 # Review captures are regenerated; the design records are not
 .impeccable/review/

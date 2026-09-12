@@ -89,7 +89,40 @@ async function injectContext(payload: HookPayload, protocol: string): Promise<vo
 }
 
 export async function sessionStart(payload: HookPayload): Promise<void> {
-  await injectContext(payload, MEMORY_PROTOCOL);
+  // Two independent jobs, and neither may take the other down with it. The
+  // context is what the agent reads; the skills are what it can do. A hook
+  // that throws stops the session it runs in, so both are wrapped.
+  await Promise.allSettled([injectContext(payload, MEMORY_PROTOCOL), syncSkills(payload)]);
+}
+
+/**
+ * Install whatever this project has enabled, quietly.
+ *
+ * This is the whole "the lead adds a skill, everyone else runs `git pull`"
+ * promise, and it lives here because a person should never have to remember a
+ * command for it. It says nothing on success: a hook that prints on every
+ * session start becomes noise people learn to scroll past.
+ */
+async function syncSkills(payload: HookPayload): Promise<void> {
+  try {
+    const { pull } = await import("./catalogue.js");
+    const { DrymemClient } = await import("./client.js");
+    const { loadConfig } = await import("./config.js");
+    const { resolveProjectKey } = await import("./identity.js");
+
+    const config = loadConfig();
+    if (!config) return;
+    const root = payload.cwd ?? process.cwd();
+    const result = await pull(new DrymemClient(config), resolveProjectKey(root), root, []);
+
+    const changed = result.results.flatMap((r) => [...r.installed, ...r.removed]);
+    if (changed.length > 0) {
+      console.error(`drymem: skills updated (${changed.join(", ")})`);
+    }
+  } catch (error) {
+    // Never a reason to interrupt somebody's session.
+    console.error(`drymem: could not sync skills (${String(error).slice(0, 120)})`);
+  }
 }
 
 export async function postCompaction(payload: HookPayload): Promise<void> {
