@@ -143,33 +143,3 @@ userRouter.delete("/:id", requireAdmin, async (req, res) => {
 });
 
 /** The audit trail. Admin only, newest first. */
-export const auditRouter = Router();
-auditRouter.use(requireUser, requireAdmin);
-
-auditRouter.get("/", async (req, res) => {
-  const principal = principalOf(req);
-  const query = z
-    .object({ limit: z.coerce.number().min(1).max(500).default(100) })
-    .parse(req.query);
-
-  const rows = await db
-    .select({ event: schema.auditLog, actor: schema.users.email })
-    .from(schema.auditLog)
-    .leftJoin(schema.users, eq(schema.users.id, schema.auditLog.actorId))
-    .where(eq(schema.auditLog.orgId, principal.orgId))
-    .orderBy(schema.auditLog.id)
-    .limit(query.limit);
-
-  res.json({
-    events: rows
-      .map((r) => ({
-        id: r.event.id,
-        action: r.event.action,
-        target: r.event.target,
-        actor: r.actor,
-        created_at: r.event.createdAt,
-      }))
-      .reverse(),
-  });
-});
-

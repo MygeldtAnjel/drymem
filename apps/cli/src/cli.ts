@@ -30,6 +30,7 @@ Usage
                                   | status | discover | distill <topic>
   npx drymem import <source>      Backfill memories the team already wrote down
                                   (claude-memory, git, docs, ecc, engram; --dry-run to preview)
+  npx drymem audit [--security]   Who did what (admins only)
   npx drymem promote <episode-id> Share a memory with the project's members
   npx drymem delete <episode-id>  Remove a memory
   npx drymem projects             List the projects you can see
@@ -530,6 +531,50 @@ async function main(argv: string[]): Promise<number> {
           "  usage · diff · status · discover · distill",
       );
       return 1;
+    }
+
+    /**
+     * The audit trail, from a terminal.
+     *
+     * `--security` is the default view on purpose: the question a lead actually
+     * opens this for is whether anyone has pasted a credential, not a feed of
+     * everything that happened.
+     */
+    case "audit": {
+      const group = ["security", "people", "skills", "projects", "access"].find((g) =>
+        rest.includes(`--${g}`),
+      );
+      const at = rest.indexOf("--actor");
+      const limitAt = rest.indexOf("--limit");
+
+      const summary = await client.auditSummary(30).catch(() => null);
+      if (!summary) {
+        fail("Only an organisation admin can read the audit trail.");
+      }
+      const { rejected, redacted } = summary!.credentials;
+      console.log(
+        `  Last ${summary!.days} days: ${summary!.total} event(s) · ` +
+          `${rejected} save(s) refused for a credential · ${redacted} redacted`,
+      );
+
+      const { events } = await client.audit({
+        group,
+        actor: at >= 0 ? rest[at + 1] : undefined,
+        limit: limitAt >= 0 ? Number(rest[limitAt + 1]) : 25,
+      });
+      if (events.length === 0) {
+        console.log("\n  Nothing matches.");
+        return 0;
+      }
+      console.log();
+      for (const event of events) {
+        console.log(
+          `  ${when(event.created_at)}  ${event.action.padEnd(22)} ` +
+            `${(event.actor ?? "—").padEnd(28)} ${event.target ?? ""}`,
+        );
+      }
+      if (!group) console.log("\n  Narrow it: --security --people --skills --projects --access");
+      return 0;
     }
 
     case "import": {

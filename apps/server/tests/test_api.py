@@ -526,6 +526,71 @@ class TestPromotion:
         assert rows[0].target == saved["episode_uuid"]
 
 
+class TestScrubberIsAudited:
+    """D30: "has anyone pasted a credential this month?" from one screen."""
+
+    KEY = (
+        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "MIIEowIBAAKCAQEAy8Dbv8prpJ/0kKhlGeJYozo2t60EG8L0561g13R29LvMR5hy\n"
+        "-----END RSA PRIVATE KEY-----"
+    )
+
+    async def test_a_refused_save_is_recorded_even_though_it_failed(
+        self, client, sessionmaker
+    ):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import AuditLog
+
+        r = await client.post(
+            "/v1/memories",
+            json={"project_key": PROJECT, "summary": f"Here is the key:\n{self.KEY}\n"},
+            headers=auth(client),
+        )
+        assert r.status_code == 422
+
+        # The request rolled back. The record of the refusal must not have.
+        async with sessionmaker() as session:
+            rows = (await session.execute(select(AuditLog))).scalars().all()
+
+        rejected = [x for x in rows if x.action == "memory.rejected"]
+        assert len(rejected) == 1
+        assert rejected[0].target == f"{PROJECT}:private-key"
+        # The rule that fired, never the value.
+        assert "MIIEowIBAAKC" not in (rejected[0].target or "")
+
+    async def test_a_redaction_is_recorded_by_rule_not_by_value(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import AuditLog
+
+        secret = "AKIAIOSFODNN7EXAMPLE"
+        r = await client.post(
+            "/v1/memories",
+            json={"project_key": PROJECT, "summary": f"Deployed with {secret} today."},
+            headers=auth(client),
+        )
+        assert r.status_code == 200
+
+        async with sessionmaker() as session:
+            rows = (await session.execute(select(AuditLog))).scalars().all()
+
+        scrubbed = [x for x in rows if x.action == "memory.scrubbed"]
+        assert len(scrubbed) == 1
+        assert secret not in (scrubbed[0].target or "")
+        assert scrubbed[0].target.startswith(f"{PROJECT}:")
+
+    async def test_a_clean_save_writes_no_scrubber_row(self, client, sessionmaker):
+        from sqlalchemy import select
+
+        from drymem_server.db.models import AuditLog
+
+        await save(client)
+        async with sessionmaker() as session:
+            rows = (await session.execute(select(AuditLog))).scalars().all()
+        assert [x for x in rows if x.action == "memory.scrubbed"] == []
+
+
 class TestLegacyGroupSafety:
     """Pre-3A memories have no scope. They must never become everyone's."""
 

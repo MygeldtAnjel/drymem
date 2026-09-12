@@ -102,6 +102,22 @@ export interface EnabledSkill extends CatalogueSkill {
   findings: { rule: string; severity: string; detail: string }[];
 }
 
+export interface AuditEvent {
+  id: number;
+  action: string;
+  target: string | null;
+  actor: string | null;
+  actor_name: string | null;
+  created_at: string;
+}
+
+export interface AuditSummary {
+  days: number;
+  total: number;
+  actions: { action: string; count: number; last_at: string }[];
+  credentials: { rejected: number; redacted: number };
+}
+
 export interface SkillVersion {
   version: number;
   sha256: string;
@@ -353,6 +369,22 @@ export class DrymemClient {
       `/v1/skills/catalogue?${this.query({ project_key: projectKey })}`,
     );
     return data.skills;
+  }
+
+  /** The audit trail, newest first. Admins only; a member gets a 403. */
+  async audit(options: { group?: string; action?: string; actor?: string; limit?: number } = {}) {
+    return this.request<{ events: AuditEvent[]; next_before: number | null }>(
+      `/v1/audit?${this.query({
+        group: options.group,
+        action: options.action,
+        actor: options.actor,
+        limit: options.limit,
+      })}`,
+    );
+  }
+
+  auditSummary(days = 30) {
+    return this.request<AuditSummary>(`/v1/audit/summary?${this.query({ days })}`);
   }
 
   /** Every version of one skill, newest first, with its content. */

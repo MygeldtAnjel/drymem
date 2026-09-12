@@ -8,6 +8,7 @@ the index, so the index never points at an episode that does not exist.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -30,8 +31,10 @@ from drymem_server.db.models import (
 from drymem_server.identity import group_id_private, group_id_team, sanitize_group_id
 from drymem_server.memory_store import Episode, Fact, MemoryStore, Metadata
 from drymem_server.schema import DEFAULT_TYPE, normalize_type
-from drymem_server.scrubber import ScrubResult, scrub
+from drymem_server.scrubber import PrivateKeyFound, ScrubResult, scrub
 from drymem_server.settings import settings
+
+logger = logging.getLogger(__name__)
 
 _TITLE_LIMIT = 500
 
@@ -193,6 +196,36 @@ class MemoryService:
             )
         )
 
+    async def audit_now(self, action: str, target: str) -> None:
+        """Audit something whose own request is about to fail.
+
+        A refused save rolls this session back, which would take the record of
+        the refusal with it — and the refusals are the rows an admin most wants
+        to see (D30). So this one gets its own session and its own commit, and
+        swallows its errors: an unwritten log line must never turn a clear 422
+        into a 500.
+
+        Bound to *this* session's engine rather than to the configured URL: the
+        settings are global and the session is not, and reaching for the global
+        pointed the first version of this at the wrong database entirely.
+        """
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+
+        try:
+            factory = async_sessionmaker(self.session.bind, expire_on_commit=False)
+            async with factory() as session:
+                session.add(
+                    AuditLog(
+                        org_id=self.principal.org_id,
+                        actor_id=self.principal.user_id,
+                        action=action,
+                        target=target,
+                    )
+                )
+                await session.commit()
+        except Exception as exc:  # noqa: BLE001 - logged, never raised
+            logger.warning("audit %s not recorded: %s", action, exc)
+
     async def save(
         self,
         *,
@@ -206,7 +239,18 @@ class MemoryService:
     ) -> SavedMemory:
         # Scrub first. Everything after this point either stores the text or
         # sends it to a model, and both are too late to take a secret back.
-        cleaned = scrub(body, denylist())
+        try:
+            cleaned = scrub(body, denylist())
+        except PrivateKeyFound:
+            # The rule that fired, never the value. "Has anyone pasted a
+            # credential this month?" is the question this answers (D30).
+            await self.audit_now("memory.rejected", f"{project_key}:private-key")
+            raise
+        if not cleaned.clean:
+            self.audit(
+                "memory.scrubbed",
+                f"{project_key}:" + ",".join(sorted(cleaned.redactions)),
+            )
 
         kind = normalize_type(memory_type)
         project = await ensure_project(self.session, self.principal, project_key)

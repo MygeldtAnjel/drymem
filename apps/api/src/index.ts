@@ -20,6 +20,7 @@ import { ZodError } from "zod";
 import { env } from "./env.js";
 import { badRequest, handleErrors } from "./lib/errors.js";
 import { resolvePrincipal } from "./middleware/auth.js";
+import { auditRouter } from "./routes/audit.js";
 import { authRouter } from "./routes/auth.js";
 import { deviceRouter } from "./routes/device.js";
 import { healthRouter, memoryRouter } from "./routes/memory.js";
@@ -28,7 +29,7 @@ import { overviewRouter } from "./routes/overview.js";
 import { projectRouter } from "./routes/projects.js";
 import { skillRouter } from "./routes/skills.js";
 import { tokenRouter } from "./routes/tokens.js";
-import { auditRouter, meRouter, userRouter } from "./routes/users.js";
+import { meRouter, userRouter } from "./routes/users.js";
 
 export function createApp() {
   const app = express();
