@@ -21,7 +21,6 @@ import {
   Ban,
   CheckCircle2,
   Clock,
-  Download,
   FileText,
   History,
   Plus,
@@ -57,11 +56,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { CatalogueSkill, Cluster, Finding, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
 import { count, relative } from "@/format";
+import { go } from "@/router";
 
 export type Draft = { name: string; content: string; model: string; memory_count: number };
 
 /** Where a skill came from. Worth showing: imported and distilled earn different trust. */
-function SourceChip({ source }: { source: string }) {
+export function SourceChip({ source }: { source: string }) {
   const label: Record<string, string> = {
     base: "Built in",
     distilled: "From memory",
@@ -71,7 +71,7 @@ function SourceChip({ source }: { source: string }) {
   return <Badge variant="outline">{label[source] ?? source}</Badge>;
 }
 
-function StateChip({ state }: { state: string }) {
+export function StateChip({ state }: { state: string }) {
   if (state === "pending") {
     return (
       <Badge variant="outline" className="text-primary">
@@ -89,7 +89,7 @@ function StateChip({ state }: { state: string }) {
   return null;
 }
 
-function Findings({ findings }: { findings: Finding[] }) {
+export function Findings({ findings }: { findings: Finding[] }) {
   if (findings.length === 0) return null;
   return (
     <ul className="flex flex-col gap-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
@@ -143,10 +143,8 @@ export function SkillsPage({
   onDeprecate: (name: string) => void;
   onVersions: (name: string) => Promise<SkillVersion[]>;
 }) {
-  const [reading, setReading] = useState<Skill | null>(null);
   const [readingDraft, setReadingDraft] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ name: string; versions: SkillVersion[] } | null>(null);
 
   const enabledNames = new Set(skills.map((s) => s.name));
   const published = catalogue.filter((s) => s.state !== "pending");
@@ -154,13 +152,8 @@ export function SkillsPage({
   const publishedTopics = new Set(catalogue.map((s) => s.topic));
   const suggestions = clusters.filter((c) => !publishedTopics.has(c.topic));
 
-  const openHistory = async (name: string) => {
-    setHistory({ name, versions: [] });
-    setHistory({ name, versions: await onVersions(name) });
-  };
-
   const draft = readingDraft ? drafts[readingDraft] : null;
-  const document = frontmatter(reading?.content ?? draft?.content ?? "");
+  const document = frontmatter(draft?.content ?? "");
 
   return (
     <div className="flex flex-col gap-4">
@@ -184,7 +177,7 @@ export function SkillsPage({
               >
                 <span className="min-w-0 flex-1 truncate font-mono text-sm">{skill.name}</span>
                 <SourceChip source={skill.source} />
-                <Button size="sm" variant="outline" onClick={() => openHistory(skill.name)}>
+                <Button size="sm" variant="outline" onClick={() => go("skills", skill.name)}>
                   Read it
                 </Button>
                 <Button size="sm" disabled={busy} onClick={() => onApprove(skill.name)}>
@@ -228,7 +221,7 @@ export function SkillsPage({
                   >
                     <button
                       className="min-w-0 flex-1 text-left"
-                      onClick={() => setReading(skill)}
+                      onClick={() => go("skills", skill.name)}
                     >
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-mono text-sm font-medium">
@@ -263,7 +256,7 @@ export function SkillsPage({
                           variant="ghost"
                           size="icon-sm"
                           aria-label={`History of ${skill.name}`}
-                          onClick={() => openHistory(skill.name)}
+                          onClick={() => go("skills", skill.name)}
                         >
                           <History />
                         </Button>
@@ -309,7 +302,7 @@ export function SkillsPage({
                   >
                     <button
                       className="min-w-0 flex-1 text-left"
-                      onClick={() => openHistory(skill.name)}
+                      onClick={() => go("skills", skill.name)}
                     >
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-mono text-sm font-medium">
@@ -422,34 +415,28 @@ export function SkillsPage({
         </TabsContent>
       </Tabs>
 
-      {/* ---- reading one -------------------------------------------------- */}
+      {/* ---- reading a draft ---------------------------------------------- */}
+      {/*
+        A published skill has its own page now. A draft does not: it exists only
+        in this browser until somebody publishes it, so there is nothing to link
+        to and a dialog is the honest container.
+      */}
       <Dialog
-        open={Boolean(reading || draft)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setReading(null);
-            setReadingDraft(null);
-          }
-        }}
+        open={Boolean(draft)}
+        onOpenChange={(open) => !open && setReadingDraft(null)}
       >
         <DialogContent className="max-h-[85vh] gap-3 overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="font-mono">
-              {reading?.name ?? draft?.name ?? "Skill"}
-            </DialogTitle>
+            <DialogTitle className="font-mono">{draft?.name ?? "Draft"}</DialogTitle>
             <DialogDescription>
-              {reading
-                ? `Version ${reading.version} · ${reading.author ?? "unknown"} · ${count(reading.memory_count, "memory", "memories")}`
-                : draft
-                  ? `Draft by ${draft.model} from ${count(draft.memory_count, "memory", "memories")}. Read it before publishing — nothing is installed until you do.`
-                  : ""}
+              {draft
+                ? `Draft by ${draft.model} from ${count(draft.memory_count, "memory", "memories")}. Read it before publishing — nothing is installed until you do.`
+                : ""}
             </DialogDescription>
             {document.meta.description && (
-              <p className="text-sm text-foreground">{document.meta.description}</p>
+              <p className="text-foreground text-sm">{document.meta.description}</p>
             )}
           </DialogHeader>
-
-          {reading?.findings?.length ? <Findings findings={reading.findings} /> : null}
 
           <div className="min-w-0 rounded-lg border bg-muted/20 p-4">
             <Markdown source={document.body} />
@@ -474,59 +461,6 @@ export function SkillsPage({
         </DialogContent>
       </Dialog>
 
-      {/* ---- every version ------------------------------------------------ */}
-      <Dialog open={history !== null} onOpenChange={(open) => !open && setHistory(null)}>
-        <DialogContent className="max-h-[85vh] gap-3 overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="font-mono">{history?.name}</DialogTitle>
-            <DialogDescription>
-              Versions are immutable. A project stays on the one it pinned until somebody moves it.
-            </DialogDescription>
-          </DialogHeader>
-
-          {history?.versions.length === 0 ? (
-            <Spinner />
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {history?.versions.map((version) => (
-                <li key={version.version} className="rounded-lg border p-3">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">v{version.version}</Badge>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {version.sha256.slice(0, 12)}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {version.author ?? "unknown"} · {relative(version.created_at)}
-                      {version.model && ` · ${version.model}`}
-                    </span>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      className="ml-auto"
-                      disabled={busy}
-                      onClick={() => {
-                        onEnable(history.name, version.version);
-                        setHistory(null);
-                      }}
-                    >
-                      <Download data-icon="inline-start" /> Use this one
-                    </Button>
-                  </div>
-                  {version.note && (
-                    <p className="mb-2 text-xs text-muted-foreground">{version.note}</p>
-                  )}
-                  <Findings findings={version.findings} />
-                  <div className="mt-2 max-h-64 overflow-y-auto rounded border bg-muted/20 p-3">
-                    <Markdown source={frontmatter(version.content).body} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ---- taking one off ----------------------------------------------- */}
       <Dialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
         <DialogContent>
           <DialogHeader>

@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>drymem</title>
-    <script type="module" crossorigin src="/assets/index-B2jZxt_h.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BNOE-y42.css">
+    <script type="module" crossorigin src="/assets/index-q6lYwkM5.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BLdeNLSd.css">
   </head>
   <body>
     <!--
@@ -16,11 +16,12 @@
       room: a rail of destinations, cards and tables, and every management
       action — members, roles, projects, skills, your own profile — reachable
       without touching a terminal.
-      OWN-WORLD: a dark operator's room with one warm light in it. Cool
-      near-black in four steps (#0b0d10 → #1e232b), amber (#f2a93b) as the only
-      accent, and a black cat as the mark — the amber is its eye. Each kind of
-      memory carries its own hue, always printed beside its own word, so the
-      screen still reads in greyscale.
+      OWN-WORLD: Geist, light by default and dark on request. An off-white
+      ground, hairline rules instead of shadows, near-black for anything that
+      matters, and the primary action is the ground inverted. Amber (#f2a93b)
+      is the mark — the cat's eye — not the button fill. Each kind of memory
+      carries its own hue, always printed beside its own word, so the screen
+      still reads in greyscale.
       STORY: someone lands on Overview, sees what the project knows and that the
       service is up, opens a memory, shares it with the team, adds a teammate,
       and publishes a skill — in that order, without leaving the browser.
@@ -34,6 +35,25 @@
       screenshot pass at three widths, the contrast measured rather than
       guessed, and DESIGN.md rewritten to match.
     -->
+    <!--
+      Before the bundle. Reading the stored choice in a React effect paints the
+      page light first and then flips it, which is a white flash for exactly the
+      people who chose dark.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("drymem.theme") || "system";
+          var dark =
+            stored === "dark" ||
+            (stored === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {
+          /* Blocked storage: light, and the toggle still works. */
+        }
+      })();
+    </script>
     <div id="root"></div>
   </body>
 </html>

@@ -49,6 +49,7 @@ import { ProjectsPage } from "@/pages/Projects";
 import { SessionsPage } from "@/pages/Sessions";
 import { GraphPage } from "@/pages/Graph";
 import { SkillsPage, type Draft } from "@/pages/Skills";
+import { SkillPage } from "@/pages/Skill";
 import { AuditPage } from "@/pages/Audit";
 import { SettingsPage } from "@/pages/Settings";
 import { count } from "./format";
@@ -470,6 +471,16 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const skillVersions = (name: string): Promise<SkillVersion[]> =>
     api.skillVersions(name).catch(() => []);
 
+  // The skill page asks for its own versions on mount. Held here so a second
+  // visit to the same skill paints from what is already loaded.
+  const [versionsFor, setVersionsFor] = useState<Record<string, SkillVersion[]>>({});
+  const loadVersions = useCallback((name: string) => {
+    api
+      .skillVersions(name)
+      .then((list) => setVersionsFor((current) => ({ ...current, [name]: list })))
+      .catch(() => setVersionsFor((current) => ({ ...current, [name]: [] })));
+  }, []);
+
   const addMember = (email: string) =>
     act("Adding", async () => {
       setMembers(await api.addMember(active, email));
@@ -540,8 +551,10 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const meta = TITLES[route.page] ?? TITLES.overview!;
   // On a memory's own page the card already carries the title; repeating it in
   // the page heading printed the same sentence twice, one line apart.
-  const heading =
-    openMemory !== undefined ? { title: "Memory", description: undefined } : meta;
+  // Detail pages print their own trail, so the shell heading steps aside.
+  const onDetail =
+    openMemory !== undefined || (route.page === "skills" && Boolean(route.id));
+  const heading = onDetail ? { title: "", description: undefined } : meta;
 
   return (
     <Shell
@@ -603,6 +616,8 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         onApprove={approveSkill}
         onDeprecate={deprecateSkill}
         onVersions={skillVersions}
+        versionsFor={versionsFor}
+        onLoadVersions={loadVersions}
         onAddMember={addMember}
         onRole={setRole}
         onRemoveMember={removeMember}
@@ -666,6 +681,8 @@ function Screen(props: {
   onApprove: (name: string) => void;
   onDeprecate: (name: string) => void;
   onVersions: (name: string) => Promise<SkillVersion[]>;
+  versionsFor: Record<string, SkillVersion[]>;
+  onLoadVersions: (name: string) => void;
   onAddMember: (email: string) => void;
   onRole: (email: string, role: string) => void;
   onRemoveMember: (email: string) => void;
@@ -725,6 +742,23 @@ function Screen(props: {
     case "sessions":
       return <SessionsPage sessions={props.sessions} loading={props.loading} />;
     case "skills":
+      if (route.id) {
+        return (
+          <SkillPage
+            name={route.id}
+            skill={props.skills.find((s) => s.name === route.id)}
+            entry={props.catalogue.find((s) => s.name === route.id)}
+            versions={props.versionsFor[route.id] ?? null}
+            isAdmin={props.isAdmin}
+            busy={props.busy}
+            onEnable={props.onEnable}
+            onDisable={props.onDisable}
+            onApprove={props.onApprove}
+            onDeprecate={props.onDeprecate}
+            onLoadVersions={props.onLoadVersions}
+          />
+        );
+      }
       return (
         <SkillsPage
           skills={props.skills}

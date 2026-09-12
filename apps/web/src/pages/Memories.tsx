@@ -10,7 +10,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  ArrowLeft,
   Ban,
   NotebookPen,
   Search as SearchIcon,
@@ -21,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { Blank, RatingChip, RowsSkeleton, ScopeChip, TypeChip } from "@/components/Bits";
+import { Crumbs } from "@/components/Crumbs";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -267,9 +267,13 @@ export function MemoryDetail({
 
   return (
     <div className="flex flex-col gap-4">
-      <Button variant="ghost" size="sm" className="self-start" onClick={() => go("memories")}>
-        <ArrowLeft data-icon="inline-start" /> All memories
-      </Button>
+      <Crumbs
+        trail={[
+          { label: "Memories", page: "memories" },
+          ...(episode.author ? [{ label: episode.author.split("@")[0]!, page: "memories" }] : []),
+          { label: episode.title || "Memory" },
+        ]}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <Card>

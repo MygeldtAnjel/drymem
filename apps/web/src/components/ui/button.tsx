@@ -8,11 +8,23 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // The primary action is the ground inverted — black on light, white on
+        // dark. Darkening on hover rather than fading: a button that goes pale
+        // when you point at it reads as going away.
+        default:
+          "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),var(--background)_18%)]",
+        /*
+         * A secondary action still has to look like a control.
+         *
+         * `--border` is a hairline for separating things and, on a button, it
+         * left a shape you could barely find — the grey Miguel called weird.
+         * These take `--input`, the token that already exists for "this is a
+         * boundary you can act on", and near-black text.
+         */
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border-input bg-card text-foreground hover:bg-muted aria-expanded:bg-muted",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "border-input bg-secondary text-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_6%)] aria-expanded:bg-secondary",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:

@@ -1,4 +1,5 @@
-import { LogOut, Settings, User } from "lucide-react";
+import { Check, LogOut, Monitor, Moon, Settings, Sun, User } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import {
@@ -13,6 +14,7 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "./ui/sidebar";
 import type { Me } from "@/api";
 import { go } from "@/router";
+import { readTheme, saveTheme, watchSystem, type Theme } from "@/theme";
 
 /** Initials for the fallback, which is what everyone sees — there are no avatars. */
 function initials(value: string): string {
@@ -20,8 +22,25 @@ function initials(value: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
+const THEMES: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "Match my system", icon: Monitor },
+];
+
 export function UserMenu({ me, onSignOut }: { me: Me | null; onSignOut: () => void }) {
   const name = me?.name || me?.email || "Signed in";
+  // The class is already on `<html>` from the inline script; this only mirrors
+  // the stored choice so the menu can tick the right row.
+  const [theme, setTheme] = useState<Theme>(readTheme);
+
+  // Follow the machine, but only while the choice is "system".
+  useEffect(() => watchSystem(theme, () => setTheme("system")), [theme]);
+
+  const choose = (next: Theme) => {
+    saveTheme(next);
+    setTheme(next);
+  };
 
   return (
     <SidebarMenu>
@@ -54,6 +73,26 @@ export function UserMenu({ me, onSignOut }: { me: Me | null; onSignOut: () => vo
               <DropdownMenuItem onSelect={() => go("settings")}>
                 <Settings /> Settings
               </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="font-normal text-muted-foreground">
+              Appearance
+            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              {THEMES.map(({ value, label, icon: Icon }) => (
+                <DropdownMenuItem
+                  key={value}
+                  onSelect={(e) => {
+                    // Keep the menu open: picking a theme is something people
+                    // try twice before settling.
+                    e.preventDefault();
+                    choose(value);
+                  }}
+                >
+                  <Icon /> {label}
+                  {theme === value && <Check className="ml-auto size-3.5" />}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
