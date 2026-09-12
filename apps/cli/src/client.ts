@@ -41,6 +41,24 @@ export interface EpisodeOut {
   rating: number | null;
 }
 
+export interface AskSource {
+  index: number;
+  uuid: string;
+  title: string;
+  author: string;
+  created_at: string | null;
+  type: string;
+  scope: string;
+}
+
+export interface AskResult {
+  question: string;
+  answer: string;
+  model: string;
+  sources: AskSource[];
+  grounded: boolean;
+}
+
 export interface SessionOut {
   session_id: string;
   author: string;
@@ -257,6 +275,22 @@ export class DrymemClient {
       method: "POST",
       body: JSON.stringify({ project_key: projectKey, topic }),
     });
+  }
+
+  /** A grounded answer with citations, or an honest "nothing mentions that". */
+  ask(projectKey: string, question: string): Promise<AskResult> {
+    return this.request<AskResult>("/v1/ask", {
+      method: "POST",
+      body: JSON.stringify({ project_key: projectKey, question }),
+    });
+  }
+
+  /** What this project wants done at the end of a session. */
+  async captureMode(projectKey: string): Promise<string> {
+    const data = await this.request<{ capture_mode: string }>(
+      `/v1/capture-mode?${this.query({ project_key: projectKey })}`,
+    );
+    return data.capture_mode;
   }
 
   /** The sittings a project's memories came out of. */

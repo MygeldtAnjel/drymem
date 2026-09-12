@@ -48,6 +48,7 @@ export function SettingsPage({
   busy,
   onRenameMe,
   onRenameProject,
+  onCaptureMode,
   onSignOut,
   onCopy,
 }: {
@@ -59,6 +60,7 @@ export function SettingsPage({
   busy: boolean;
   onRenameMe: (name: string) => void;
   onRenameProject: (key: string, name: string) => void;
+  onCaptureMode: (key: string, mode: string) => void;
   onSignOut: () => void;
   onCopy: (text: string, what: string) => void;
 }) {
@@ -181,6 +183,66 @@ export function SettingsPage({
               <Save data-icon="inline-start" /> Save
             </Button>
           </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>What gets saved</CardTitle>
+            <CardDescription>
+              Only what someone decides to keep, and never a transcript. On top of that, this
+              chooses what happens when an agent finishes a session here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {[
+              {
+                value: "automatic",
+                title: "Automatic",
+                blurb:
+                  "The agent writes a private summary when it finishes. Nobody else sees a word until the author shares it.",
+              },
+              {
+                value: "ask",
+                title: "Ask first",
+                blurb:
+                  "The agent proposes a summary and waits. You confirm, edit, or throw it away.",
+              },
+              {
+                value: "manual",
+                title: "Manual only",
+                blurb:
+                  "Nothing is saved unless someone runs drymem save-session.",
+              },
+            ].map((option) => {
+              const active = (project?.capture_mode ?? "automatic") === option.value;
+              return (
+                <button
+                  key={option.value}
+                  disabled={busy || !project}
+                  onClick={() => project && onCaptureMode(project.project_key, option.value)}
+                  className={
+                    "flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors " +
+                    (active
+                      ? "border-primary/50 bg-primary/5"
+                      : "hover:bg-muted/40 disabled:opacity-50")
+                  }
+                >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    {option.title}
+                    {active && (
+                      <Badge className="bg-primary/15 text-primary">Current</Badge>
+                    )}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{option.blurb}</span>
+                </button>
+              );
+            })}
+            <p className="text-xs text-muted-foreground">
+              Automatic is the default because a tool that asks permission at the end of every
+              session gets “no” out of fatigue, and an empty memory helps nobody. Private-by-default
+              already means nothing is visible without your decision.
+            </p>
+          </CardContent>
         </Card>
       </TabsContent>
 

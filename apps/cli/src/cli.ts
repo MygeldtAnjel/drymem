@@ -22,6 +22,9 @@ Usage
   npx drymem login [--server URL] Sign in through the browser; stores a token for this machine
   npx drymem setup [--global]     Configure this repo (signs in if needed, installs hooks + MCP)
   npx drymem save <summary>       Save a memory for the current project
+  npx drymem save-session [--shared] [--type <kind>]
+                                  Save deliberately, from a file or stdin
+  npx drymem ask "<question>"     A grounded answer from this project's memory
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
   npx drymem skills <cmd>         list | status | sync | discover | distill <topic>
@@ -116,6 +119,84 @@ async function main(argv: string[]): Promise<number> {
       console.log(`server:  ${config.serverUrl}`);
       const health = await client.health();
       console.log(`health:  ${health.status} (postgres ${health.postgres}, neo4j ${health.neo4j})`);
+      return 0;
+    }
+
+    case "ask": {
+      const question = rest.join(" ").trim();
+      if (!question) fail('Ask something: drymem ask "who changed the payments retry?"');
+      const result = await client.ask(projectKey, question);
+      console.log();
+      console.log(result.answer);
+      if (result.sources.length > 0) {
+        console.log();
+        for (const source of result.sources) {
+          console.log(
+            `  [${source.index}] ${source.type.padEnd(12)} ${source.title}` +
+              `  · ${source.author} · ${when(source.created_at)}`,
+          );
+        }
+      }
+      // Saying which model wrote it matters: a local 35B and Opus are not the
+      // same claim, and the reader should know which one they are trusting.
+      if (result.grounded) console.log(`\n  — written by ${result.model} from those memories`);
+      return 0;
+    }
+
+    /**
+     * A deliberate save, from the terminal.
+     *
+     * The point of the command is that the *person* decides. Everything else
+     * about memory is the agent's initiative; this is the one that is not.
+     * Content comes from a file, from stdin, or from the remaining arguments —
+     * a session summary is usually longer than a comfortable argument.
+     */
+    case "save-session": {
+      const shared = rest.includes("--shared");
+      const typeAt = rest.indexOf("--type");
+      const type = typeAt >= 0 ? rest[typeAt + 1] : undefined;
+      const fileAt = rest.indexOf("--file");
+      const file = fileAt >= 0 ? rest[fileAt + 1] : undefined;
+
+      const words = rest.filter(
+        (arg, i) =>
+          !arg.startsWith("--") &&
+          i !== typeAt + 1 &&
+          i !== fileAt + 1,
+      );
+
+      let summary = words.join(" ").trim();
+      if (file) {
+        const { readFileSync } = await import("node:fs");
+        summary = readFileSync(file, "utf8");
+      } else if (!summary && !process.stdin.isTTY) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+        summary = Buffer.concat(chunks).toString("utf8");
+      }
+      if (!summary.trim()) {
+        fail(
+          "Nothing to save. Pass the summary, --file <path>, or pipe it in:\n" +
+            '  drymem save-session --type decision "## Summary\n…"',
+        );
+      }
+
+      const saved = await client.save({
+        project_key: projectKey,
+        summary,
+        type: type ?? "note",
+        topic_key: "",
+      });
+      console.log(`Saved '${saved.name}' (${saved.entity_count} entities)`);
+      if (saved.scrubbed) console.log(`  ${saved.scrubbed}`);
+      if (saved.degraded) console.log(`  WARNING: extraction failed (${saved.degraded})`);
+
+      if (shared) {
+        await client.promote(saved.episode_uuid);
+        console.log("  shared with the project");
+      } else {
+        console.log("  private to you — share it from the web UI or with `drymem promote`");
+      }
       return 0;
     }
 

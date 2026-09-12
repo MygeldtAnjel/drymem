@@ -399,6 +399,19 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
       return name ? `You are now shown as ${name}` : "Display name cleared";
     });
 
+  const setCaptureMode = (key: string, mode: string) =>
+    act("Changing what gets saved", async () => {
+      const updated = await api.setCaptureMode(key, mode);
+      setProjects((list) =>
+        list.map((p) => (p.project_key === key ? { ...p, capture_mode: updated.capture_mode } : p)),
+      );
+      return mode === "automatic"
+        ? "Agents will save a private summary automatically"
+        : mode === "ask"
+          ? "Agents will ask before saving"
+          : "Nothing saves unless you run drymem save-session";
+    });
+
   const renameProject = (key: string, name: string) =>
     act("Renaming", async () => {
       const updated = await api.renameProject(key, name);
@@ -490,6 +503,7 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         onRemoveMember={removeMember}
         onRenameMe={renameMe}
         onRenameProject={renameProject}
+        onCaptureMode={setCaptureMode}
         onChooseProject={chooseProject}
         onSignOut={signOut}
         onCopy={copy}
@@ -542,6 +556,7 @@ function Screen(props: {
   onRemoveMember: (email: string) => void;
   onRenameMe: (name: string) => void;
   onRenameProject: (key: string, name: string) => void;
+  onCaptureMode: (key: string, mode: string) => void;
   onChooseProject: (key: string) => void;
   onSignOut: () => void;
   onCopy: (text: string, what: string) => void;
@@ -645,6 +660,7 @@ function Screen(props: {
           busy={props.busy}
           onRenameMe={props.onRenameMe}
           onRenameProject={props.onRenameProject}
+          onCaptureMode={props.onCaptureMode}
           onSignOut={props.onSignOut}
           onCopy={props.onCopy}
         />

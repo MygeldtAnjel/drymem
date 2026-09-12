@@ -30,6 +30,8 @@ export interface Project {
   id: string;
   project_key: string;
   display_name: string | null;
+  capture_mode: string;
+  your_role: string;
   memory_count: number;
   positive: number;
   negative: number;
@@ -340,6 +342,8 @@ export const api = {
       id: p.id ?? "",
       project_key: p.project_key ?? "",
       display_name: p.display_name ?? null,
+      capture_mode: p.capture_mode ?? "automatic",
+      your_role: p.your_role ?? "member",
       memory_count: p.memory_count ?? 0,
       positive: p.positive ?? 0,
       negative: p.negative ?? 0,
@@ -393,6 +397,12 @@ export const api = {
     request<Project>(`/v1/projects/${projectKey}`, {
       method: "PATCH",
       body: JSON.stringify({ display_name: displayName }),
+    }),
+
+  setCaptureMode: (projectKey: string, mode: string) =>
+    request<Project>(`/v1/projects/${projectKey}`, {
+      method: "PATCH",
+      body: JSON.stringify({ capture_mode: mode }),
     }),
 
   setMemberRole: async (projectKey: string, email: string, role: string): Promise<Member[]> => {

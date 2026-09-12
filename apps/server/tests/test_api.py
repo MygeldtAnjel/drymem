@@ -87,8 +87,9 @@ class TestPrincipal:
         assert r.status_code == 401
 
     async def test_an_expired_principal_is_401(self, client):
-        import jwt as _jwt
         from datetime import UTC, datetime, timedelta
+
+        import jwt as _jwt
 
         from drymem_server.settings import settings
 
