@@ -29,6 +29,7 @@ import { overviewRouter } from "./routes/overview.js";
 import { projectRouter } from "./routes/projects.js";
 import { skillRouter } from "./routes/skills.js";
 import { tokenRouter } from "./routes/tokens.js";
+import { usageRouter } from "./routes/usage.js";
 import { meRouter, userRouter } from "./routes/users.js";
 
 export function createApp() {
@@ -50,6 +51,7 @@ export function createApp() {
   app.use("/v1/projects", projectRouter);
   app.use("/v1/overview", overviewRouter);
   app.use("/v1/audit", auditRouter);
+  app.use("/v1/usage", usageRouter);
   // Registry CRUD here; `/v1/skills/discover` and `/distill` fall through to
   // the engine, so this router must not answer them.
   app.use("/v1/skills", skillRouter);

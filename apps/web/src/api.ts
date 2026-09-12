@@ -78,6 +78,23 @@ export interface Member {
   role: string;
 }
 
+export interface Usage {
+  seats_used: number;
+  pending_invites: number;
+  projects: number;
+  memories: { total: number; this_month: number; shared: number };
+  skills: { catalogue: number; versions: number; reads: number };
+  subscription: {
+    plan: string;
+    status: string;
+    seats_paid: number;
+    current_period_end: string | null;
+    cancel_at_period_end: boolean;
+    metered: boolean;
+  };
+  month_started: string;
+}
+
 export interface AuditEvent {
   id: number;
   action: string;
@@ -437,6 +454,8 @@ export const api = {
     query.set("limit", String(options.limit ?? 50));
     return request<{ events: AuditEvent[]; next_before: number | null }>(`/v1/audit?${query}`);
   },
+
+  usage: () => request<Usage>("/v1/usage"),
 
   auditSummary: (days = 30) => request<AuditSummary>(`/v1/audit/summary?days=${days}`),
 

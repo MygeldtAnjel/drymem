@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  api,
   auth,
   type ApiToken,
   type Health,
@@ -34,6 +35,7 @@ import {
   type MemorySchema,
   type Project,
   type Session,
+  type Usage,
   type WebSession,
 } from "@/api";
 import { MEMORY_TYPES } from "@/memory";
@@ -322,8 +324,65 @@ export function SettingsPage({
             </p>
           </CardFooter>
         </Card>
+        <UsageCard />
       </TabsContent>
     </Tabs>
+  );
+}
+
+/**
+ * What this organisation is using.
+ *
+ * Loads itself, like the sessions and tokens cards, because it is admin-only
+ * and every other screen would be paying a 403 for it. A member simply does not
+ * see the card.
+ */
+function UsageCard() {
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const [refused, setRefused] = useState(false);
+
+  useEffect(() => {
+    api
+      .usage()
+      .then(setUsage)
+      .catch(() => setRefused(true));
+  }, []);
+
+  if (refused || !usage) return null;
+  // Formatted in UTC because the counter is: the month boundary is midnight
+  // UTC, and a local rendering called it "August" for anyone west of it.
+  const month = new Date(usage.month_started).toLocaleDateString(undefined, {
+    month: "long",
+    timeZone: "UTC",
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>What you are using</CardTitle>
+        <CardDescription>
+          On the {usage.subscription.plan} plan.{" "}
+          {usage.subscription.metered
+            ? `Renews ${when(usage.subscription.current_period_end)}.`
+            : "Nothing here is charged for yet."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <Line label="People signed in" value={String(usage.seats_used)} />
+        {usage.pending_invites > 0 && (
+          <Line label="Invitations not accepted" value={String(usage.pending_invites)} />
+        )}
+        <Line label="Projects" value={String(usage.projects)} />
+        <Line
+          label="Memories"
+          value={`${usage.memories.total} · ${usage.memories.this_month} in ${month} · ${usage.memories.shared} shared`}
+        />
+        <Line
+          label="Skills"
+          value={`${usage.skills.catalogue} in the catalogue · ${usage.skills.versions} versions · ${usage.skills.reads} reads`}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
