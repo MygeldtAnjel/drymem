@@ -101,8 +101,8 @@ export function MembersPage({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="lead">Lead</SelectItem>
                         <SelectItem value="member">Member</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
@@ -135,8 +135,8 @@ export function MembersPage({
         {others.length === 0 ? (
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">
-              Everyone in your organisation is already on this project. New people are created
-              with <code className="font-mono text-xs">drymem-admin user-create</code>.
+              Everyone in your organisation is already on this project. Invite someone new above
+              and they will appear here.
             </p>
           </CardContent>
         ) : (

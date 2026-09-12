@@ -2,32 +2,47 @@
 #
 # One image, one origin: no CORS, no second deployment, and a browser that only
 # ever talks to this. The memory engine sits behind it on its own port.
-FROM node:22-slim AS build
+#
+# Neither stage copies `pnpm-workspace.yaml`. With it present, pnpm treats /repo
+# as the workspace root and puts the store there, so `apps/api/node_modules` is
+# a tree of symlinks pointing outside anything the runtime image copies —
+# which is exactly how this image first shipped without `cookie-parser`.
+# PNPM_CONFIG_STRICT_DEP_BUILDS: pnpm 10+ refuses any command while a
+# dependency's build script is merely unapproved. Nothing in either image needs
+# one — argon2 ships a prebuilt binding and esbuild belongs to vitest, which
+# never runs here — so the whole class is turned off rather than approved one
+# package at a time.
+FROM node:22-slim AS web
+ENV PNPM_CONFIG_STRICT_DEP_BUILDS=false
 RUN corepack enable
-WORKDIR /repo
-
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
-COPY apps/api/package.json ./apps/api/
-COPY apps/web/package.json ./apps/web/
+WORKDIR /web
+COPY apps/web/package.json ./
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
+COPY apps/web/ ./
+RUN pnpm exec vite build --outDir /web-dist --emptyOutDir
 
-COPY apps/api/ ./apps/api/
-COPY apps/web/ ./apps/web/
-# Argon2 ships native bindings; the ignore-scripts above skipped them.
-RUN pnpm --filter @drymem/api rebuild @node-rs/argon2 || true
-RUN pnpm --filter @drymem/web exec vite build --outDir /web-dist --emptyOutDir \
- && pnpm --filter @drymem/api exec tsc -p tsconfig.build.json
+FROM node:22-slim AS api
+ENV PNPM_CONFIG_STRICT_DEP_BUILDS=false
+RUN corepack enable
+WORKDIR /api
+COPY apps/api/package.json ./
+# No build scripts anywhere: argon2 ships its binding as an optional platform
+# package rather than compiling one, and esbuild — vitest's, never used here —
+# is the only thing that wants to run one. pnpm 10 refuses the whole install
+# over an unapproved script, so the answer is to want none.
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
+COPY apps/api/ ./
+RUN pnpm exec tsc -p tsconfig.build.json \
+ && pnpm install --prod --no-frozen-lockfile --ignore-scripts
 
 FROM node:22-slim AS runtime
-RUN corepack enable
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/apps/api/node_modules ./node_modules_api
-COPY --from=build /repo/apps/api/dist ./dist
-COPY --from=build /repo/apps/api/package.json ./package.json
-COPY --from=build /web-dist ./web
+COPY --from=api /api/node_modules ./node_modules
+COPY --from=api /api/dist ./dist
+COPY --from=api /api/package.json ./package.json
+COPY --from=web /web-dist ./web
 
 RUN useradd --system --uid 10002 drymem && chown -R drymem:drymem /app
 USER drymem

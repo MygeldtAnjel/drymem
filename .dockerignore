@@ -1,0 +1,23 @@
+# Anything a build stage installs for itself. Copying the host's
+# `node_modules` in on top of the image's replaced real packages with pnpm
+# symlinks pointing at a store that does not exist in the image — which is how
+# `tsc` went missing from a stage that had just installed it.
+**/node_modules
+**/.venv
+**/dist
+**/__pycache__
+**/*.pyc
+
+.git
+.env
+.env.*
+!.env.example
+
+# Build output the image regenerates.
+apps/server/drymem_server/web
+
+# Local state and scratch.
+.drymem
+.impeccable/review
+.agents
+.claude
