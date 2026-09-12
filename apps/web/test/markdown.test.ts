@@ -89,3 +89,37 @@ describe("frontmatter", () => {
     expect(frontmatter(source).meta).toEqual({});
   });
 });
+
+describe("hard-wrapped prose", () => {
+  it("joins consecutive lines into one paragraph", async () => {
+    // Memory bodies wrap at 80 columns. One <p> per line is what made the
+    // memory page look like an unstyled form.
+    const html = await render("The plan's three steps are done.\nSkills gained import\nfrom public repos.");
+    expect(html.match(/<p /g)?.length).toBe(1);
+    expect(html).toContain("done. Skills gained import from public repos.");
+  });
+
+  it("still starts a new paragraph on a blank line", async () => {
+    const html = await render("First thought.\nStill the first.\n\nA second one.");
+    expect(html.match(/<p /g)?.length).toBe(2);
+  });
+
+  it("ends the paragraph when a list starts", async () => {
+    const html = await render("Here is why:\n- one\n- two");
+    expect(html.match(/<p /g)?.length).toBe(1);
+    expect(html.match(/<li /g)?.length).toBe(2);
+    expect(html.indexOf("<p ")).toBeLessThan(html.indexOf("<ul "));
+  });
+
+  it("ends the paragraph when a heading starts", async () => {
+    const html = await render("Some prose.\n## Next section");
+    expect(html.match(/<p /g)?.length).toBe(1);
+    expect(html).toContain("Next section");
+  });
+
+  it("does not swallow the line into a code fence", async () => {
+    const html = await render("Before.\n```\ncode()\n```\nAfter.");
+    expect(html.match(/<p /g)?.length).toBe(2);
+    expect(html).toContain("code()");
+  });
+});

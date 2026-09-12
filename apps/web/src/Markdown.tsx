@@ -84,6 +84,26 @@ export function Markdown({ source }: { source: string }) {
     }
   };
 
+  /*
+   * Consecutive text lines are one paragraph, not one paragraph each.
+   *
+   * Memory bodies are hard-wrapped at 80 columns, and emitting a `<p>` per line
+   * printed them as a ragged column of one-line blocks with a gap between every
+   * line — the single thing that made the page look unfinished. A newline
+   * inside a paragraph is a soft break in CommonMark, and joining with a space
+   * is what a soft break means.
+   */
+  let para: string[] = [];
+  const closePara = () => {
+    if (para.length === 0) return;
+    out.push(`<p class="${CLASS.p}">${inline(para.join(" "))}</p>`);
+    para = [];
+  };
+  const close = () => {
+    closePara();
+    closeList();
+  };
+
   lines.forEach((raw, i) => {
     if (raw.trimStart().startsWith("```")) {
       if (fence) {
@@ -92,7 +112,7 @@ export function Markdown({ source }: { source: string }) {
         return;
       }
       if (closes(lines, i)) {
-        closeList();
+        close();
         fence = [];
         return;
       }
@@ -105,13 +125,13 @@ export function Markdown({ source }: { source: string }) {
 
     const line = raw.trim();
     if (!line) {
-      closeList();
+      close();
       return;
     }
 
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
-      closeList();
+      close();
       const level = Math.min(heading[1]!.length + 1, 4);
       const cls = level === 2 ? CLASS.h2 : level === 3 ? CLASS.h3 : CLASS.h4;
       out.push(`<h${level} class="${cls}">${inline(heading[2]!)}</h${level}>`);
@@ -119,7 +139,7 @@ export function Markdown({ source }: { source: string }) {
     }
 
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
-      closeList();
+      close();
       out.push(`<hr class="${CLASS.hr}" />`);
       return;
     }
@@ -127,10 +147,11 @@ export function Markdown({ source }: { source: string }) {
     const bullet = /^[-*]\s+(.*)$/.exec(line);
     if (bullet) {
       if (list !== "ul") {
-        closeList();
+        close();
         out.push(`<ul class="${CLASS.ul}">`);
         list = "ul";
       }
+      closePara();
       out.push(`<li class="${CLASS.li}">${inline(bullet[1]!)}</li>`);
       return;
     }
@@ -138,27 +159,28 @@ export function Markdown({ source }: { source: string }) {
     const numbered = /^\d+[.)]\s+(.*)$/.exec(line);
     if (numbered) {
       if (list !== "ol") {
-        closeList();
+        close();
         out.push(`<ol class="${CLASS.ol}">`);
         list = "ol";
       }
+      closePara();
       out.push(`<li class="${CLASS.li}">${inline(numbered[1]!)}</li>`);
       return;
     }
 
     const quote = /^>\s?(.*)$/.exec(line);
     if (quote) {
-      closeList();
+      close();
       out.push(`<blockquote class="${CLASS.blockquote}">${inline(quote[1]!)}</blockquote>`);
       return;
     }
 
     closeList();
-    out.push(`<p class="${CLASS.p}">${inline(line)}</p>`);
+    para.push(line);
   });
 
   if (fence !== null) out.push(flush(fence));
-  closeList();
+  close();
 
   return (
     // `min-w-0` so a long unbroken token scrolls its own `pre` instead of
