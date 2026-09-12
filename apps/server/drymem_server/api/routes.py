@@ -47,6 +47,9 @@ from drymem_server.api.schemas import (
     SessionOut,
     SessionsResponse,
     TopicsResponse,
+    TreeArea,
+    TreeDecision,
+    TreeResponse,
     UpdateMemoryRequest,
 )
 from drymem_server.schema import MEMORY_TYPES, SECTIONS, TEMPLATE
@@ -353,6 +356,49 @@ async def project_graph(
         ],
         truncated=view.truncated,
         total_memories=view.total_memories,
+    )
+
+
+@router.get("/v1/graph/tree", response_model=TreeResponse, tags=["graph"])
+async def project_tree(
+    service: ServiceDep,
+    project_key: str = Query(...),
+    limit: int = Query(200, ge=1, le=500),
+    kind: Annotated[list[str], Query(description="Filter to these memory kinds")] = [],  # noqa: B006
+) -> TreeResponse:
+    """The decision tree: what was decided about each part of the codebase.
+
+    Restricted to the caller's readable groups, like the canvas beside it.
+    """
+    built = await service.decision_tree(project_key=project_key, limit=limit, kinds=list(kind))
+
+    def area(node) -> TreeArea:
+        return TreeArea(
+            id=node.id,
+            label=node.label,
+            total=node.total,
+            decisions=[
+                TreeDecision(
+                    id=d.id,
+                    title=d.title,
+                    type=d.memory_type,
+                    author=d.author,
+                    created_at=d.created_at,
+                    gist=d.gist,
+                    paths=d.paths,
+                    superseded_by=d.superseded_by,
+                )
+                for d in node.decisions
+            ],
+            children=[area(c) for c in node.children],
+        )
+
+    return TreeResponse(
+        project_key=project_key,
+        root=area(built.root),
+        truncated=built.truncated,
+        total_memories=built.total_memories,
+        unplaced=built.unplaced,
     )
 
 

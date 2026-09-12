@@ -302,6 +302,33 @@ class GraphResponse(BaseModel):
     total_memories: int = 0
 
 
+class TreeDecision(BaseModel):
+    id: str
+    title: str
+    type: str = ""
+    author: str = ""
+    created_at: datetime | None = None
+    gist: str = ""
+    paths: list[str] = []
+    superseded_by: str | None = None
+
+
+class TreeArea(BaseModel):
+    id: str
+    label: str
+    total: int = 0
+    decisions: list[TreeDecision] = []
+    children: list[TreeArea] = []
+
+
+class TreeResponse(BaseModel):
+    project_key: str
+    root: TreeArea
+    truncated: bool = False
+    total_memories: int = 0
+    unplaced: int = 0
+
+
 class AskRequest(BaseModel):
     project_key: str
     question: str = Field(..., min_length=3, max_length=500)

@@ -637,6 +637,24 @@ class MemoryService:
         )
         return [tuple(row) for row in result.all()]
 
+    async def decision_tree(
+        self,
+        *,
+        project_key: str,
+        limit: int,
+        kinds: list[str] | None,
+    ):
+        """The decision tree. Only groups this caller may read."""
+        from drymem_server import tree as tree_view
+
+        groups = await self.readable_groups(project_key)
+        return await tree_view.build(
+            groups=groups,
+            project_label=project_key.rsplit("/", 1)[-1] or project_key,
+            limit=limit,
+            kinds=kinds,
+        )
+
     async def graph(
         self,
         *,

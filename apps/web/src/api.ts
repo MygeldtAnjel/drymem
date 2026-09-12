@@ -78,6 +78,33 @@ export interface Member {
   role: string;
 }
 
+export interface TreeDecision {
+  id: string;
+  title: string;
+  type: string;
+  author: string;
+  created_at: string | null;
+  gist: string;
+  paths: string[];
+  superseded_by: string | null;
+}
+
+export interface TreeArea {
+  id: string;
+  label: string;
+  total: number;
+  decisions: TreeDecision[];
+  children: TreeArea[];
+}
+
+export interface Tree {
+  project_key: string;
+  root: TreeArea;
+  truncated: boolean;
+  total_memories: number;
+  unplaced: number;
+}
+
 export interface Usage {
   seats_used: number;
   pending_invites: number;
@@ -456,6 +483,13 @@ export const api = {
   },
 
   usage: () => request<Usage>("/v1/usage"),
+
+  /** The decision tree: areas of the codebase and what was decided about them. */
+  tree: (projectKey: string, kinds: string[] = []) => {
+    const query = new URLSearchParams({ project_key: projectKey });
+    for (const k of kinds) query.append("kind", k);
+    return request<Tree>(`/v1/graph/tree?${query}`);
+  },
 
   auditSummary: (days = 30) => request<AuditSummary>(`/v1/audit/summary?days=${days}`),
 

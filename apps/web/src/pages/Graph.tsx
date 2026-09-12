@@ -34,6 +34,7 @@ import { Ban, Network, Search, Sparkles } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 
 import { Blank, TypeChip } from "@/components/Bits";
+import { DecisionTreeCanvas } from "@/pages/DecisionTree";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,20 +47,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { AskResult, Graph } from "@/api";
+import type { AskResult, Graph, Tree } from "@/api";
 import { MEMORY_TYPES } from "@/memory";
 import { relative } from "@/format";
 import { go } from "@/router";
 
 /** One hue per memory kind, matching the chips everywhere else. */
 const KIND_COLOR: Record<string, string> = {
-  decision: "#a98bf5",
-  architecture: "#5b9cf5",
-  bugfix: "#f0596b",
-  discovery: "#f2a93b",
-  convention: "#3fb27f",
-  note: "#7d8794",
+  decision: "#5b21b6",
+  architecture: "#1d4ed8",
+  bugfix: "#be123c",
+  discovery: "#a16207",
+  convention: "#047857",
+  note: "#666666",
 };
+
+/* The quiet greys the canvas draws on, as literals because React Flow's inline
+   styles are not in the cascade and cannot read a CSS variable. */
+const LINE = "#d4d4d4";
+const FACT = "#a3a3a3";
+const QUIET = "#e5e5e5";
+const QUIET_FILL = "#f5f5f5";
 
 const NODE_W = 210;
 const NODE_H = 40;
@@ -90,7 +98,7 @@ function layout(graph: Graph, showFacts: boolean): { nodes: Node[]; edges: Edge[
   const nodes: Node[] = graph.nodes.map((node) => {
     const placed = g.node(node.id);
     const memory = node.kind === "memory";
-    const colour = memory ? (KIND_COLOR[node.type] ?? KIND_COLOR.note!) : "#333c48";
+    const colour = memory ? (KIND_COLOR[node.type] ?? KIND_COLOR.note!) : QUIET;
     return {
       id: node.id,
       position: { x: placed?.x ?? 0, y: placed?.y ?? 0 },
@@ -100,10 +108,10 @@ function layout(graph: Graph, showFacts: boolean): { nodes: Node[]; edges: Edge[
         // Memories are the thing you click through to, so they carry the hue
         // and the entities stay quiet. A canvas where everything is coloured
         // is a canvas where nothing is.
-        background: memory ? `${colour}22` : "#171b21",
-        border: `1px solid ${memory ? colour : "#333c48"}`,
+        background: memory ? `${colour}14` : QUIET_FILL,
+        border: `1px solid ${memory ? colour : QUIET}`,
         borderRadius: memory ? 8 : 999,
-        color: "#e8eaed",
+        color: "#0a0a0a",
         fontSize: 12,
         padding: "7px 10px",
         textAlign: "left" as const,
@@ -124,14 +132,14 @@ function layout(graph: Graph, showFacts: boolean): { nodes: Node[]; edges: Edge[
     style: {
       // The mentions edges are the structure and were nearly invisible at
       // `border` grey; they need to read against the canvas, not blend into it.
-      stroke: edge.superseded ? "#f0596b" : edge.kind === "fact" ? "#6b7688" : "#3b4450",
+      stroke: edge.superseded ? "#be123c" : edge.kind === "fact" ? FACT : LINE,
       strokeWidth: edge.kind === "fact" ? 1.4 : 1,
       // A contradicted fact is struck, not hidden: "we changed our mind" is the
       // most useful thing a decision graph can show.
       strokeDasharray: edge.superseded ? "4 3" : undefined,
     },
     labelStyle: { fill: "#98a1ad", fontSize: 9 },
-    labelBgStyle: { fill: "#111419" },
+    labelBgStyle: { fill: "#ffffff" },
   }));
 
   return { nodes, edges };
@@ -162,10 +170,28 @@ export function GraphPage({
   // click away for someone who came to explore rather than to orient.
   const [density, setDensity] = useState("3");
   const [showFacts, setShowFacts] = useState(false);
+  // The tree opens first. It is the view that answers a question; the canvas
+  // is the one you explore, and exploring is the rarer errand.
+  const [view, setView] = useState("tree");
+  const [tree, setTree] = useState<Tree | null>(null);
+  const [treeLoading, setTreeLoading] = useState(true);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [result, setResult] = useState<AskResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setTreeLoading(true);
+    import("@/api")
+      .then(({ api }) => api.tree(projectKey, kind === "all" ? [] : [kind]))
+      .then((built) => live && setTree(built))
+      .catch(() => live && setTree(null))
+      .finally(() => live && setTreeLoading(false));
+    return () => {
+      live = false;
+    };
+  }, [projectKey, kind]);
 
   useEffect(() => {
     onReload(kind === "all" ? [] : [kind], Number(density));
@@ -275,41 +301,57 @@ export function GraphPage({
       <Card className="overflow-hidden p-0">
         <CardHeader className="flex-wrap gap-3 border-b p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-sm">The graph</CardTitle>
+            <div className="min-w-0">
+              <CardTitle className="text-sm">
+                {view === "tree" ? "What was decided, and where" : "Everything, connected"}
+              </CardTitle>
               <CardDescription>
-                {graph
-                  ? `${memories} memories and ${entities} subjects. Click a memory to read it.`
-                  : "What this project knows, and how it connects."}
+                {view === "tree"
+                  ? "Your codebase, and the decisions that touched each part. Newest first. Click a branch to open it."
+                  : graph
+                    ? `${memories} memories and ${entities} subjects. Click a memory to read it.`
+                    : "What this project knows, and how it connects."}
               </CardDescription>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Tabs value={density} onValueChange={setDensity}>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Tabs value={view} onValueChange={setView}>
                 <TabsList>
-                  <TabsTrigger value="3">Core</TabsTrigger>
-                  <TabsTrigger value="2">Connected</TabsTrigger>
-                  <TabsTrigger value="1">Everything</TabsTrigger>
+                  <TabsTrigger value="tree">Tree</TabsTrigger>
+                  <TabsTrigger value="graph">Everything</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Tabs
-                value={showFacts ? "facts" : "structure"}
-                onValueChange={(v) => setShowFacts(v === "facts")}
-              >
-                <TabsList>
-                  <TabsTrigger value="structure">Structure</TabsTrigger>
-                  <TabsTrigger value="facts">With facts</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Tabs value={kind} onValueChange={setKind}>
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  {Object.keys(MEMORY_TYPES).map((t) => (
-                    <TabsTrigger key={t} value={t} className="capitalize">
-                      {t}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+              {view === "graph" && (
+                <>
+                  <Tabs value={density} onValueChange={setDensity}>
+                    <TabsList>
+                      <TabsTrigger value="3">Core</TabsTrigger>
+                      <TabsTrigger value="2">Connected</TabsTrigger>
+                      <TabsTrigger value="1">Everything</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Tabs
+                    value={showFacts ? "facts" : "structure"}
+                    onValueChange={(v) => setShowFacts(v === "facts")}
+                  >
+                    <TabsList>
+                      <TabsTrigger value="structure">Structure</TabsTrigger>
+                      <TabsTrigger value="facts">With facts</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </>
+              )}
+              <div className="min-w-0 overflow-x-auto">
+                <Tabs value={kind} onValueChange={setKind}>
+                  <TabsList className="w-max">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                    {Object.keys(MEMORY_TYPES).map((t) => (
+                      <TabsTrigger key={t} value={t} className="capitalize">
+                        {t}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
             </div>
           </div>
           {graph?.truncated && (
@@ -319,7 +361,17 @@ export function GraphPage({
           )}
         </CardHeader>
         <CardContent className="p-0">
-          {loading && !graph ? (
+          {view === "tree" ? (
+            treeLoading && !tree ? (
+              <Skeleton className="h-[40rem] rounded-none" />
+            ) : (
+              <DecisionTreeCanvas
+                root={tree?.root ?? null}
+                unplaced={tree?.unplaced ?? 0}
+                onOpenMemory={(id) => go("memories", id)}
+              />
+            )
+          ) : loading && !graph ? (
             <Skeleton className="h-[40rem] rounded-none" />
           ) : laid.nodes.length === 0 ? (
             <Blank icon={Network} title="Nothing to draw yet">
@@ -336,7 +388,6 @@ export function GraphPage({
                 fitViewOptions={{ padding: 0.1, maxZoom: 0.9 }}
                 minZoom={0.1}
                 proOptions={{ hideAttribution: true }}
-                colorMode="dark"
               >
                 <Background color="#232932" gap={18} />
                 <Controls showInteractive={false} />
@@ -344,10 +395,10 @@ export function GraphPage({
                   pannable
                   zoomable
                   nodeColor={(n) =>
-                    n.data?.kind === "memory" ? (KIND_COLOR.decision ?? "#a98bf5") : "#333c48"
+                    n.data?.kind === "memory" ? (KIND_COLOR.decision ?? "#5b21b6") : QUIET
                   }
                   maskColor="rgb(11 13 16 / 0.7)"
-                  style={{ background: "#111419", border: "1px solid #232932" }}
+                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}
                 />
               </ReactFlow>
             </div>
@@ -355,13 +406,13 @@ export function GraphPage({
         </CardContent>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-2.5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm border border-[#a98bf5] bg-[#a98bf522]" /> memory
+            <span className="size-2.5 rounded-sm border border-chart-1 bg-chart-1/15" /> memory
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full border border-[#333c48] bg-[#171b21]" /> subject
+            <span className="size-2.5 rounded-full border border-input bg-muted" /> subject
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-px w-4 bg-[#6b7688]" /> fact (shown under “With facts”)
+            <span className="h-px w-4 bg-input" /> fact (shown under “With facts”)
           </span>
           <span className="flex items-center gap-1.5">
             <Ban className="size-3 text-destructive" /> superseded by a later memory
