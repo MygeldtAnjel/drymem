@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Network,
   NotebookPen,
+  ScrollText,
   Settings,
   Sparkles,
   Users,
@@ -55,6 +56,7 @@ export const WORK: Destination[] = [
 export const ADMIN: Destination[] = [
   { page: "projects", label: "Projects", icon: FolderGit2 },
   { page: "members", label: "Members", icon: Users },
+  { page: "audit", label: "Audit", icon: ScrollText },
   { page: "settings", label: "Settings", icon: Settings },
 ];
 

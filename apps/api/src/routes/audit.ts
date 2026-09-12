@@ -26,6 +26,10 @@ auditRouter.use(requireUser, requireAdmin);
 /**
  * Groups, so a filter is one click rather than knowing every action name.
  * `security` is the one that matters: it is the second half of the question.
+ *
+ * Two services write here and they named the same concepts differently — the
+ * engine says `project.add_member` where this one says `member.add` — so a
+ * group lists both spellings rather than silently showing half the events.
  */
 export const GROUPS: Record<string, string[]> = {
   security: ["memory.rejected", "memory.scrubbed", "skill.approve", "token.create", "token.revoke"],
@@ -38,6 +42,9 @@ export const GROUPS: Record<string, string[]> = {
     "member.add",
     "member.remove",
     "member.role",
+    "project.add_member",
+    "project.remove_member",
+    "project.set_role",
   ],
   skills: [
     "skill.publish",
@@ -49,7 +56,8 @@ export const GROUPS: Record<string, string[]> = {
     "skill.update",
     "skill.delete",
   ],
-  projects: ["project.create", "project.rename", "project.capture_mode", "project.add_member"],
+  memories: ["memory.promote", "memory.rejected", "memory.scrubbed"],
+  projects: ["project.create", "project.rename", "project.capture_mode"],
   access: [
     "user.login",
     "user.password_change",
@@ -62,7 +70,7 @@ export const GROUPS: Record<string, string[]> = {
 };
 
 const querySchema = z.object({
-  group: z.enum(["security", "people", "skills", "projects", "access"]).optional(),
+  group: z.enum(["security", "people", "skills", "memories", "projects", "access"]).optional(),
   action: z.string().max(100).optional(),
   actor: z.string().max(320).optional(),
   since: z.string().max(40).optional(),

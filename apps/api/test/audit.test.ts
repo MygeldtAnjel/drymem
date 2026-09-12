@@ -106,6 +106,15 @@ describe("filtering", () => {
     expect(body.events.every((e: { action: string }) => e.action === "skill.publish")).toBe(true);
   });
 
+  it("covers both services' spellings of the same concept", async () => {
+    // The engine writes `project.set_role`; this service writes `member.role`.
+    // A "People" filter that showed only one of them would be quietly wrong.
+    const { GROUPS } = await import("../src/routes/audit.js");
+    expect(GROUPS.people).toContain("member.role");
+    expect(GROUPS.people).toContain("project.set_role");
+    expect(GROUPS.people).toContain("project.add_member");
+  });
+
   it("narrows to one person", async () => {
     const { body } = await h.client.get(`/v1/audit?actor=${encodeURIComponent(OWNER.email)}`);
     expect(body.events.length).toBeGreaterThan(0);

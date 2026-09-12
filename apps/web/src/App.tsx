@@ -31,6 +31,8 @@ import {
   type MemorySchema,
   type Overview,
   type Person,
+  type AuditEvent,
+  type AuditSummary,
   type CatalogueSkill,
   type Project,
   type Session,
@@ -47,6 +49,7 @@ import { ProjectsPage } from "@/pages/Projects";
 import { SessionsPage } from "@/pages/Sessions";
 import { GraphPage } from "@/pages/Graph";
 import { SkillsPage, type Draft } from "@/pages/Skills";
+import { AuditPage } from "@/pages/Audit";
 import { SettingsPage } from "@/pages/Settings";
 import { count } from "./format";
 import { SignIn } from "./SignIn";
@@ -65,6 +68,10 @@ const TITLES: Record<string, { title: string; description?: string }> = {
   graph: {
     title: "Graph & Ask",
     description: "What this project knows, how it connects, and answers with citations.",
+  },
+  audit: {
+    title: "Audit",
+    description: "Who did what, and whether a credential has gone anywhere it should not.",
   },
   sessions: {
     title: "Sessions",
@@ -163,6 +170,12 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const [members, setMembers] = useState<Member[]>([]);
   const [graph, setGraph] = useState<Graph | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
+
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
+  const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
+  const [auditGroup, setAuditGroup] = useState("");
+  const [auditBefore, setAuditBefore] = useState<number | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const [facts, setFacts] = useState<Fact[] | null>(null);
   const [query, setQuery] = useState("");
@@ -357,6 +370,42 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     }
   };
 
+  /**
+   * The audit trail is loaded on demand, not with the rest of the project.
+   * It is admin-only and most sessions never open it, so fetching it eagerly
+   * would be one 403 per sign-in for every member of the team.
+   */
+  const loadAudit = async (group: string, before: number | null = null) => {
+    setAuditLoading(true);
+    try {
+      const [page, summary] = await Promise.all([
+        api.audit({ group: group || undefined, before: before ?? undefined }),
+        before ? Promise.resolve(auditSummary) : api.auditSummary(30).catch(() => null),
+      ]);
+      setAuditEvents((current) => (before ? [...current, ...page.events] : page.events));
+      setAuditBefore(page.next_before);
+      if (!before) setAuditSummary(summary);
+    } catch (e) {
+      fail(e, "Loading the audit trail");
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const chooseAuditGroup = (group: string) => {
+    setAuditGroup(group);
+    setAuditEvents([]);
+    void loadAudit(group);
+  };
+
+  useEffect(() => {
+    if (route.page !== "audit") return;
+    void loadAudit(auditGroup);
+    // Re-reading on every filter change is handled by chooseAuditGroup; this is
+    // only the first open of the screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.page]);
+
   /** Reload just the two skill lists, after anything that changes them. */
   const refreshSkills = async () => {
     const [enabled, all] = await Promise.all([
@@ -525,6 +574,13 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         onLoadGraph={loadGraph}
         skills={skills}
         catalogue={catalogue}
+        auditEvents={auditEvents}
+        auditSummary={auditSummary}
+        auditGroup={auditGroup}
+        auditLoading={auditLoading}
+        auditHasMore={auditBefore !== null}
+        onAuditGroup={chooseAuditGroup}
+        onAuditMore={() => void loadAudit(auditGroup, auditBefore)}
         clusters={clusters}
         people={people}
         members={members}
@@ -581,6 +637,13 @@ function Screen(props: {
   onLoadGraph: (kinds: string[], minMentions: number) => void;
   skills: Skill[];
   catalogue: CatalogueSkill[];
+  auditEvents: AuditEvent[];
+  auditSummary: AuditSummary | null;
+  auditGroup: string;
+  auditLoading: boolean;
+  auditHasMore: boolean;
+  onAuditGroup: (group: string) => void;
+  onAuditMore: () => void;
   clusters: Cluster[];
   people: Person[];
   members: Member[];
@@ -703,6 +766,19 @@ function Screen(props: {
           onAdd={props.onAddMember}
           onRole={props.onRole}
           onRemove={props.onRemoveMember}
+        />
+      );
+    case "audit":
+      return (
+        <AuditPage
+          events={props.auditEvents}
+          summary={props.auditSummary}
+          loading={props.auditLoading}
+          busy={props.auditLoading}
+          group={props.auditGroup}
+          hasMore={props.auditHasMore}
+          onGroup={props.onAuditGroup}
+          onMore={props.onAuditMore}
         />
       );
     case "settings":

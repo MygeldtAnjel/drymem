@@ -78,6 +78,22 @@ export interface Member {
   role: string;
 }
 
+export interface AuditEvent {
+  id: number;
+  action: string;
+  target: string | null;
+  actor: string | null;
+  actor_name: string | null;
+  created_at: string;
+}
+
+export interface AuditSummary {
+  days: number;
+  total: number;
+  actions: { action: string; count: number; last_at: string }[];
+  credentials: { rejected: number; redacted: number };
+}
+
 export interface Finding {
   rule: string;
   severity: "reject" | "review";
@@ -412,6 +428,17 @@ export const api = {
     const q = new URLSearchParams({ project_key: projectKey });
     return (await request<{ sessions: AgentSession[] }>(`/v1/sessions?${q}`)).sessions;
   },
+
+  /** Admins only; a member gets a 403 and the screen is not offered to them. */
+  audit: (options: { group?: string; before?: number; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (options.group) query.set("group", options.group);
+    if (options.before) query.set("before", String(options.before));
+    query.set("limit", String(options.limit ?? 50));
+    return request<{ events: AuditEvent[]; next_before: number | null }>(`/v1/audit?${query}`);
+  },
+
+  auditSummary: (days = 30) => request<AuditSummary>(`/v1/audit/summary?days=${days}`),
 
   people: async (): Promise<Person[]> => (await request<{ users: Person[] }>("/v1/users")).users,
 
