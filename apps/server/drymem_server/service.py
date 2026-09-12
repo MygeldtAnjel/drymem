@@ -593,6 +593,72 @@ class MemoryService:
         )
         return [tuple(row) for row in result.all()]
 
+    async def graph(
+        self, *, project_key: str, limit: int, kinds: list[str] | None, author: str | None
+    ):
+        """The knowledge graph, for the canvas. Only groups this caller may read."""
+        from drymem_server import graph_view
+
+        groups = await self.readable_groups(project_key)
+        return await graph_view.build(groups=groups, limit=limit, kinds=kinds, author=author)
+
+    async def ask(self, *, project_key: str, question: str, limit: int = 6):
+        """Answer from this project's memories, with citations.
+
+        Retrieval is two passes because the two halves fail differently: the
+        graph search finds a *subject* the question names, and recency finds
+        what was written about it lately. A question about "the payment
+        component" that matches no entity would otherwise return nothing at all,
+        even when three memories last week are about exactly that.
+        """
+        from drymem_server import ask as ask_module
+
+        entries = await self.entries(project_key=project_key, limit=40)
+        if not entries:
+            return await ask_module.answer(question=question, sources=[], bodies={})
+
+        facts = await self.search(project_key=project_key, query=question, limit=10)
+        # `Fact.name` is the episode's name, which is how a hit points back at
+        # the memory it came from.
+        named = {f.name for f in facts}
+
+        words = {w for w in question.lower().split() if len(w) > 3}
+
+        def score(entry) -> tuple[int, int]:
+            episode = entry.episode
+            text = f"{entry.title} {episode.name} {episode.content[:2000]}".lower()
+            return (
+                1 if episode.name in named else 0,
+                sum(1 for w in words if w in text),
+            )
+
+        ranked = sorted(entries, key=score, reverse=True)
+        picked = [e for e in ranked if any(score(e))][: ask_module.MAX_SOURCES]
+        if not picked:
+            picked = ranked[: ask_module.MAX_SOURCES]
+
+        sources = [
+            ask_module.Source(
+                index=i,
+                uuid=entry.episode.uuid,
+                title=entry.title or entry.episode.name,
+                author=entry.episode.metadata.author if entry.episode.metadata else "",
+                created_at=entry.episode.created_at,
+                memory_type=entry.memory_type,
+                scope=entry.episode.metadata.scope if entry.episode.metadata else "private",
+            )
+            for i, entry in enumerate(picked, start=1)
+        ]
+        bodies = {e.episode.uuid: e.episode.content for e in picked}
+        return await ask_module.answer(question=question, sources=sources, bodies=bodies)
+
+    async def capture_mode(self, *, project_key: str) -> str:
+        """How this project wants sessions captured. See PLAN.md D38."""
+        from drymem_server.db.models import CAPTURE_AUTOMATIC
+
+        project = await project_for(self.session, self.principal, project_key)
+        return project.capture_mode if project else CAPTURE_AUTOMATIC
+
     # ---- the management surface: sessions, people, skills -------------------
 
     async def sessions(self, *, project_key: str, limit: int = 50) -> list[SessionSummary]:

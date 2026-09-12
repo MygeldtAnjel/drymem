@@ -274,6 +274,62 @@ class OverviewResponse(BaseModel):
     by_type: dict[str, int] = {}
 
 
+class GraphNode(BaseModel):
+    id: str
+    kind: str = Field(..., description="memory or entity")
+    label: str
+    type: str = ""
+    author: str = ""
+    scope: str = ""
+    created_at: datetime | None = None
+    mentions: int = 0
+
+
+class GraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    kind: str = Field(..., description="mentions or fact")
+    label: str = ""
+    superseded: bool = False
+
+
+class GraphResponse(BaseModel):
+    project_key: str
+    nodes: list[GraphNode] = []
+    edges: list[GraphEdge] = []
+    truncated: bool = False
+    total_memories: int = 0
+
+
+class AskRequest(BaseModel):
+    project_key: str
+    question: str = Field(..., min_length=3, max_length=500)
+
+
+class AskSource(BaseModel):
+    index: int
+    uuid: str
+    title: str
+    author: str = ""
+    created_at: datetime | None = None
+    type: str = "note"
+    scope: str = "private"
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    model: str
+    sources: list[AskSource] = []
+    grounded: bool = Field(True, description="False when nothing was found and no model was asked")
+
+
+class CaptureModeResponse(BaseModel):
+    project_key: str
+    capture_mode: str
+
+
 class HealthResponse(BaseModel):
     status: str
     postgres: bool

@@ -14,11 +14,16 @@ Nothing here authenticates. `X-Drymem-Principal` says who the caller is; see
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
 from drymem_server.api.deps import PrincipalDep, ServiceDep, SessionDep, get_store
 from drymem_server.api.schemas import (
+    AskRequest,
+    AskResponse,
+    AskSource,
+    CaptureModeResponse,
     ClusterOut,
     ContextResponse,
     DeleteResponse,
@@ -29,6 +34,9 @@ from drymem_server.api.schemas import (
     FactOut,
     FeedbackRequest,
     FeedbackResponse,
+    GraphEdge,
+    GraphNode,
+    GraphResponse,
     HealthResponse,
     MemorySchemaResponse,
     MemoryTypeOut,
@@ -291,6 +299,90 @@ async def list_sessions(
             )
             for s in sessions
         ],
+    )
+
+
+@router.get("/v1/graph", response_model=GraphResponse, tags=["graph"])
+async def project_graph(
+    service: ServiceDep,
+    project_key: str = Query(...),
+    limit: int = Query(120, ge=1, le=400),
+    kind: Annotated[list[str], Query(description="Filter to these memory kinds")] = [],  # noqa: B006
+    author: str = Query("", description="Filter to one person's memories"),
+) -> GraphResponse:
+    """The knowledge graph, as nodes and edges.
+
+    Restricted to the caller's readable groups, so a private memory is never a
+    node on somebody else's canvas. Layout belongs to the browser.
+    """
+    view = await service.graph(
+        project_key=project_key, limit=limit, kinds=list(kind), author=author or None
+    )
+    return GraphResponse(
+        project_key=project_key,
+        nodes=[
+            GraphNode(
+                id=n.id,
+                kind=n.kind,
+                label=n.label,
+                type=n.memory_type,
+                author=n.author,
+                scope=n.scope,
+                created_at=n.created_at,
+                mentions=n.mentions,
+            )
+            for n in view.nodes
+        ],
+        edges=[
+            GraphEdge(
+                id=e.id,
+                source=e.source,
+                target=e.target,
+                kind=e.kind,
+                label=e.label,
+                superseded=e.superseded,
+            )
+            for e in view.edges
+        ],
+        truncated=view.truncated,
+        total_memories=view.total_memories,
+    )
+
+
+@router.post("/v1/ask", response_model=AskResponse, tags=["graph"])
+async def ask_question(body: AskRequest, service: ServiceDep) -> AskResponse:
+    """Answer a question from this project's memories, with citations.
+
+    Every claim points at a memory or is not made. When nothing matches, the
+    answer says so rather than inventing one that reads like a fact.
+    """
+    result = await service.ask(project_key=body.project_key, question=body.question)
+    return AskResponse(
+        question=result.question,
+        answer=result.text,
+        model=result.model,
+        grounded=result.grounded,
+        sources=[
+            AskSource(
+                index=s.index,
+                uuid=s.uuid,
+                title=s.title,
+                author=s.author,
+                created_at=s.created_at,
+                type=s.memory_type,
+                scope=s.scope,
+            )
+            for s in result.sources
+        ],
+    )
+
+
+@router.get("/v1/capture-mode", response_model=CaptureModeResponse, tags=["memories"])
+async def capture_mode(service: ServiceDep, project_key: str = Query(...)) -> CaptureModeResponse:
+    """What the hooks should do at the end of a session. See PLAN.md D38."""
+    return CaptureModeResponse(
+        project_key=project_key,
+        capture_mode=await service.capture_mode(project_key=project_key),
     )
 
 
