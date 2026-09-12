@@ -91,6 +91,22 @@ export const MEMORY_TYPES: Record<string, string> = {
 /** Kept as an alias because chips and filters both read it. */
 export const TYPES = MEMORY_TYPES;
 
+/**
+ * The saturated hue for a kind, for anywhere a block of colour has to carry
+ * the meaning on its own — a bar segment, a node dot.
+ *
+ * Not the `.chip-*` classes: those pair a near-white tint with dark text, so
+ * painting a bar with one produces a bar you cannot see.
+ */
+export const TYPE_FILL: Record<string, string> = {
+  decision: "bg-chart-1",
+  architecture: "bg-chart-2",
+  bugfix: "bg-chart-3",
+  discovery: "bg-chart-4",
+  convention: "bg-chart-5",
+  note: "bg-muted-foreground",
+};
+
 
 /**
  * Split a SKILL.md's YAML frontmatter off its body.

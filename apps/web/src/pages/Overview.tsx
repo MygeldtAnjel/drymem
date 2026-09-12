@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Episode, Health, Overview as Stats } from "@/api";
-import { MEMORY_TYPES } from "@/memory";
+import { MEMORY_TYPES, TYPE_FILL } from "@/memory";
 import { relative } from "@/format";
 import { go } from "@/router";
 
@@ -78,7 +78,7 @@ function TypeMix({ byType, total }: { byType: Record<string, number>; total: num
         {order.map((type) => (
           <span
             key={type}
-            className={`chip-${type}`}
+            className={TYPE_FILL[type] ?? TYPE_FILL.note}
             style={{ width: `${((byType[type] ?? 0) / total) * 100}%` }}
             // The bar is a summary of the list below it, which carries the
             // same numbers in words — so it needs no label of its own.

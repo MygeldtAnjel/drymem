@@ -37,21 +37,13 @@ import "@xyflow/react/dist/style.css";
 import { Blank } from "@/components/Bits";
 import type { TreeArea, TreeDecision } from "@/api";
 import { relative } from "@/format";
+import { TYPE_FILL } from "@/memory";
 
 /* Measured, not guessed: dagre needs real sizes or the ranks collide. */
 const AREA_W = 190;
 const AREA_H = 46;
 const DECISION_W = 300;
 const DECISION_H = 84;
-
-const TYPE_DOT: Record<string, string> = {
-  decision: "bg-chart-1",
-  architecture: "bg-chart-2",
-  bugfix: "bg-chart-3",
-  discovery: "bg-chart-4",
-  convention: "bg-chart-5",
-  note: "bg-muted-foreground",
-};
 
 type AreaData = {
   label: string;
@@ -102,7 +94,7 @@ function DecisionNode({ data }: NodeProps) {
     >
       <Handle type="target" position={Position.Left} className="!opacity-0" />
       <div className="flex items-center gap-1.5">
-        <span className={`size-1.5 shrink-0 rounded-full ${TYPE_DOT[decision.type] ?? TYPE_DOT.note}`} />
+        <span className={`size-1.5 shrink-0 rounded-full ${TYPE_FILL[decision.type] ?? TYPE_FILL.note}`} />
         <span className={`truncate text-[13px] font-medium ${dead ? "line-through" : ""}`}>
           {decision.title}
         </span>
