@@ -1,0 +1,57 @@
+# Deploying drymem on a server, rather than on the machine you develop on.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Two things change, and they are the two that are wrong about the development
+# setup once nobody is sitting at the machine:
+#
+# **Networking.** Development uses `network_mode: host` so the engine can reach
+# an Ollama listening on the host's own loopback. On a server there is no such
+# Ollama, and host networking would put Postgres and Neo4j on the box's real
+# interfaces. Here everything is on a private bridge and the API is the only
+# thing published — which is what "the API is the only public port" has meant
+# all along (§1b).
+#
+# **The model.** `LOCAL_LLM_URL` has to name something reachable from inside the
+# network: another container, or a host running Ollama elsewhere. There is no
+# default that could be right, so the compose refuses to start without it.
+
+services:
+  neo4j:
+    network_mode: ""
+    # Not published. The engine reaches it by service name.
+    ports: !override []
+    networks: [drymem]
+
+  postgres:
+    network_mode: ""
+    ports: !override []
+    networks: [drymem]
+
+  engine:
+    network_mode: ""
+    networks: [drymem]
+    environment:
+      DRYMEM_BIND: 0.0.0.0
+      DRYMEM_PORT: 8090
+      DATABASE_URL: postgresql+asyncpg://drymem:drymem_pass@postgres:5432/drymem
+      NEO4J_URI: bolt://neo4j:7687
+      LOCAL_LLM_URL: ${LOCAL_LLM_URL:?set LOCAL_LLM_URL to a model this network can reach}
+
+  api:
+    network_mode: ""
+    networks: [drymem]
+    # The one published port. Put a TLS terminator in front of it and set
+    # COOKIE_SECURE=true, or session cookies travel in the clear.
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
+    environment:
+      BIND: 0.0.0.0
+      DATABASE_URL: postgres://drymem:drymem_pass@postgres:5432/drymem
+      MEMORY_URL: http://engine:8090
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL to the address people type}
+
+networks:
+  drymem:
+    driver: bridge

@@ -78,77 +78,95 @@ make test      # every suite
 
 ## Installation
 
+drymem is three services and a database pair, all started together. You do not
+install the Python or the Node app by hand; `docker compose` builds both.
+
 ### Prerequisites
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/) (package manager)
-- Docker (for Neo4j)
-- [Ollama](https://ollama.ai/) with a chat model and an embedding model pulled
+- Docker with `docker compose`
+- [Ollama](https://ollama.ai/) with a chat model and an embedding model pulled,
+  if you want extraction to run on your own machine (the default)
+- Node 20+, only to run the `drymem` CLI from a repository
 
-### 1. Start Neo4j
+### 1. Configure
+
+```bash
+cp .env.example .env
+openssl rand -hex 32   # put this in SERVICE_SECRET
+```
+
+`SERVICE_SECRET` is the only value with no default. It signs the short-lived
+principal the API mints for each call into the memory engine — the engine
+authenticates nobody and trusts that signature alone, so generate one per
+install and keep it out of git.
+
+### 2. Start it
 
 ```bash
 docker compose up -d
 ```
 
-This starts Neo4j Community with APOC plugins. Default credentials: `neo4j` / `drymem_pass`.
+Four containers: Postgres, Neo4j, the memory engine on 8090, and the API with
+the web app on 8080. Only 8080 is meant for people. Open
+<http://127.0.0.1:8080> and create the first account — whoever signs up first
+owns the organisation, and everyone after them arrives by invitation.
 
-### 2. Configure environment
+The catalogue is not empty on day one: signing up publishes the bundled base
+skills into it. They are published, not enabled — a project lead still chooses
+what runs on the team's machines.
 
-Copy `.env.example` or create `.env`:
-
-```bash
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=drymem_pass
-LOCAL_LLM_URL=http://localhost:11434/v1
-LOCAL_LLM_MODEL=qwen3.6:35b-a3b
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_DIM=768
-```
-
-### 3. Install dependencies & run setup
+### 3. Connect a repository
 
 ```bash
-uv sync
-bash setup.sh
+cd ~/your-project
+npx drymem setup
 ```
 
-The setup script installs hooks for Claude Code and/or shows instructions for Roo Code.
+That signs the machine in through the browser, writes `.drymem/`, installs the
+session hooks, and registers the MCP server. From then on `npx drymem skills
+pull` runs on session start, so a `git pull` is all a teammate needs.
+
+### Deploying it somewhere
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+The override moves everything onto a private bridge network and publishes only
+the API — the development compose uses host networking so the engine can reach
+an Ollama on the host's loopback, which is the wrong shape on a server. Set
+`PUBLIC_URL` to the address people actually type (invitation and reset links
+are built from it), `LOCAL_LLM_URL` to a model that network can reach, and put
+TLS in front of it with `COOKIE_SECURE=true`.
 
 ---
 
 ## Claude Code Integration
 
-Claude Code supports **lifecycle hooks** that fire automatically on session events.
+`npx drymem setup` writes both halves of this into the repository's Claude Code
+settings. There is nothing to copy by hand.
 
-| Event | Hook | What drymem does |
-|---|---|---|
-| Session starts | `session-start.sh` | Injects memory protocol + loads project context |
-| Context compacted | `post-compaction.sh` | Re-injects context, prompts agent to save before continuing |
-| Subagent finishes | `subagent-stop.sh` | Detects Key Learnings sections, surfaces them for save |
+### Lifecycle hooks
 
-### MCP config (`.mcp.json`)
+Each one runs `npx drymem hook <event>`, so they work on any machine that can
+run the CLI — no paths into a clone.
 
-```json
-{
-  "mcpServers": {
-    "drymem": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/drymem", "run", "python", "-m", "src.server"],
-      "env": {
-        "NEO4J_URI": "bolt://localhost:7687",
-        "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "drymem_pass",
-        "LOCAL_LLM_URL": "http://localhost:11434/v1",
-        "LOCAL_LLM_MODEL": "qwen3.6:35b-a3b",
-        "EMBEDDING_MODEL": "nomic-embed-text",
-        "EMBEDDING_DIM": "768"
-      }
-    }
-  }
-}
-```
+| Event | What drymem does |
+|---|---|
+| Session starts | Pulls the project's skills, then injects the memory protocol and recent context |
+| Context compacted | Re-injects context and asks the agent to save before continuing |
+| Session ends | Offers to save a summary, if the project's capture mode asks for one |
+| Subagent finishes | Surfaces a Key Learnings section for saving |
+
+What gets saved is the project's choice, not ours: capture mode is `automatic`,
+`ask` or `manual`, set per project in Settings. On `manual` nothing is written
+unless somebody runs `drymem save-session`.
+
+### MCP server
+
+`setup` registers it in `.mcp.json` as `npx drymem mcp`, giving the agent
+`mem_search`, `mem_context`, `mem_finalize_session`, `mem_update` and
+`mem_delete` over stdio.
 
 ---
 
