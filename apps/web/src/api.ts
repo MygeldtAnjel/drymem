@@ -78,15 +78,52 @@ export interface Member {
   role: string;
 }
 
-export interface Skill {
+export interface Finding {
+  rule: string;
+  severity: "reject" | "review";
+  detail: string;
+  line?: number;
+}
+
+/** A catalogue entry: what the organisation has, whatever its source. */
+export interface CatalogueSkill {
   id: string;
   name: string;
   topic: string;
+  description: string | null;
+  author: string | null;
+  scope: string;
+  source: string;
+  state: string;
+  origin: string | null;
+  latest_version: number;
+  uses: number;
+  enabled_here: boolean;
+  updated_at: string | null;
+}
+
+/** One the project has turned on, pinned to a version. */
+export interface Skill extends CatalogueSkill {
   content: string;
-  author: string;
+  files: Record<string, string>;
   model: string | null;
   memory_count: number;
-  updated_at: string | null;
+  version: number;
+  sha256: string;
+  outdated: boolean;
+  findings: Finding[];
+}
+
+export interface SkillVersion {
+  version: number;
+  sha256: string;
+  content: string;
+  model: string | null;
+  memory_count: number;
+  findings: Finding[];
+  note: string | null;
+  author: string | null;
+  created_at: string;
 }
 
 export interface Session {
@@ -426,19 +463,59 @@ export const api = {
     return (await request<{ skills: Skill[] }>(`/v1/skills?${q}`)).skills;
   },
 
+  catalogue: async (projectKey: string): Promise<CatalogueSkill[]> => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    return (await request<{ skills: CatalogueSkill[] }>(`/v1/skills/catalogue?${q}`)).skills;
+  },
+
+  skillVersions: async (name: string): Promise<SkillVersion[]> => {
+    const data = await request<{ versions: SkillVersion[] }>(
+      `/v1/skills/${encodeURIComponent(name)}/versions`,
+    );
+    return data.versions;
+  },
+
   publishSkill: (body: {
-    project_key: string;
     name: string;
-    topic: string;
+    topic?: string;
+    description?: string;
     content: string;
     model?: string | null;
     memory_count?: number;
-  }) => request<Skill>("/v1/skills", { method: "POST", body: JSON.stringify(body) }),
+    source?: string;
+    project_key?: string;
+  }) =>
+    request<{
+      name: string;
+      version: number;
+      state: string;
+      findings: Finding[];
+      detail?: string;
+      unchanged?: boolean;
+    }>("/v1/skills", { method: "POST", body: JSON.stringify(body) }),
 
-  removeSkill: (projectKey: string, name: string) => {
+  enableSkill: (name: string, projectKey: string, version?: number) =>
+    request<{ name: string; version: number }>(
+      `/v1/skills/${encodeURIComponent(name)}/enable`,
+      { method: "POST", body: JSON.stringify({ project_key: projectKey, version }) },
+    ),
+
+  disableSkill: (name: string, projectKey: string) => {
     const q = new URLSearchParams({ project_key: projectKey });
-    return request(`/v1/skills/${encodeURIComponent(name)}?${q}`, { method: "DELETE" });
+    return request(`/v1/skills/${encodeURIComponent(name)}/enable?${q}`, { method: "DELETE" });
   },
+
+  approveSkill: (name: string) =>
+    request<{ name: string; state: string }>(
+      `/v1/skills/${encodeURIComponent(name)}/approve`,
+      { method: "POST", body: "{}" },
+    ),
+
+  deprecateSkill: (name: string) =>
+    request<{ name: string; state: string; still_enabled_in: number }>(
+      `/v1/skills/${encodeURIComponent(name)}/deprecate`,
+      { method: "POST", body: "{}" },
+    ),
 
   graph: (
     projectKey: string,

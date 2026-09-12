@@ -1,15 +1,35 @@
 /**
- * Skills: the loop that makes drymem more than a notebook.
+ * Skills — three panels, in the order somebody actually moves through them.
  *
- * Left half is what the team has published. Right half is what the memories
- * keep circling back to but nobody has written a skill for yet. Drafting runs
- * a model over those memories; publishing is a separate, deliberate click,
- * because a skill changes how every agent on the team behaves and a model
- * writing one unsupervised is a loop with nobody in it.
+ * **On this project** is what is installed on everyone's machine right now, so
+ * it comes first: a lead opening this screen is usually checking or removing
+ * something, not shopping.
+ *
+ * **Catalogue** is what the organisation has and this project could turn on.
+ *
+ * **Suggested** is the loop nobody else has — subjects the project's own
+ * memories keep returning to, drafted into a skill and published after a human
+ * reads it.
+ *
+ * Everything destructive or organisation-wide is behind a role check on the
+ * server; the buttons are hidden here as a courtesy, never as the control.
  */
 
 import { useState } from "react";
-import { FileText, Sparkles, Trash2, Wand2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Ban,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileText,
+  History,
+  Plus,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 
 import { Blank } from "@/components/Bits";
 import { Markdown } from "@/Markdown";
@@ -17,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -31,168 +52,404 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
-import type { Cluster, Skill } from "@/api";
-import { count, relative } from "@/format";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CatalogueSkill, Cluster, Finding, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
+import { count, relative } from "@/format";
 
 export type Draft = { name: string; content: string; model: string; memory_count: number };
 
+/** Where a skill came from. Worth showing: imported and distilled earn different trust. */
+function SourceChip({ source }: { source: string }) {
+  const label: Record<string, string> = {
+    base: "Built in",
+    distilled: "From memory",
+    imported: "Imported",
+    authored: "Written",
+  };
+  return <Badge variant="outline">{label[source] ?? source}</Badge>;
+}
+
+function StateChip({ state }: { state: string }) {
+  if (state === "pending") {
+    return (
+      <Badge variant="outline" className="text-primary">
+        <Clock /> Waiting for review
+      </Badge>
+    );
+  }
+  if (state === "deprecated") {
+    return (
+      <Badge variant="outline" className="text-destructive">
+        <Ban /> Deprecated
+      </Badge>
+    );
+  }
+  return null;
+}
+
+function Findings({ findings }: { findings: Finding[] }) {
+  if (findings.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+      {findings.map((finding, i) => (
+        <li key={i} className="flex items-start gap-2 text-xs">
+          {finding.severity === "reject" ? (
+            <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-destructive" />
+          ) : (
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          )}
+          <span>
+            <span className="font-mono">{finding.rule}</span>
+            {finding.line ? <span className="text-muted-foreground"> · line {finding.line}</span> : null}
+            <br />
+            <span className="text-muted-foreground">{finding.detail}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function SkillsPage({
   skills,
+  catalogue,
   clusters,
   drafts,
   drafting,
   busy,
+  isAdmin,
   onDraft,
   onPublish,
-  onUnpublish,
-  onOpen,
-  open,
+  onEnable,
+  onDisable,
+  onApprove,
+  onDeprecate,
+  onVersions,
 }: {
   skills: Skill[];
+  catalogue: CatalogueSkill[];
   clusters: Cluster[];
   drafts: Record<string, Draft>;
   drafting: string | null;
   busy: boolean;
+  isAdmin: boolean;
   onDraft: (topic: string) => void;
   onPublish: (topic: string) => void;
-  onUnpublish: (name: string) => void;
-  onOpen: (value: { kind: "skill" | "draft"; key: string } | null) => void;
-  open: { kind: "skill" | "draft"; key: string } | null;
+  onEnable: (name: string, version?: number) => void;
+  onDisable: (name: string) => void;
+  onApprove: (name: string) => void;
+  onDeprecate: (name: string) => void;
+  onVersions: (name: string) => Promise<SkillVersion[]>;
 }) {
+  const [reading, setReading] = useState<Skill | null>(null);
+  const [readingDraft, setReadingDraft] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const publishedTopics = new Set(skills.map((s) => s.topic));
+  const [history, setHistory] = useState<{ name: string; versions: SkillVersion[] } | null>(null);
+
+  const enabledNames = new Set(skills.map((s) => s.name));
+  const published = catalogue.filter((s) => s.state !== "pending");
+  const pending = catalogue.filter((s) => s.state === "pending");
+  const publishedTopics = new Set(catalogue.map((s) => s.topic));
   const suggestions = clusters.filter((c) => !publishedTopics.has(c.topic));
 
-  const openSkill = open?.kind === "skill" ? skills.find((s) => s.name === open.key) : undefined;
-  const openDraft = open?.kind === "draft" ? drafts[open.key] : undefined;
-  const document = frontmatter(openSkill?.content ?? openDraft?.content ?? "");
+  const openHistory = async (name: string) => {
+    setHistory({ name, versions: [] });
+    setHistory({ name, versions: await onVersions(name) });
+  };
+
+  const draft = readingDraft ? drafts[readingDraft] : null;
+  const document = frontmatter(reading?.content ?? draft?.content ?? "");
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card className="overflow-hidden p-0">
-          <CardHeader className="border-b p-4">
-            <CardTitle className="text-sm">Published</CardTitle>
+    <div className="flex flex-col gap-4">
+      {pending.length > 0 && isAdmin && (
+        <Card className="border-primary/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ShieldAlert className="size-4 text-primary" />
+              {count(pending.length, "skill")} waiting for review
+            </CardTitle>
             <CardDescription>
-              Installed by anyone on the team with <code className="font-mono text-xs">drymem skills sync</code>.
+              The scanner found something worth a human reading before this runs on anyone's
+              machine. Nothing can enable them until you approve.
             </CardDescription>
           </CardHeader>
-          {skills.length === 0 ? (
-            <Blank icon={FileText} title="Nothing published yet">
-              Draft one from a suggestion, read it, then publish it if it is right.
-            </Blank>
-          ) : (
-            <ul className="flex flex-col">
-              {skills.map((skill) => (
-                <li key={skill.id} className="flex items-center gap-2 border-t px-4 py-3 first:border-t-0">
-                  <button
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => onOpen({ kind: "skill", key: skill.name })}
-                  >
-                    <span className="block truncate font-mono text-sm font-medium">{skill.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {skill.author} · {relative(skill.updated_at)} ·{" "}
-                      {count(skill.memory_count, "memory", "memories")}
-                    </span>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Unpublish ${skill.name}`}
-                    disabled={busy}
-                    onClick={() => setConfirm(skill.name)}
-                  >
-                    <Trash2 />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <CardContent className="flex flex-col gap-2">
+            {pending.map((skill) => (
+              <div
+                key={skill.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg border p-3"
+              >
+                <span className="min-w-0 flex-1 truncate font-mono text-sm">{skill.name}</span>
+                <SourceChip source={skill.source} />
+                <Button size="sm" variant="outline" onClick={() => openHistory(skill.name)}>
+                  Read it
+                </Button>
+                <Button size="sm" disabled={busy} onClick={() => onApprove(skill.name)}>
+                  <CheckCircle2 data-icon="inline-start" /> Approve
+                </Button>
+              </div>
+            ))}
+          </CardContent>
         </Card>
+      )}
 
-        <Card className="overflow-hidden p-0">
-          <CardHeader className="border-b p-4">
-            <CardTitle className="text-sm">Suggested</CardTitle>
-            <CardDescription>
-              Subjects this project’s memories keep returning to, with no skill written for them.
-            </CardDescription>
-          </CardHeader>
-          {suggestions.length === 0 ? (
-            <Blank icon={Sparkles} title="No suggestions">
-              A subject shows up here once two or more memories mention it.
-            </Blank>
-          ) : (
-            <ul className="flex max-h-[26rem] flex-col overflow-y-auto">
-              {suggestions.map((cluster) => {
-                const draft = drafts[cluster.topic];
-                const isDrafting = drafting === cluster.topic;
-                return (
+      <Tabs defaultValue="project" className="gap-4">
+        <TabsList>
+          <TabsTrigger value="project">On this project {skills.length}</TabsTrigger>
+          <TabsTrigger value="catalogue">Catalogue {published.length}</TabsTrigger>
+          <TabsTrigger value="suggested">Suggested {suggestions.length}</TabsTrigger>
+        </TabsList>
+
+        {/* ---- installed here ------------------------------------------------ */}
+        <TabsContent value="project">
+          <Card className="overflow-hidden p-0">
+            <CardHeader className="border-b p-4">
+              <CardTitle className="text-sm">Installed on every machine on this project</CardTitle>
+              <CardDescription>
+                A teammate gets these by running <code className="font-mono text-xs">git pull</code>
+                . The lockfile at <code className="font-mono text-xs">.drymem/skills.lock</code> is
+                what carries them.
+              </CardDescription>
+            </CardHeader>
+            {skills.length === 0 ? (
+              <Blank icon={FileText} title="Nothing enabled here yet">
+                Turn one on from the catalogue, or distil one from what this project keeps
+                re-learning.
+              </Blank>
+            ) : (
+              <ul className="flex flex-col">
+                {skills.map((skill) => (
                   <li
-                    key={cluster.topic}
-                    className="flex items-center gap-2 border-t px-4 py-3 first:border-t-0"
+                    key={skill.id}
+                    className="flex flex-wrap items-center gap-2 border-t px-4 py-3 first:border-t-0"
                   >
                     <button
                       className="min-w-0 flex-1 text-left"
-                      onClick={() => draft && onOpen({ kind: "draft", key: cluster.topic })}
-                      disabled={!draft}
+                      onClick={() => setReading(skill)}
                     >
-                      <span className="flex items-center gap-2">
-                        <span className="truncate font-medium">{cluster.topic}</span>
-                        {draft && <Badge variant="outline">Draft ready</Badge>}
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="truncate font-mono text-sm font-medium">
+                          {skill.name}
+                        </span>
+                        <Badge variant="outline">v{skill.version}</Badge>
+                        <StateChip state={skill.state} />
+                        {skill.outdated && (
+                          <Badge variant="outline" className="text-primary">
+                            v{skill.latest_version} available
+                          </Badge>
+                        )}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {count(cluster.memory_count, "memory", "memories")}
+                        {skill.description || skill.topic || "No description"} ·{" "}
+                        {skill.uses > 0 ? count(skill.uses, "read") : "never read by an agent"}
                       </span>
                     </button>
-                    {draft ? (
-                      <Button size="sm" onClick={() => onOpen({ kind: "draft", key: cluster.topic })}>
-                        Review
-                      </Button>
-                    ) : (
+                    {skill.outdated && (
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={isDrafting || busy}
-                        onClick={() => onDraft(cluster.topic)}
+                        disabled={busy}
+                        onClick={() => onEnable(skill.name)}
                       >
-                        {isDrafting ? <Spinner /> : <Wand2 data-icon="inline-start" />}
-                        {isDrafting ? "Drafting…" : "Draft"}
+                        Update to v{skill.latest_version}
+                      </Button>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`History of ${skill.name}`}
+                          onClick={() => openHistory(skill.name)}
+                        >
+                          <History />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Every version</TooltipContent>
+                    </Tooltip>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Remove ${skill.name} from this project`}
+                      disabled={busy}
+                      onClick={() => setConfirm(skill.name)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ---- the organisation's catalogue ---------------------------------- */}
+        <TabsContent value="catalogue">
+          <Card className="overflow-hidden p-0">
+            <CardHeader className="border-b p-4">
+              <CardTitle className="text-sm">Everything your organisation has</CardTitle>
+              <CardDescription>
+                Turning one on pins this project to a version. Other projects are unaffected.
+              </CardDescription>
+            </CardHeader>
+            {published.length === 0 ? (
+              <Blank icon={Sparkles} title="The catalogue is empty">
+                Distil one from a suggestion, or publish a folder you already have with{" "}
+                <code className="font-mono">drymem skills publish ./my-skill</code>.
+              </Blank>
+            ) : (
+              <ul className="flex flex-col">
+                {published.map((skill) => (
+                  <li
+                    key={skill.id}
+                    className="flex flex-wrap items-center gap-2 border-t px-4 py-3 first:border-t-0"
+                  >
+                    <button
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => openHistory(skill.name)}
+                    >
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="truncate font-mono text-sm font-medium">
+                          {skill.name}
+                        </span>
+                        <SourceChip source={skill.source} />
+                        <StateChip state={skill.state} />
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {skill.description || skill.topic || "No description"} · v
+                        {skill.latest_version} · {relative(skill.updated_at)}
+                        {skill.origin && ` · ${skill.origin}`}
+                      </span>
+                    </button>
+                    {enabledNames.has(skill.name) ? (
+                      <Badge variant="outline" className="text-success">
+                        <CheckCircle2 /> On here
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => onEnable(skill.name)}
+                      >
+                        <Plus data-icon="inline-start" /> Enable
+                      </Button>
+                    )}
+                    {isAdmin && skill.state !== "deprecated" && (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Deprecate ${skill.name}`}
+                        disabled={busy}
+                        onClick={() => onDeprecate(skill.name)}
+                      >
+                        <Ban />
                       </Button>
                     )}
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ---- the loop ------------------------------------------------------ */}
+        <TabsContent value="suggested">
+          <Card className="overflow-hidden p-0">
+            <CardHeader className="border-b p-4">
+              <CardTitle className="text-sm">Subjects this project keeps returning to</CardTitle>
+              <CardDescription>
+                Drafting reads the memories about a subject and writes a SKILL.md. Nothing is
+                installed until a person reads it and publishes it.
+              </CardDescription>
+            </CardHeader>
+            {suggestions.length === 0 ? (
+              <Blank icon={Sparkles} title="No suggestions">
+                A subject appears here once two or more memories mention it and no skill covers it.
+              </Blank>
+            ) : (
+              <ul className="flex max-h-[32rem] flex-col overflow-y-auto">
+                {suggestions.map((cluster) => {
+                  const ready = drafts[cluster.topic];
+                  const busyHere = drafting === cluster.topic;
+                  return (
+                    <li
+                      key={cluster.topic}
+                      className="flex items-center gap-2 border-t px-4 py-3 first:border-t-0"
+                    >
+                      <button
+                        className="min-w-0 flex-1 text-left"
+                        disabled={!ready}
+                        onClick={() => ready && setReadingDraft(cluster.topic)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="truncate font-medium">{cluster.topic}</span>
+                          {ready && <Badge variant="outline">Draft ready</Badge>}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {count(cluster.memory_count, "memory", "memories")}
+                        </span>
+                      </button>
+                      {ready ? (
+                        <Button size="sm" onClick={() => setReadingDraft(cluster.topic)}>
+                          Review
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyHere || busy}
+                          onClick={() => onDraft(cluster.topic)}
+                        >
+                          {busyHere ? <Spinner /> : <Wand2 data-icon="inline-start" />}
+                          {busyHere ? "Drafting…" : "Draft"}
+                        </Button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
+          {drafting && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Writing a skill from the memories about “{drafting}”. A local model takes a minute or
+              two — you can keep working.
+            </p>
           )}
-        </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
 
-      {drafting && (
-        <p className="text-sm text-muted-foreground">
-          Writing a skill from the memories about “{drafting}”. A local model takes a minute or
-          two — you can keep working.
-        </p>
-      )}
-
-      {/* Reading a skill is reading a document, so it gets the whole width. */}
-      <Dialog open={Boolean(openSkill || openDraft)} onOpenChange={(o) => !o && onOpen(null)}>
+      {/* ---- reading one -------------------------------------------------- */}
+      <Dialog
+        open={Boolean(reading || draft)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReading(null);
+            setReadingDraft(null);
+          }
+        }}
+      >
         <DialogContent className="max-h-[85vh] gap-3 overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="font-mono">
-              {openSkill?.name ?? openDraft?.name ?? "Skill"}
+              {reading?.name ?? draft?.name ?? "Skill"}
             </DialogTitle>
             <DialogDescription>
-              {openSkill
-                ? `Published by ${openSkill.author} · drawn from ${count(openSkill.memory_count, "memory", "memories")}`
-                : openDraft
-                  ? `Draft written by ${openDraft.model} from ${count(openDraft.memory_count, "memory", "memories")}. Read it before publishing — nothing is installed until you do.`
+              {reading
+                ? `Version ${reading.version} · ${reading.author ?? "unknown"} · ${count(reading.memory_count, "memory", "memories")}`
+                : draft
+                  ? `Draft by ${draft.model} from ${count(draft.memory_count, "memory", "memories")}. Read it before publishing — nothing is installed until you do.`
                   : ""}
             </DialogDescription>
             {document.meta.description && (
               <p className="text-sm text-foreground">{document.meta.description}</p>
             )}
           </DialogHeader>
+
+          {reading?.findings?.length ? <Findings findings={reading.findings} /> : null}
 
           <div className="min-w-0 rounded-lg border bg-muted/20 p-4">
             <Markdown source={document.body} />
@@ -202,28 +459,81 @@ export function SkillsPage({
             <DialogClose asChild>
               <Button variant="outline">Close</Button>
             </DialogClose>
-            {openDraft && open && (
+            {draft && readingDraft && (
               <Button
-                onClick={() => {
-                  onPublish(open.key);
-                  onOpen(null);
-                }}
                 disabled={busy}
+                onClick={() => {
+                  onPublish(readingDraft);
+                  setReadingDraft(null);
+                }}
               >
-                <Sparkles data-icon="inline-start" /> Publish to the team
+                <Sparkles data-icon="inline-start" /> Publish and enable here
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
+      {/* ---- every version ------------------------------------------------ */}
+      <Dialog open={history !== null} onOpenChange={(open) => !open && setHistory(null)}>
+        <DialogContent className="max-h-[85vh] gap-3 overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-mono">{history?.name}</DialogTitle>
+            <DialogDescription>
+              Versions are immutable. A project stays on the one it pinned until somebody moves it.
+            </DialogDescription>
+          </DialogHeader>
+
+          {history?.versions.length === 0 ? (
+            <Spinner />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {history?.versions.map((version) => (
+                <li key={version.version} className="rounded-lg border p-3">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">v{version.version}</Badge>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {version.sha256.slice(0, 12)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {version.author ?? "unknown"} · {relative(version.created_at)}
+                      {version.model && ` · ${version.model}`}
+                    </span>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      className="ml-auto"
+                      disabled={busy}
+                      onClick={() => {
+                        onEnable(history.name, version.version);
+                        setHistory(null);
+                      }}
+                    >
+                      <Download data-icon="inline-start" /> Use this one
+                    </Button>
+                  </div>
+                  {version.note && (
+                    <p className="mb-2 text-xs text-muted-foreground">{version.note}</p>
+                  )}
+                  <Findings findings={version.findings} />
+                  <div className="mt-2 max-h-64 overflow-y-auto rounded border bg-muted/20 p-3">
+                    <Markdown source={frontmatter(version.content).body} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ---- taking one off ----------------------------------------------- */}
+      <Dialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Unpublish {confirm}?</DialogTitle>
+            <DialogTitle>Remove {confirm} from this project?</DialogTitle>
             <DialogDescription>
-              It stops being available to the team. The memories it was written from are not
-              touched, so you can draft it again at any time.
+              It stops being installed on everyone's machine at their next session. The skill stays
+              in the catalogue and every version is kept, so you can turn it back on at any time.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -233,11 +543,11 @@ export function SkillsPage({
             <Button
               variant="destructive"
               onClick={() => {
-                if (confirm) onUnpublish(confirm);
+                if (confirm) onDisable(confirm);
                 setConfirm(null);
               }}
             >
-              Unpublish
+              Remove
             </Button>
           </DialogFooter>
         </DialogContent>

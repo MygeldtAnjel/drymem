@@ -31,9 +31,11 @@ import {
   type MemorySchema,
   type Overview,
   type Person,
+  type CatalogueSkill,
   type Project,
   type Session,
   type Skill,
+  type SkillVersion,
 } from "./api";
 import { AcceptInvite, ApproveDevice, ForgotPassword, ResetPassword } from "@/pages/Gate";
 import { Shell } from "@/components/Shell";
@@ -46,6 +48,7 @@ import { SessionsPage } from "@/pages/Sessions";
 import { GraphPage } from "@/pages/Graph";
 import { SkillsPage, type Draft } from "@/pages/Skills";
 import { SettingsPage } from "@/pages/Settings";
+import { count } from "./format";
 import { SignIn } from "./SignIn";
 import { go, useRoute } from "./router";
 import { SearchX } from "lucide-react";
@@ -154,6 +157,7 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const [stats, setStats] = useState<Overview | null>(null);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [catalogue, setCatalogue] = useState<CatalogueSkill[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -165,7 +169,6 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const [searching, setSearching] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [drafting, setDrafting] = useState<string | null>(null);
-  const [openSkill, setOpenSkill] = useState<{ kind: "skill" | "draft"; key: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -226,19 +229,21 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
       if (!projectKey) return;
       setLoading(true);
       try {
-        const [context, overview, sessionList, skillList, memberList, personList] =
+        const [context, overview, sessionList, enabled, wholeCatalogue, memberList, personList] =
           await Promise.all([
             api.context(projectKey, 100),
             api.overview(projectKey).catch(() => null),
             api.sessions(projectKey).catch(() => []),
             api.skills(projectKey).catch(() => []),
+            api.catalogue(projectKey).catch(() => []),
             api.members(projectKey).catch(() => []),
             api.people().catch(() => []),
           ]);
         setEpisodes(context);
         setStats(overview);
         setSessions(sessionList);
-        setSkills(skillList);
+        setSkills(enabled);
+        setCatalogue(wholeCatalogue);
         setMembers(memberList);
         setPeople(personList);
         api.discover(projectKey).then(setClusters).catch(() => setClusters([]));
@@ -352,28 +357,69 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     }
   };
 
+  /** Reload just the two skill lists, after anything that changes them. */
+  const refreshSkills = async () => {
+    const [enabled, all] = await Promise.all([
+      api.skills(active).catch(() => []),
+      api.catalogue(active).catch(() => []),
+    ]);
+    setSkills(enabled);
+    setCatalogue(all);
+  };
+
   const publishSkill = (topic: string) =>
     act("Publishing", async () => {
       const draft = drafts[topic];
       if (!draft) return;
       const saved = await api.publishSkill({
-        project_key: active,
         name: draft.name,
         topic,
         content: draft.content,
         model: draft.model,
         memory_count: draft.memory_count,
+        source: "distilled",
+        project_key: active,
       });
-      setSkills((list) => [saved, ...list.filter((s) => s.name !== saved.name)]);
-      return `Published ${saved.name} to the team`;
+      await refreshSkills();
+      // A held version is not an installed one, and saying "published" would be
+      // a lie the person only discovers when nothing appears on their machine.
+      return saved.state === "pending"
+        ? `${saved.name} is held for review — an admin has to approve it`
+        : `Published ${saved.name}@${saved.version} and enabled it here`;
     });
 
-  const unpublishSkill = (name: string) =>
-    act("Unpublishing", async () => {
-      await api.removeSkill(active, name);
-      setSkills((list) => list.filter((s) => s.name !== name));
-      return `${name} unpublished`;
+  const enableSkill = (name: string, version?: number) =>
+    act("Enabling", async () => {
+      const enabled = await api.enableSkill(name, active, version);
+      await refreshSkills();
+      return `${enabled.name}@${enabled.version} is on this project — commit .drymem/skills.lock`;
     });
+
+  const disableSkill = (name: string) =>
+    act("Removing", async () => {
+      await api.disableSkill(name, active);
+      await refreshSkills();
+      return `${name} removed — commit .drymem/skills.lock`;
+    });
+
+  const approveSkill = (name: string) =>
+    act("Approving", async () => {
+      await api.approveSkill(name);
+      await refreshSkills();
+      return `${name} approved; projects can enable it now`;
+    });
+
+  const deprecateSkill = (name: string) =>
+    act("Deprecating", async () => {
+      const result = await api.deprecateSkill(name);
+      await refreshSkills();
+      return result.still_enabled_in > 0
+        ? `${name} deprecated — still enabled in ${count(result.still_enabled_in, "project")}`
+        : `${name} deprecated`;
+    });
+
+  const skillVersions = (name: string): Promise<SkillVersion[]> =>
+    api.skillVersions(name).catch(() => []);
 
   const addMember = (email: string) =>
     act("Adding", async () => {
@@ -478,6 +524,7 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         graphLoading={graphLoading}
         onLoadGraph={loadGraph}
         skills={skills}
+        catalogue={catalogue}
         clusters={clusters}
         people={people}
         members={members}
@@ -487,8 +534,6 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         searching={searching}
         drafts={drafts}
         drafting={drafting}
-        openSkill={openSkill}
-        setOpenSkill={setOpenSkill}
         setQuery={setQuery}
         onSearch={search}
         onClearSearch={() => setFacts(null)}
@@ -497,7 +542,11 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         onDelete={remove}
         onDraft={draftSkill}
         onPublish={publishSkill}
-        onUnpublish={unpublishSkill}
+        onEnable={enableSkill}
+        onDisable={disableSkill}
+        onApprove={approveSkill}
+        onDeprecate={deprecateSkill}
+        onVersions={skillVersions}
         onAddMember={addMember}
         onRole={setRole}
         onRemoveMember={removeMember}
@@ -531,6 +580,7 @@ function Screen(props: {
   graphLoading: boolean;
   onLoadGraph: (kinds: string[], minMentions: number) => void;
   skills: Skill[];
+  catalogue: CatalogueSkill[];
   clusters: Cluster[];
   people: Person[];
   members: Member[];
@@ -540,8 +590,6 @@ function Screen(props: {
   searching: boolean;
   drafts: Record<string, Draft>;
   drafting: string | null;
-  openSkill: { kind: "skill" | "draft"; key: string } | null;
-  setOpenSkill: (v: { kind: "skill" | "draft"; key: string } | null) => void;
   setQuery: (v: string) => void;
   onSearch: () => void;
   onClearSearch: () => void;
@@ -550,7 +598,11 @@ function Screen(props: {
   onDelete: (episode: Episode) => void;
   onDraft: (topic: string) => void;
   onPublish: (topic: string) => void;
-  onUnpublish: (name: string) => void;
+  onEnable: (name: string, version?: number) => void;
+  onDisable: (name: string) => void;
+  onApprove: (name: string) => void;
+  onDeprecate: (name: string) => void;
+  onVersions: (name: string) => Promise<SkillVersion[]>;
   onAddMember: (email: string) => void;
   onRole: (email: string, role: string) => void;
   onRemoveMember: (email: string) => void;
@@ -613,15 +665,19 @@ function Screen(props: {
       return (
         <SkillsPage
           skills={props.skills}
+          catalogue={props.catalogue}
           clusters={props.clusters}
           drafts={props.drafts}
           drafting={props.drafting}
           busy={props.busy}
+          isAdmin={props.isAdmin}
           onDraft={props.onDraft}
           onPublish={props.onPublish}
-          onUnpublish={props.onUnpublish}
-          open={props.openSkill}
-          onOpen={props.setOpenSkill}
+          onEnable={props.onEnable}
+          onDisable={props.onDisable}
+          onApprove={props.onApprove}
+          onDeprecate={props.onDeprecate}
+          onVersions={props.onVersions}
         />
       );
     case "projects":
