@@ -26,7 +26,8 @@ Usage
   npx drymem search <query>       Search this project's memory
   npx drymem context [n]          Show the most recent memories
   npx drymem skills <cmd>         list | catalogue | add | remove | pull | publish
-                                  | status | discover | distill <topic>
+                                  | import owner/repo@skill | status
+                                  | discover | distill <topic>
   npx drymem import <source>      Backfill memories the team already wrote down
                                   (claude-memory, git, docs, ecc, engram; --dry-run to preview)
   npx drymem promote <episode-id> Share a memory with the project's members
@@ -389,6 +390,39 @@ async function main(argv: string[]): Promise<number> {
         return 0;
       }
 
+      if (sub === "import") {
+        const { parseSpec, originOf, fetchSkill } = await import("./registry.js");
+        const raw = rest[1];
+        if (!raw) fail("Which skill? npx drymem skills import owner/repo@skill-name");
+
+        const spec = parseSpec(raw);
+        console.log(`Fetching ${originOf(spec)}…`);
+        const fetched = await fetchSkill(spec);
+
+        const published = await client.publishSkillVersion({
+          name: rest.includes("--name") ? rest[rest.indexOf("--name") + 1]! : fetched.name,
+          content: fetched.content,
+          files: fetched.files,
+          source: "imported",
+          origin: originOf(spec),
+          project_key: rest.includes("--enable") ? projectKey : undefined,
+        });
+
+        if (published.unchanged) {
+          console.log(`${published.name} is already at v${published.version}; nothing changed.`);
+          return 0;
+        }
+        console.log(`Imported ${published.name}@${published.version} via ${fetched.via} (${published.state}).`);
+        for (const finding of published.findings) {
+          console.log(`  ${finding.severity}: ${finding.rule} — ${finding.detail}`);
+        }
+        if (published.detail) console.log(`\n  ${published.detail}`);
+        else if (!rest.includes("--enable")) {
+          console.log(`\n  Read it, then:  npx drymem skills add ${published.name}`);
+        }
+        return 0;
+      }
+
       if (sub === "status") {
         const lock = readLockfile(root);
         const platforms = chosenPlatforms(rest, root);
@@ -440,7 +474,7 @@ async function main(argv: string[]): Promise<number> {
 
       fail(
         `Unknown skills command: ${sub}.\n` +
-          "  list · catalogue · add · remove · pull · publish · status · discover · distill",
+          "  list · catalogue · add · remove · pull · publish · import · status · discover · distill",
       );
       return 1;
     }
