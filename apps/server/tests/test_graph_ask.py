@@ -593,3 +593,87 @@ async def test_a_carried_uuid_that_no_longer_exists_is_ignored(client, no_model)
 
     assert body["grounded"] is True
     assert len(body["sources"]) >= 1
+
+
+class TestOnlyWhatWasCited:
+    """Cards badged 3 and 4 with no 1 or 2 read as something broken.
+
+    The engine offers four memories and the model cites two of them. Filtering
+    to those two is right; leaving them with the numbers they were given is not,
+    because the badge has to match the marker in the prose.
+    """
+
+    @staticmethod
+    def sources(n=4):
+        from drymem_server.ask import Source
+
+        return [
+            Source(
+                index=i,
+                uuid=f"u{i}",
+                title=f"Memory {i}",
+                author="miguel@acme.test",
+                created_at=None,
+                memory_type="note",
+                scope="private",
+            )
+            for i in range(1, n + 1)
+        ]
+
+    def test_both_the_markers_and_the_cards_are_renumbered(self):
+        from drymem_server.ask import _only_what_was_cited
+
+        text, kept = _only_what_was_cited("Feedback led to changes [4] and fixes [3].", self.sources())
+
+        assert text == "Feedback led to changes [1] and fixes [2]."
+        assert [(s.index, s.uuid) for s in kept] == [(1, "u4"), (2, "u3")]
+
+    def test_numbering_follows_the_order_they_appear(self):
+        from drymem_server.ask import _only_what_was_cited
+
+        text, kept = _only_what_was_cited("First [3]. Then [1]. Again [3].", self.sources())
+
+        assert text == "First [1]. Then [2]. Again [1]."
+        assert [s.uuid for s in kept] == ["u3", "u1"]
+
+    def test_an_uncited_memory_is_not_shown(self):
+        from drymem_server.ask import _only_what_was_cited
+
+        _, kept = _only_what_was_cited("Only this one [2].", self.sources())
+        assert [s.uuid for s in kept] == ["u2"]
+
+    def test_citing_nothing_shows_nothing(self):
+        # "The memories do not say" has no evidence behind it, so no cards.
+        from drymem_server.ask import _only_what_was_cited
+
+        text, kept = _only_what_was_cited("The memories do not say.", self.sources())
+        assert kept == []
+        assert text == "The memories do not say."
+
+    def test_a_marker_pointing_at_nothing_is_left_alone(self):
+        # Renumbering around it would change which memory a sentence claims.
+        from drymem_server.ask import _only_what_was_cited
+
+        text, kept = _only_what_was_cited("Out of range [9], but [2] is real.", self.sources())
+        assert text == "Out of range [9], but [1] is real."
+        assert [s.uuid for s in kept] == ["u2"]
+
+
+async def test_an_answer_only_carries_the_memories_it_cited(client, no_model):
+    """End to end: the response, not just the helper."""
+    await save(client, summary="Retries cap at thirty seconds.", topic="pay/retry")
+    await save(client, summary="Invoices run nightly.", topic="billing/invoices")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={"project_key": PROJECT, "question": "What is the retry cap?"},
+            headers=auth(client),
+        )
+    ).json()
+
+    # The fake model echoes the prompt, which contains every offered marker, so
+    # every source is cited here — and they must be numbered from one, in order.
+    assert [s["index"] for s in body["sources"]] == list(
+        range(1, len(body["sources"]) + 1)
+    )

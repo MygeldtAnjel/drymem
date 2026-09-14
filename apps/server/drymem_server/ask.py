@@ -18,7 +18,7 @@ only ever be built out of what the asker was already allowed to read.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from drymem_server.settings import settings
@@ -53,20 +53,26 @@ plainly. Never fill a gap with general knowledge.
 2. Cite every claim as [1], [2] — matching the numbers you were given. A \
 sentence with no citation must not appear. Separate several with a space: \
 "[2] [4]", never "[2][4]".
-3. Be short. Two or three sentences is usually right. A lead is scanning.
-4. Name people and dates when the memories do. "Jose decided X on 4 September \
+3. A citation is a marker, not a noun. Say what happened and put the marker \
+after it: "the canvas was removed [4]", never "the changes in [4]" or \
+"memory [3] says".
+4. You did not do any of this. The memories were written by the team; say who \
+did what — "Miguel asked whether the chat had been tested [2]" — and never \
+"I asked" or "we decided".
+5. Be short. Two or three sentences is usually right. A lead is scanning.
+6. Name people and dates when the memories do. "Jose decided X on 4 September \
 [2]" is worth far more than "it was decided".
-5. Write dates the way a person says them — "on 12 September", not \
+7. Write dates the way a person says them — "on 12 September", not \
 "2026-09-12" and not "logged on". Say what happened, not that it was recorded: \
 "Ask became Chat", not "a decision was logged".
-6. Lead with the answer. No "The provided memories indicate" and no "Based on \
+8. Lead with the answer. No "The provided memories indicate" and no "Based on \
 the memories" — the citations already say where it came from.
-7. Never deny and then answer. "The memories do not list the files … the files \
+9. Never deny and then answer. "The memories do not list the files … the files \
 are X, Y, Z" is one sentence too long — if it is there, give it and stop.
-8. If a question asks for a judgement the memories cannot settle — how big, \
+10. If a question asks for a judgement the memories cannot settle — how big, \
 how risky, whether it was wise — give the evidence that bears on it and say \
 what the memories do not say. Do not pad it out by listing them again.
-9. If the memories disagree, say that they disagree and cite both."""
+11. If the memories disagree, say that they disagree and cite both."""
 
 TEMPLATE = """Question: {question}
 
@@ -186,6 +192,45 @@ async def _answer_with_local(prompt: str, turns: list[dict] | None = None) -> tu
     return response.choices[0].message.content or "", settings.local_llm_model
 
 
+def _only_what_was_cited(text: str, sources: list[Source]) -> tuple[str, list[Source]]:
+    """Keep the memories the answer used, and number them from one.
+
+    Two separate problems, one fix.
+
+    The engine offers four memories and the model cites the ones that bear on
+    the question — often two. Listing all four under the answer claims they are
+    the evidence when half of them are not.
+
+    But filtering alone leaves the *numbers* it was given: cards badged 3 and 4
+    with no 1 or 2, which reads as something broken. The badge has to match the
+    marker in the prose, so both are renumbered together — first cited becomes
+    [1], and the card beside it says 1.
+
+    A marker pointing at nothing is left exactly as written. Renumbering around
+    it would silently change which memory a sentence claims to rest on.
+    """
+    by_index = {s.index: s for s in sources}
+    order: list[int] = []
+    for found in _CITATION.finditer(text):
+        n = int(found.group(0)[1:-1])
+        if n in by_index and n not in order:
+            order.append(n)
+
+    if not order:
+        return text, []
+
+    moved = {old: new for new, old in enumerate(order, start=1)}
+    renumbered = _CITATION.sub(
+        lambda m: f"[{moved[int(m.group(0)[1:-1])]}]"
+        if int(m.group(0)[1:-1]) in moved
+        else m.group(0),
+        text,
+    )
+    kept = [replace(by_index[old], index=new) for old, new in moved.items()]
+    kept.sort(key=lambda s: s.index)
+    return renumbered, kept
+
+
 async def answer(
     *,
     question: str,
@@ -224,4 +269,5 @@ async def answer(
             sources=sources,
             grounded=False,
         )
-    return Answer(question=question, text=written, model=model, sources=sources)
+    written, cited = _only_what_was_cited(written, sources)
+    return Answer(question=question, text=written, model=model, sources=cited)

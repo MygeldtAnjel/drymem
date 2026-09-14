@@ -41,26 +41,17 @@ import { go } from "@/router";
  * that order, which is the order somebody checks them in.
  */
 function Sources({ message }: { message: ChatMessage }) {
-  /*
-   * Only the memories the answer actually cited.
-   *
-   * The engine offers four; the model uses the ones that bear on the question
-   * and sometimes none of them. Showing all four under "the memories do not
-   * say" invites exactly the question Miguel asked — why is it returning cards
-   * anyway — because the cards claim to be the evidence and there was none.
-   */
-  const cited = message.sources.filter((s) =>
-    new RegExp(`\\[\\s*${s.index}\\s*\\]`).test(message.content),
-  );
-  if (cited.length === 0) return null;
+  // Already filtered and renumbered by the engine: what arrives here is what
+  // the answer cited, numbered from one, matching the markers in the prose.
+  if (message.sources.length === 0) return null;
 
   return (
     <div className="mt-4 min-w-0">
       <p className="text-muted-foreground mb-2 text-xs font-medium">
-        {cited.length === 1 ? "The memory this stands on" : `${cited.length} memories this stands on`}
+        {message.sources.length === 1 ? "From this memory" : "From these memories"}
       </p>
       <ul className="grid min-w-0 gap-2 sm:grid-cols-2">
-        {cited.map((source) => (
+        {message.sources.map((source) => (
           <li key={source.uuid} className="min-w-0">
             <button
               className="border-border bg-background hover:border-input hover:bg-muted/40 group flex h-full w-full min-w-0 flex-col gap-1.5 rounded-lg border p-2.5 text-left transition-colors"
