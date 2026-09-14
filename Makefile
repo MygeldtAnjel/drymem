@@ -23,7 +23,10 @@ test:               ## Every suite: engine, control plane, cli, web
 migrate:            ## Apply the schema. Alembic is the single authority.
 	cd $(SERVER) && .venv/bin/alembic upgrade head
 
-types:              ## Regenerate packages/api-types from the server's OpenAPI schema
+# The *engine's* schema, not the whole API. Since the split (D40) identity,
+# people, projects, skills and audit live in Express, which has no OpenAPI
+# document — so this covers memories, the graph, ask, discover and distill.
+types:              ## Regenerate packages/api-types from the engine's OpenAPI schema
 	@DRYMEM_EXTRACTOR=fake uv --directory $(SERVER) run python -c \
 	  "import json; from drymem_server.api.app import create_app; print(json.dumps(create_app().openapi(), indent=2))" \
 	  > packages/api-types/openapi.json

@@ -4,323 +4,6 @@
  */
 
 export interface paths {
-    "/auth/bootstrap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Bootstrap State
-         * @description Unauthenticated on purpose: the sign-in page needs to know whether to
-         *     offer 'create your organisation' or 'sign in'.
-         */
-        get: operations["bootstrap_state_auth_bootstrap_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/signup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Signup
-         * @description Only while the server is empty. The first person owns the organisation.
-         */
-        post: operations["signup_auth_signup_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Sign In */
-        post: operations["sign_in_auth_login_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Sign Out */
-        post: operations["sign_out_auth_logout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/session": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Whoami */
-        get: operations["whoami_auth_session_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/password": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Change Password
-         * @description Set or change your own password. A user who has none yet (created by
-         *     `drymem-admin` before identity existed) may set one without a current.
-         */
-        post: operations["change_password_auth_password_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/invites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Pending Invites */
-        get: operations["pending_invites_auth_invites_get"];
-        put?: never;
-        /** Invite */
-        post: operations["invite_auth_invites_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/invites/{invite_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke Invite */
-        delete: operations["revoke_invite_auth_invites__invite_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/invites/{token}/public": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Invite Public
-         * @description What the invite page shows before the person has an account.
-         */
-        get: operations["invite_public_auth_invites__token__public_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/invites/{token}/accept": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Accept */
-        post: operations["accept_auth_invites__token__accept_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** My Sessions */
-        get: operations["my_sessions_auth_sessions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/sessions/{session_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke My Session */
-        delete: operations["revoke_my_session_auth_sessions__session_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/tokens": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** My Tokens */
-        get: operations["my_tokens_auth_tokens_get"];
-        put?: never;
-        /**
-         * New Token
-         * @description For CI and other machines. Shown once; `drymem login` is the human path.
-         */
-        post: operations["new_token_auth_tokens_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/tokens/{token_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke Token */
-        delete: operations["revoke_token_auth_tokens__token_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/device": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Device Start
-         * @description Step one of `drymem login`. Unauthenticated: the CLI has nothing yet.
-         */
-        post: operations["device_start_auth_device_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/device/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Device Approve
-         * @description Step two, in the browser, signed in.
-         */
-        post: operations["device_approve_auth_device_approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/device/token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Device Poll
-         * @description Step three: the CLI collects its token. Handed over exactly once.
-         */
-        post: operations["device_poll_auth_device_token_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/memories": {
         parameters: {
             query?: never;
@@ -486,27 +169,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/projects/{project_key}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Members */
-        get: operations["list_members_v1_projects__project_key__members_get"];
-        put?: never;
-        /**
-         * Add Member
-         * @description Add someone to a project. They see its team memories, never its private ones.
-         */
-        post: operations["add_member_v1_projects__project_key__members_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/skills/discover": {
         parameters: {
             query?: never;
@@ -547,23 +209,6 @@ export interface paths {
          *     automatically: a skill changes how every agent on the team behaves.
          */
         post: operations["distill_skill_v1_skills_distill_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Projects */
-        get: operations["list_projects_v1_projects_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -613,7 +258,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/users": {
+    "/v1/graph": {
         parameters: {
             query?: never;
             header?: never;
@@ -621,131 +266,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Users
-         * @description Everyone in this org, with counts only — never anyone's memories.
-         */
-        get: operations["list_users_v1_users_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/skills": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Skills
-         * @description Skills this project has published.
-         */
-        get: operations["list_skills_v1_skills_get"];
-        put?: never;
-        /**
-         * Publish Skill
-         * @description Publish a reviewed draft to the project. Publishing twice replaces it.
-         */
-        post: operations["publish_skill_v1_skills_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/skills/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Skill */
-        delete: operations["delete_skill_v1_skills__name__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Whoami
-         * @description Who this token belongs to. The UI needs it to say 'you' anywhere.
-         */
-        get: operations["whoami_v1_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Rename Me
-         * @description Set your display name. An empty name falls back to your email.
-         */
-        patch: operations["rename_me_v1_me_patch"];
-        trace?: never;
-    };
-    "/v1/projects/{project_key}/members/{email}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove Member
-         * @description Take someone off a project. Their own memories stay theirs and stay private.
-         */
-        delete: operations["remove_member_v1_projects__project_key__members__email__delete"];
-        options?: never;
-        head?: never;
-        /** Set Member Role */
-        patch: operations["set_member_role_v1_projects__project_key__members__email__patch"];
-        trace?: never;
-    };
-    "/v1/projects/{project_key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Rename Project
-         * @description Give a project a readable name.
+         * Project Graph
+         * @description The knowledge graph, as nodes and edges.
          *
-         *     Declared *after* the member routes on purpose: `project_key` is a `:path`
-         *     converter, so registered first it would greedily match
-         *     `/v1/projects/<key>/members/<email>` as a project named
-         *     "<key>/members/<email>". The key itself never changes — it is the normalised
-         *     git remote, and changing it would split the team's memory in two.
+         *     Restricted to the caller's readable groups, so a private memory is never a
+         *     node on somebody else's canvas. Layout belongs to the browser.
          */
-        patch: operations["rename_project_v1_projects__project_key__patch"];
+        get: operations["project_graph_v1_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
-    "/v1/overview": {
+    "/v1/graph/tree": {
         parameters: {
             query?: never;
             header?: never;
@@ -753,10 +289,55 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Project Overview
-         * @description Everything the dashboard opens with, in one round trip.
+         * Project Tree
+         * @description The decision tree: what was decided about each part of the codebase.
+         *
+         *     Restricted to the caller's readable groups, like the canvas beside it.
          */
-        get: operations["project_overview_v1_overview_get"];
+        get: operations["project_tree_v1_graph_tree_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Question
+         * @description Answer a question from this project's memories, with citations.
+         *
+         *     Every claim points at a memory or is not made. When nothing matches, the
+         *     answer says so rather than inventing one that reads like a fact.
+         */
+        post: operations["ask_question_v1_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/capture-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Capture Mode
+         * @description What the hooks should do at the end of a session. See PLAN.md D38.
+         */
+        get: operations["capture_mode_v1_capture_mode_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -789,27 +370,65 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AcceptRequest */
-        AcceptRequest: {
-            /** Password */
-            password: string;
+        /** AskRequest */
+        AskRequest: {
+            /** Project Key */
+            project_key: string;
+            /** Question */
+            question: string;
+        };
+        /** AskResponse */
+        AskResponse: {
+            /** Question */
+            question: string;
+            /** Answer */
+            answer: string;
+            /** Model */
+            model: string;
             /**
-             * Name
+             * Sources
+             * @default []
+             */
+            sources: components["schemas"]["AskSource"][];
+            /**
+             * Grounded
+             * @description False when nothing was found and no model was asked
+             * @default true
+             */
+            grounded: boolean;
+        };
+        /** AskSource */
+        AskSource: {
+            /** Index */
+            index: number;
+            /** Uuid */
+            uuid: string;
+            /** Title */
+            title: string;
+            /**
+             * Author
              * @default
              */
-            name: string;
-        };
-        /** BootstrapOut */
-        BootstrapOut: {
-            /** Needs Setup */
-            needs_setup: boolean;
-            /** Org Name */
-            org_name?: string | null;
+            author: string;
+            /** Created At */
+            created_at?: string | null;
             /**
-             * Smtp Enabled
-             * @default false
+             * Type
+             * @default note
              */
-            smtp_enabled: boolean;
+            type: string;
+            /**
+             * Scope
+             * @default private
+             */
+            scope: string;
+        };
+        /** CaptureModeResponse */
+        CaptureModeResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Capture Mode */
+            capture_mode: string;
         };
         /** ClusterOut */
         ClusterOut: {
@@ -836,50 +455,6 @@ export interface components {
             episode_uuid: string;
             /** Deleted */
             deleted: boolean;
-        };
-        /** DeviceApprove */
-        DeviceApprove: {
-            /** User Code */
-            user_code: string;
-        };
-        /** DevicePoll */
-        DevicePoll: {
-            /** Device Code */
-            device_code: string;
-        };
-        /** DevicePollOut */
-        DevicePollOut: {
-            /** Status */
-            status: string;
-            /** Token */
-            token?: string | null;
-        };
-        /** DeviceStart */
-        DeviceStart: {
-            /**
-             * Label
-             * @default
-             */
-            label: string;
-        };
-        /** DeviceStartOut */
-        DeviceStartOut: {
-            /** Device Code */
-            device_code: string;
-            /** User Code */
-            user_code: string;
-            /** Verification Url */
-            verification_url: string;
-            /**
-             * Expires In
-             * @default 900
-             */
-            expires_in: number;
-            /**
-             * Interval
-             * @default 3
-             */
-            interval: number;
         };
         /** DiscoverResponse */
         DiscoverResponse: {
@@ -990,6 +565,89 @@ export interface components {
             /** Query */
             query: string;
         };
+        /** GraphEdge */
+        GraphEdge: {
+            /** Id */
+            id: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+            /**
+             * Kind
+             * @description mentions or fact
+             */
+            kind: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Superseded
+             * @default false
+             */
+            superseded: boolean;
+        };
+        /** GraphNode */
+        GraphNode: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @description memory or entity
+             */
+            kind: string;
+            /** Label */
+            label: string;
+            /**
+             * Type
+             * @default
+             */
+            type: string;
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Mentions
+             * @default 0
+             */
+            mentions: number;
+        };
+        /** GraphResponse */
+        GraphResponse: {
+            /** Project Key */
+            project_key: string;
+            /**
+             * Nodes
+             * @default []
+             */
+            nodes: components["schemas"]["GraphNode"][];
+            /**
+             * Edges
+             * @default []
+             */
+            edges: components["schemas"]["GraphEdge"][];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /**
+             * Total Memories
+             * @default 0
+             */
+            total_memories: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1005,105 +663,6 @@ export interface components {
             neo4j: boolean;
             /** Extractor */
             extractor: string;
-        };
-        /** InviteOut */
-        InviteOut: {
-            /** Id */
-            id: string;
-            /** Email */
-            email: string;
-            /** Role */
-            role: string;
-            /** Project Key */
-            project_key?: string | null;
-            /** Invited By */
-            invited_by?: string | null;
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
-            /** Invite Url */
-            invite_url?: string | null;
-        };
-        /** InvitePublicOut */
-        InvitePublicOut: {
-            /** Email */
-            email: string;
-            /** Org Name */
-            org_name: string;
-            /** Project Key */
-            project_key?: string | null;
-            /** Invited By */
-            invited_by?: string | null;
-        };
-        /** InviteRequest */
-        InviteRequest: {
-            /** Email */
-            email: string;
-            /**
-             * Role
-             * @description member or admin
-             * @default member
-             */
-            role: string;
-            /**
-             * Project Key
-             * @description Also add them to this project
-             */
-            project_key?: string | null;
-        };
-        /** LoginRequest */
-        LoginRequest: {
-            /** Email */
-            email: string;
-            /** Password */
-            password: string;
-        };
-        /** MeOut */
-        MeOut: {
-            /** Id */
-            id: string;
-            /** Email */
-            email: string;
-            /** Name */
-            name?: string | null;
-            /** Org Id */
-            org_id: string;
-            /** Created At */
-            created_at?: string | null;
-        };
-        /** MemberOut */
-        MemberOut: {
-            /** User Id */
-            user_id: string;
-            /** Email */
-            email: string;
-            /** Role */
-            role: string;
-        };
-        /** MemberRequest */
-        MemberRequest: {
-            /**
-             * Email
-             * @description An existing user in this org
-             */
-            email: string;
-        };
-        /** MemberRoleRequest */
-        MemberRoleRequest: {
-            /**
-             * Role
-             * @description member or admin
-             */
-            role: string;
-        };
-        /** MembersResponse */
-        MembersResponse: {
-            /** Project Key */
-            project_key: string;
-            /** Members */
-            members: components["schemas"]["MemberOut"][];
         };
         /**
          * MemorySchemaResponse
@@ -1124,92 +683,6 @@ export interface components {
             /** Description */
             description: string;
         };
-        /** OverviewResponse */
-        OverviewResponse: {
-            /** Project Key */
-            project_key: string;
-            /**
-             * Memories
-             * @default 0
-             */
-            memories: number;
-            /**
-             * Shared
-             * @default 0
-             */
-            shared: number;
-            /**
-             * Sessions
-             * @default 0
-             */
-            sessions: number;
-            /**
-             * Members
-             * @default 0
-             */
-            members: number;
-            /**
-             * Skills
-             * @default 0
-             */
-            skills: number;
-            /**
-             * Positive
-             * @default 0
-             */
-            positive: number;
-            /**
-             * Negative
-             * @default 0
-             */
-            negative: number;
-            /**
-             * By Type
-             * @default {}
-             */
-            by_type: {
-                [key: string]: number;
-            };
-        };
-        /** PasswordRequest */
-        PasswordRequest: {
-            /**
-             * Current
-             * @default
-             */
-            current: string;
-            /** New */
-            new: string;
-        };
-        /** ProjectOut */
-        ProjectOut: {
-            /** Id */
-            id: string;
-            /** Project Key */
-            project_key: string;
-            /** Display Name */
-            display_name?: string | null;
-            /**
-             * Memory Count
-             * @default 0
-             */
-            memory_count: number;
-            /**
-             * Positive
-             * @default 0
-             */
-            positive: number;
-            /**
-             * Negative
-             * @default 0
-             */
-            negative: number;
-        };
-        /** ProjectsResponse */
-        ProjectsResponse: {
-            /** Projects */
-            projects: components["schemas"]["ProjectOut"][];
-        };
         /** PromoteResponse */
         PromoteResponse: {
             /** Episode Uuid */
@@ -1218,43 +691,6 @@ export interface components {
             scope: string;
             /** Promoted At */
             promoted_at?: string | null;
-        };
-        /** PublishSkillRequest */
-        PublishSkillRequest: {
-            /** Project Key */
-            project_key: string;
-            /** Name */
-            name: string;
-            /**
-             * Topic
-             * @default
-             */
-            topic: string;
-            /** Content */
-            content: string;
-            /** Model */
-            model?: string | null;
-            /**
-             * Memory Count
-             * @default 0
-             */
-            memory_count: number;
-        };
-        /** RenameMeRequest */
-        RenameMeRequest: {
-            /**
-             * Name
-             * @default
-             */
-            name: string;
-        };
-        /** RenameProjectRequest */
-        RenameProjectRequest: {
-            /**
-             * Display Name
-             * @default
-             */
-            display_name: string;
         };
         /** SaveMemoryRequest */
         SaveMemoryRequest: {
@@ -1327,190 +763,19 @@ export interface components {
             query: string;
             /** Project Key */
             project_key: string;
-            /** Results */
+            /**
+             * Memories
+             * @default []
+             */
+            memories: components["schemas"]["EpisodeOut"][];
+            /**
+             * Results
+             * @default []
+             */
             results: components["schemas"]["FactOut"][];
         };
-        /** SessionsResponse */
-        SessionsResponse: {
-            /** Project Key */
-            project_key: string;
-            /** Sessions */
-            sessions: components["schemas"]["drymem_server__api__schemas__SessionOut"][];
-        };
-        /** SignupRequest */
-        SignupRequest: {
-            /** Org Name */
-            org_name: string;
-            /** Email */
-            email: string;
-            /** Password */
-            password: string;
-            /**
-             * Name
-             * @default
-             */
-            name: string;
-        };
-        /** SkillOut */
-        SkillOut: {
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Topic */
-            topic: string;
-            /** Content */
-            content: string;
-            /** Author */
-            author: string;
-            /** Model */
-            model?: string | null;
-            /**
-             * Memory Count
-             * @default 0
-             */
-            memory_count: number;
-            /** Updated At */
-            updated_at?: string | null;
-        };
-        /** SkillsResponse */
-        SkillsResponse: {
-            /** Project Key */
-            project_key: string;
-            /** Skills */
-            skills: components["schemas"]["SkillOut"][];
-        };
-        /** TokenOut */
-        TokenOut: {
-            /** Id */
-            id: string;
-            /** Label */
-            label: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Last Used At */
-            last_used_at: string | null;
-            /** Token */
-            token?: string | null;
-        };
-        /** TokenRequest */
-        TokenRequest: {
-            /**
-             * Label
-             * @default
-             */
-            label: string;
-        };
-        /** TopicsResponse */
-        TopicsResponse: {
-            /** Project Key */
-            project_key: string;
-            /** Topic Keys */
-            topic_keys: string[];
-        };
-        /** UpdateMemoryRequest */
-        UpdateMemoryRequest: {
-            /** Project Key */
-            project_key: string;
-            /** Update Summary */
-            update_summary: string;
-            /**
-             * Replace
-             * @description Delete prior episodes for this topic first
-             * @default false
-             */
-            replace: boolean;
-            /**
-             * Tool
-             * @default claude-code
-             */
-            tool: string;
-            /**
-             * Type
-             * @default note
-             */
-            type: string;
-            /**
-             * Session Id
-             * @default
-             */
-            session_id: string;
-        };
-        /** UserOut */
-        UserOut: {
-            /** Id */
-            id: string;
-            /** Email */
-            email: string;
-            /** Name */
-            name?: string | null;
-            /**
-             * Memory Count
-             * @default 0
-             */
-            memory_count: number;
-            /**
-             * Project Count
-             * @default 0
-             */
-            project_count: number;
-            /** Created At */
-            created_at?: string | null;
-        };
-        /** UsersResponse */
-        UsersResponse: {
-            /** Users */
-            users: components["schemas"]["UserOut"][];
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
-        };
-        /** WebSessionOut */
-        WebSessionOut: {
-            /** Id */
-            id: string;
-            /** User Agent */
-            user_agent: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Last Seen At */
-            last_seen_at: string | null;
-            /** Current */
-            current: boolean;
-        };
         /** SessionOut */
-        drymem_server__api__auth_routes__SessionOut: {
-            /** Id */
-            id: string;
-            /** Email */
-            email: string;
-            /** Name */
-            name: string | null;
-            /** Role */
-            role: string;
-            /** Org Id */
-            org_id: string;
-            /** Org Name */
-            org_name: string;
-        };
-        /** SessionOut */
-        drymem_server__api__schemas__SessionOut: {
+        SessionOut: {
             /** Session Id */
             session_id: string;
             /** Author */
@@ -1544,6 +809,135 @@ export interface components {
              */
             synthetic: boolean;
         };
+        /** SessionsResponse */
+        SessionsResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Sessions */
+            sessions: components["schemas"]["SessionOut"][];
+        };
+        /** TopicsResponse */
+        TopicsResponse: {
+            /** Project Key */
+            project_key: string;
+            /** Topic Keys */
+            topic_keys: string[];
+        };
+        /** TreeArea */
+        TreeArea: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Decisions
+             * @default []
+             */
+            decisions: components["schemas"]["TreeDecision"][];
+            /**
+             * Children
+             * @default []
+             */
+            children: components["schemas"]["TreeArea"][];
+        };
+        /** TreeDecision */
+        TreeDecision: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @default
+             */
+            type: string;
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Gist
+             * @default
+             */
+            gist: string;
+            /**
+             * Paths
+             * @default []
+             */
+            paths: string[];
+            /** Superseded By */
+            superseded_by?: string | null;
+        };
+        /** TreeResponse */
+        TreeResponse: {
+            /** Project Key */
+            project_key: string;
+            root: components["schemas"]["TreeArea"];
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /**
+             * Total Memories
+             * @default 0
+             */
+            total_memories: number;
+            /**
+             * Unplaced
+             * @default 0
+             */
+            unplaced: number;
+        };
+        /** UpdateMemoryRequest */
+        UpdateMemoryRequest: {
+            /** Project Key */
+            project_key: string;
+            /** Update Summary */
+            update_summary: string;
+            /**
+             * Replace
+             * @description Delete prior episodes for this topic first
+             * @default false
+             */
+            replace: boolean;
+            /**
+             * Tool
+             * @default claude-code
+             */
+            tool: string;
+            /**
+             * Type
+             * @default note
+             */
+            type: string;
+            /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
+        };
     };
     responses: never;
     parameters: never;
@@ -1553,627 +947,14 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    bootstrap_state_auth_bootstrap_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BootstrapOut"];
-                };
-            };
-        };
-    };
-    signup_auth_signup_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    sign_in_auth_login_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    sign_out_auth_logout_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    whoami_auth_session_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    change_password_auth_password_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    pending_invites_auth_invites_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InviteOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    invite_auth_invites_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InviteRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InviteOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_invite_auth_invites__invite_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                invite_id: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    invite_public_auth_invites__token__public_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InvitePublicOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    accept_auth_invites__token__accept_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AcceptRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["drymem_server__api__auth_routes__SessionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    my_sessions_auth_sessions_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebSessionOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_my_session_auth_sessions__session_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                session_id: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    my_tokens_auth_tokens_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TokenOut"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    new_token_auth_tokens_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TokenRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TokenOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_token_auth_tokens__token_id__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                token_id: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    device_start_auth_device_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeviceStart"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeviceStartOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    device_approve_auth_device_approve_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeviceApprove"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    device_poll_auth_device_token_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DevicePoll"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DevicePollOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     save_memory_v1_memories_post: {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {
@@ -2205,14 +986,12 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path: {
                 topic_key: string;
             };
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {
@@ -2248,12 +1027,10 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2284,12 +1061,10 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2319,12 +1094,10 @@ export interface operations {
                 project_key: string;
             };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2352,14 +1125,12 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path: {
                 episode_uuid: string;
             };
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2387,14 +1158,12 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path: {
                 episode_uuid: string;
             };
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {
@@ -2426,14 +1195,12 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path: {
                 episode_uuid: string;
             };
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2457,80 +1224,6 @@ export interface operations {
             };
         };
     };
-    list_members_v1_projects__project_key__members_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                project_key: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MembersResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_member_v1_projects__project_key__members_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                project_key: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MemberRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MembersResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     discover_skills_v1_skills_discover_get: {
         parameters: {
             query: {
@@ -2538,12 +1231,10 @@ export interface operations {
                 min_memories?: number;
             };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2571,12 +1262,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody: {
             content: {
@@ -2604,49 +1293,14 @@ export interface operations {
             };
         };
     };
-    list_projects_v1_projects_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     memory_schema_v1_memories_schema_get: {
         parameters: {
             query?: never;
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2677,12 +1331,10 @@ export interface operations {
                 limit?: number;
             };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2706,16 +1358,23 @@ export interface operations {
             };
         };
     };
-    list_users_v1_users_get: {
+    project_graph_v1_graph_get: {
         parameters: {
-            query?: never;
+            query: {
+                project_key: string;
+                limit?: number;
+                /** @description Filter to these memory kinds */
+                kind?: string[];
+                /** @description Filter to one person's memories */
+                author?: string;
+                /** @description Drop subjects fewer than this many memories mention */
+                min_mentions?: number;
+            };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2725,7 +1384,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UsersResponse"];
+                    "application/json": components["schemas"]["GraphResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2739,18 +1398,87 @@ export interface operations {
             };
         };
     };
-    list_skills_v1_skills_get: {
+    project_tree_v1_graph_tree_get: {
+        parameters: {
+            query: {
+                project_key: string;
+                limit?: number;
+                /** @description Filter to these memory kinds */
+                kind?: string[];
+            };
+            header?: {
+                "x-drymem-principal"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TreeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_question_v1_ask_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-drymem-principal"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_mode_v1_capture_mode_get: {
         parameters: {
             query: {
                 project_key: string;
             };
             header?: {
-                authorization?: string | null;
+                "x-drymem-principal"?: string | null;
             };
             path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -2760,301 +1488,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SkillsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    publish_skill_v1_skills_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishSkillRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_skill_v1_skills__name__delete: {
-        parameters: {
-            query: {
-                project_key: string;
-            };
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                name: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeleteResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    whoami_v1_me_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MeOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rename_me_v1_me_patch: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RenameMeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MeOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_member_v1_projects__project_key__members__email__delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                project_key: string;
-                email: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MembersResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_member_role_v1_projects__project_key__members__email__patch: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                project_key: string;
-                email: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MemberRoleRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MembersResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rename_project_v1_projects__project_key__patch: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                project_key: string;
-            };
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RenameProjectRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProjectOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    project_overview_v1_overview_get: {
-        parameters: {
-            query: {
-                project_key: string;
-            };
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                drymem_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OverviewResponse"];
+                    "application/json": components["schemas"]["CaptureModeResponse"];
                 };
             };
             /** @description Validation Error */

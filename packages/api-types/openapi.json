@@ -2,1066 +2,10 @@
   "openapi": "3.1.0",
   "info": {
     "title": "drymem",
-    "description": "Shared long-term memory for AI coding agents.\n\nEvery memory belongs to a project, identified by its normalised git remote, and\nto the person who saved it. Memories are private until explicitly promoted.",
+    "description": "drymem's memory engine.\n\nThe knowledge graph, the extractor, the scrubber and the distiller. It is\nreached only through the control plane, which authenticates the caller and\npasses a signed assertion of who they are; nothing here faces the internet.",
     "version": "2.1.0"
   },
   "paths": {
-    "/auth/bootstrap": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Bootstrap State",
-        "description": "Unauthenticated on purpose: the sign-in page needs to know whether to\noffer 'create your organisation' or 'sign in'.",
-        "operationId": "bootstrap_state_auth_bootstrap_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BootstrapOut"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/signup": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Signup",
-        "description": "Only while the server is empty. The first person owns the organisation.",
-        "operationId": "signup_auth_signup_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SignupRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/drymem_server__api__auth_routes__SessionOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/login": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Sign In",
-        "operationId": "sign_in_auth_login_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/drymem_server__api__auth_routes__SessionOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/logout": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Sign Out",
-        "operationId": "sign_out_auth_logout_post",
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          }
-        }
-      }
-    },
-    "/auth/session": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Whoami",
-        "operationId": "whoami_auth_session_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/drymem_server__api__auth_routes__SessionOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/password": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Change Password",
-        "description": "Set or change your own password. A user who has none yet (created by\n`drymem-admin` before identity existed) may set one without a current.",
-        "operationId": "change_password_auth_password_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PasswordRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/invites": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Invite",
-        "operationId": "invite_auth_invites_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InviteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InviteOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Pending Invites",
-        "operationId": "pending_invites_auth_invites_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/InviteOut"
-                  },
-                  "title": "Response Pending Invites Auth Invites Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/invites/{invite_id}": {
-      "delete": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Revoke Invite",
-        "operationId": "revoke_invite_auth_invites__invite_id__delete",
-        "parameters": [
-          {
-            "name": "invite_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Invite Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/invites/{token}/public": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Invite Public",
-        "description": "What the invite page shows before the person has an account.",
-        "operationId": "invite_public_auth_invites__token__public_get",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Token"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InvitePublicOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/invites/{token}/accept": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Accept",
-        "operationId": "accept_auth_invites__token__accept_post",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Token"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AcceptRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/drymem_server__api__auth_routes__SessionOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/sessions": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "My Sessions",
-        "operationId": "my_sessions_auth_sessions_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/WebSessionOut"
-                  },
-                  "title": "Response My Sessions Auth Sessions Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/sessions/{session_id}": {
-      "delete": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Revoke My Session",
-        "operationId": "revoke_my_session_auth_sessions__session_id__delete",
-        "parameters": [
-          {
-            "name": "session_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Session Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/tokens": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "My Tokens",
-        "operationId": "my_tokens_auth_tokens_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/TokenOut"
-                  },
-                  "title": "Response My Tokens Auth Tokens Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "New Token",
-        "description": "For CI and other machines. Shown once; `drymem login` is the human path.",
-        "operationId": "new_token_auth_tokens_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/tokens/{token_id}": {
-      "delete": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Revoke Token",
-        "operationId": "revoke_token_auth_tokens__token_id__delete",
-        "parameters": [
-          {
-            "name": "token_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Token Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/device": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Device Start",
-        "description": "Step one of `drymem login`. Unauthenticated: the CLI has nothing yet.",
-        "operationId": "device_start_auth_device_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeviceStart"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceStartOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/device/approve": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Device Approve",
-        "description": "Step two, in the browser, signed in.",
-        "operationId": "device_approve_auth_device_approve_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeviceApprove"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/auth/device/token": {
-      "post": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Device Poll",
-        "description": "Step three: the CLI collects its token. Handed over exactly once.",
-        "operationId": "device_poll_auth_device_token_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DevicePoll"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DevicePollOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/memories": {
       "post": {
         "tags": [
@@ -1072,7 +16,7 @@
         "operationId": "save_memory_v1_memories_post",
         "parameters": [
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1084,23 +28,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1157,7 +85,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1169,23 +97,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1263,7 +175,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1275,23 +187,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1349,7 +245,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1361,23 +257,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1424,7 +304,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1436,23 +316,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1499,7 +363,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1511,23 +375,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1574,7 +422,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1586,23 +434,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1659,7 +491,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1671,23 +503,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1698,163 +514,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PromoteResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/projects/{project_key}/members": {
-      "get": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "List Members",
-        "operationId": "list_members_v1_projects__project_key__members_get",
-        "parameters": [
-          {
-            "name": "project_key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Key"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembersResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "Add Member",
-        "description": "Add someone to a project. They see its team memories, never its private ones.",
-        "operationId": "add_member_v1_projects__project_key__members_post",
-        "parameters": [
-          {
-            "name": "project_key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Key"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MemberRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembersResponse"
                 }
               }
             }
@@ -1903,7 +562,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1915,23 +574,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -1969,7 +612,7 @@
         "operationId": "distill_skill_v1_skills_distill_post",
         "parameters": [
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -1981,23 +624,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -2035,71 +662,6 @@
         }
       }
     },
-    "/v1/projects": {
-      "get": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "List Projects",
-        "operationId": "list_projects_v1_projects_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProjectsResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/memories/schema": {
       "get": {
         "tags": [
@@ -2110,7 +672,7 @@
         "operationId": "memory_schema_v1_memories_schema_get",
         "parameters": [
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -2122,23 +684,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -2197,7 +743,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -2209,23 +755,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -2253,17 +783,79 @@
         }
       }
     },
-    "/v1/users": {
+    "/v1/graph": {
       "get": {
         "tags": [
-          "users"
+          "graph"
         ],
-        "summary": "List Users",
-        "description": "Everyone in this org, with counts only \u2014 never anyone's memories.",
-        "operationId": "list_users_v1_users_get",
+        "summary": "Project Graph",
+        "description": "The knowledge graph, as nodes and edges.\n\nRestricted to the caller's readable groups, so a private memory is never a\nnode on somebody else's canvas. Layout belongs to the browser.",
+        "operationId": "project_graph_v1_graph_get",
         "parameters": [
           {
-            "name": "authorization",
+            "name": "project_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 400,
+              "minimum": 1,
+              "default": 120,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Filter to these memory kinds",
+              "default": [],
+              "title": "Kind"
+            },
+            "description": "Filter to these memory kinds"
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Filter to one person's memories",
+              "default": "",
+              "title": "Author"
+            },
+            "description": "Filter to one person's memories"
+          },
+          {
+            "name": "min_mentions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "description": "Drop subjects fewer than this many memories mention",
+              "default": 2,
+              "title": "Min Mentions"
+            },
+            "description": "Drop subjects fewer than this many memories mention"
+          },
+          {
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -2275,23 +867,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -2301,7 +877,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UsersResponse"
+                  "$ref": "#/components/schemas/GraphResponse"
                 }
               }
             }
@@ -2319,14 +895,14 @@
         }
       }
     },
-    "/v1/skills": {
+    "/v1/graph/tree": {
       "get": {
         "tags": [
-          "skills"
+          "graph"
         ],
-        "summary": "List Skills",
-        "description": "Skills this project has published.",
-        "operationId": "list_skills_v1_skills_get",
+        "summary": "Project Tree",
+        "description": "The decision tree: what was decided about each part of the codebase.\n\nRestricted to the caller's readable groups, like the canvas beside it.",
+        "operationId": "project_tree_v1_graph_tree_get",
         "parameters": [
           {
             "name": "project_key",
@@ -2338,7 +914,34 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Filter to these memory kinds",
+              "default": [],
+              "title": "Kind"
+            },
+            "description": "Filter to these memory kinds"
+          },
+          {
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -2350,23 +953,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -2376,7 +963,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SkillsResponse"
+                  "$ref": "#/components/schemas/TreeResponse"
                 }
               }
             }
@@ -2392,17 +979,19 @@
             }
           }
         }
-      },
+      }
+    },
+    "/v1/ask": {
       "post": {
         "tags": [
-          "skills"
+          "graph"
         ],
-        "summary": "Publish Skill",
-        "description": "Publish a reviewed draft to the project. Publishing twice replaces it.",
-        "operationId": "publish_skill_v1_skills_post",
+        "summary": "Ask Question",
+        "description": "Answer a question from this project's memories, with citations.\n\nEvery claim points at a memory or is not made. When nothing matches, the\nanswer says so rather than inventing one that reads like a fact.",
+        "operationId": "ask_question_v1_ask_post",
         "parameters": [
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -2414,23 +1003,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -2439,7 +1012,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PublishSkillRequest"
+                "$ref": "#/components/schemas/AskRequest"
               }
             }
           }
@@ -2450,7 +1023,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SkillOut"
+                  "$ref": "#/components/schemas/AskResponse"
                 }
               }
             }
@@ -2468,497 +1041,14 @@
         }
       }
     },
-    "/v1/skills/{name}": {
-      "delete": {
-        "tags": [
-          "skills"
-        ],
-        "summary": "Delete Skill",
-        "operationId": "delete_skill_v1_skills__name__delete",
-        "parameters": [
-          {
-            "name": "name",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Name"
-            }
-          },
-          {
-            "name": "project_key",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Key"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me": {
+    "/v1/capture-mode": {
       "get": {
         "tags": [
-          "users"
+          "memories"
         ],
-        "summary": "Whoami",
-        "description": "Who this token belongs to. The UI needs it to say 'you' anywhere.",
-        "operationId": "whoami_v1_me_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Rename Me",
-        "description": "Set your display name. An empty name falls back to your email.",
-        "operationId": "rename_me_v1_me_patch",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RenameMeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/projects/{project_key}/members/{email}": {
-      "patch": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "Set Member Role",
-        "operationId": "set_member_role_v1_projects__project_key__members__email__patch",
-        "parameters": [
-          {
-            "name": "project_key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Key"
-            }
-          },
-          {
-            "name": "email",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Email"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MemberRoleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembersResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "Remove Member",
-        "description": "Take someone off a project. Their own memories stay theirs and stay private.",
-        "operationId": "remove_member_v1_projects__project_key__members__email__delete",
-        "parameters": [
-          {
-            "name": "project_key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Key"
-            }
-          },
-          {
-            "name": "email",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Email"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembersResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/projects/{project_key}": {
-      "patch": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "Rename Project",
-        "description": "Give a project a readable name.\n\nDeclared *after* the member routes on purpose: `project_key` is a `:path`\nconverter, so registered first it would greedily match\n`/v1/projects/<key>/members/<email>` as a project named\n\"<key>/members/<email>\". The key itself never changes \u2014 it is the normalised\ngit remote, and changing it would split the team's memory in two.",
-        "operationId": "rename_project_v1_projects__project_key__patch",
-        "parameters": [
-          {
-            "name": "project_key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Project Key"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RenameProjectRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProjectOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/overview": {
-      "get": {
-        "tags": [
-          "projects"
-        ],
-        "summary": "Project Overview",
-        "description": "Everything the dashboard opens with, in one round trip.",
-        "operationId": "project_overview_v1_overview_get",
+        "summary": "Capture Mode",
+        "description": "What the hooks should do at the end of a session. See PLAN.md D38.",
+        "operationId": "capture_mode_v1_capture_mode_get",
         "parameters": [
           {
             "name": "project_key",
@@ -2970,7 +1060,7 @@
             }
           },
           {
-            "name": "authorization",
+            "name": "x-drymem-principal",
             "in": "header",
             "required": false,
             "schema": {
@@ -2982,23 +1072,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Authorization"
-            }
-          },
-          {
-            "name": "drymem_session",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Drymem Session"
+              "title": "X-Drymem-Principal"
             }
           }
         ],
@@ -3008,7 +1082,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OverviewResponse"
+                  "$ref": "#/components/schemas/CaptureModeResponse"
                 }
               }
             }
@@ -3051,55 +1125,130 @@
   },
   "components": {
     "schemas": {
-      "AcceptRequest": {
+      "AskRequest": {
         "properties": {
-          "password": {
+          "project_key": {
             "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Password"
+            "title": "Project Key"
           },
-          "name": {
+          "question": {
             "type": "string",
-            "maxLength": 200,
-            "title": "Name",
-            "default": ""
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Question"
           }
         },
         "type": "object",
         "required": [
-          "password"
+          "project_key",
+          "question"
         ],
-        "title": "AcceptRequest"
+        "title": "AskRequest"
       },
-      "BootstrapOut": {
+      "AskResponse": {
         "properties": {
-          "needs_setup": {
-            "type": "boolean",
-            "title": "Needs Setup"
+          "question": {
+            "type": "string",
+            "title": "Question"
           },
-          "org_name": {
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AskSource"
+            },
+            "type": "array",
+            "title": "Sources",
+            "default": []
+          },
+          "grounded": {
+            "type": "boolean",
+            "title": "Grounded",
+            "description": "False when nothing was found and no model was asked",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer",
+          "model"
+        ],
+        "title": "AskResponse"
+      },
+      "AskSource": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "uuid": {
+            "type": "string",
+            "title": "Uuid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "default": ""
+          },
+          "created_at": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Org Name"
+            "title": "Created At"
           },
-          "smtp_enabled": {
-            "type": "boolean",
-            "title": "Smtp Enabled",
-            "default": false
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "note"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": "private"
           }
         },
         "type": "object",
         "required": [
-          "needs_setup"
+          "index",
+          "uuid",
+          "title"
         ],
-        "title": "BootstrapOut"
+        "title": "AskSource"
+      },
+      "CaptureModeResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "capture_mode": {
+            "type": "string",
+            "title": "Capture Mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "capture_mode"
+        ],
+        "title": "CaptureModeResponse"
       },
       "ClusterOut": {
         "properties": {
@@ -3165,101 +1314,6 @@
           "deleted"
         ],
         "title": "DeleteResponse"
-      },
-      "DeviceApprove": {
-        "properties": {
-          "user_code": {
-            "type": "string",
-            "title": "User Code"
-          }
-        },
-        "type": "object",
-        "required": [
-          "user_code"
-        ],
-        "title": "DeviceApprove"
-      },
-      "DevicePoll": {
-        "properties": {
-          "device_code": {
-            "type": "string",
-            "title": "Device Code"
-          }
-        },
-        "type": "object",
-        "required": [
-          "device_code"
-        ],
-        "title": "DevicePoll"
-      },
-      "DevicePollOut": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Token"
-          }
-        },
-        "type": "object",
-        "required": [
-          "status"
-        ],
-        "title": "DevicePollOut"
-      },
-      "DeviceStart": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Label",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "DeviceStart"
-      },
-      "DeviceStartOut": {
-        "properties": {
-          "device_code": {
-            "type": "string",
-            "title": "Device Code"
-          },
-          "user_code": {
-            "type": "string",
-            "title": "User Code"
-          },
-          "verification_url": {
-            "type": "string",
-            "title": "Verification Url"
-          },
-          "expires_in": {
-            "type": "integer",
-            "title": "Expires In",
-            "default": 900
-          },
-          "interval": {
-            "type": "integer",
-            "title": "Interval",
-            "default": 3
-          }
-        },
-        "type": "object",
-        "required": [
-          "device_code",
-          "user_code",
-          "verification_url"
-        ],
-        "title": "DeviceStartOut"
       },
       "DiscoverResponse": {
         "properties": {
@@ -3508,6 +1562,140 @@
         ],
         "title": "FeedbackResponse"
       },
+      "GraphEdge": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "mentions or fact"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "default": ""
+          },
+          "superseded": {
+            "type": "boolean",
+            "title": "Superseded",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "target",
+          "kind"
+        ],
+        "title": "GraphEdge"
+      },
+      "GraphNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "memory or entity"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "default": ""
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "mentions": {
+            "type": "integer",
+            "title": "Mentions",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "title": "GraphNode"
+      },
+      "GraphResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "type": "array",
+            "title": "Nodes",
+            "default": []
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "type": "array",
+            "title": "Edges",
+            "default": []
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "total_memories": {
+            "type": "integer",
+            "title": "Total Memories",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key"
+        ],
+        "title": "GraphResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -3548,277 +1736,6 @@
           "extractor"
         ],
         "title": "HealthResponse"
-      },
-      "InviteOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role"
-          },
-          "project_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Key"
-          },
-          "invited_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Invited By"
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Expires At"
-          },
-          "invite_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Invite Url"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "email",
-          "role",
-          "expires_at"
-        ],
-        "title": "InviteOut"
-      },
-      "InvitePublicOut": {
-        "properties": {
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "org_name": {
-            "type": "string",
-            "title": "Org Name"
-          },
-          "project_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Key"
-          },
-          "invited_by": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Invited By"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email",
-          "org_name"
-        ],
-        "title": "InvitePublicOut"
-      },
-      "InviteRequest": {
-        "properties": {
-          "email": {
-            "type": "string",
-            "maxLength": 320,
-            "minLength": 3,
-            "title": "Email"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role",
-            "description": "member or admin",
-            "default": "member"
-          },
-          "project_key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project Key",
-            "description": "Also add them to this project"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email"
-        ],
-        "title": "InviteRequest"
-      },
-      "LoginRequest": {
-        "properties": {
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "password": {
-            "type": "string",
-            "title": "Password"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email",
-          "password"
-        ],
-        "title": "LoginRequest"
-      },
-      "MeOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "org_id": {
-            "type": "string",
-            "title": "Org Id"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "email",
-          "org_id"
-        ],
-        "title": "MeOut"
-      },
-      "MemberOut": {
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "title": "User Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role"
-          }
-        },
-        "type": "object",
-        "required": [
-          "user_id",
-          "email",
-          "role"
-        ],
-        "title": "MemberOut"
-      },
-      "MemberRequest": {
-        "properties": {
-          "email": {
-            "type": "string",
-            "title": "Email",
-            "description": "An existing user in this org"
-          }
-        },
-        "type": "object",
-        "required": [
-          "email"
-        ],
-        "title": "MemberRequest"
-      },
-      "MemberRoleRequest": {
-        "properties": {
-          "role": {
-            "type": "string",
-            "title": "Role",
-            "description": "member or admin"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role"
-        ],
-        "title": "MemberRoleRequest"
-      },
-      "MembersResponse": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "members": {
-            "items": {
-              "$ref": "#/components/schemas/MemberOut"
-            },
-            "type": "array",
-            "title": "Members"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key",
-          "members"
-        ],
-        "title": "MembersResponse"
       },
       "MemorySchemaResponse": {
         "properties": {
@@ -3868,142 +1785,6 @@
         ],
         "title": "MemoryTypeOut"
       },
-      "OverviewResponse": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "memories": {
-            "type": "integer",
-            "title": "Memories",
-            "default": 0
-          },
-          "shared": {
-            "type": "integer",
-            "title": "Shared",
-            "default": 0
-          },
-          "sessions": {
-            "type": "integer",
-            "title": "Sessions",
-            "default": 0
-          },
-          "members": {
-            "type": "integer",
-            "title": "Members",
-            "default": 0
-          },
-          "skills": {
-            "type": "integer",
-            "title": "Skills",
-            "default": 0
-          },
-          "positive": {
-            "type": "integer",
-            "title": "Positive",
-            "default": 0
-          },
-          "negative": {
-            "type": "integer",
-            "title": "Negative",
-            "default": 0
-          },
-          "by_type": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "By Type",
-            "default": {}
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key"
-        ],
-        "title": "OverviewResponse"
-      },
-      "PasswordRequest": {
-        "properties": {
-          "current": {
-            "type": "string",
-            "title": "Current",
-            "default": ""
-          },
-          "new": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "New"
-          }
-        },
-        "type": "object",
-        "required": [
-          "new"
-        ],
-        "title": "PasswordRequest"
-      },
-      "ProjectOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "display_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Display Name"
-          },
-          "memory_count": {
-            "type": "integer",
-            "title": "Memory Count",
-            "default": 0
-          },
-          "positive": {
-            "type": "integer",
-            "title": "Positive",
-            "default": 0
-          },
-          "negative": {
-            "type": "integer",
-            "title": "Negative",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "project_key"
-        ],
-        "title": "ProjectOut"
-      },
-      "ProjectsResponse": {
-        "properties": {
-          "projects": {
-            "items": {
-              "$ref": "#/components/schemas/ProjectOut"
-            },
-            "type": "array",
-            "title": "Projects"
-          }
-        },
-        "type": "object",
-        "required": [
-          "projects"
-        ],
-        "title": "ProjectsResponse"
-      },
       "PromoteResponse": {
         "properties": {
           "episode_uuid": {
@@ -4033,78 +1814,6 @@
           "scope"
         ],
         "title": "PromoteResponse"
-      },
-      "PublishSkillRequest": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "topic": {
-            "type": "string",
-            "maxLength": 300,
-            "title": "Topic",
-            "default": ""
-          },
-          "content": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Content"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "memory_count": {
-            "type": "integer",
-            "title": "Memory Count",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key",
-          "name",
-          "content"
-        ],
-        "title": "PublishSkillRequest"
-      },
-      "RenameMeRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Name",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "RenameMeRequest"
-      },
-      "RenameProjectRequest": {
-        "properties": {
-          "display_name": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Display Name",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "RenameProjectRequest"
       },
       "SaveMemoryRequest": {
         "properties": {
@@ -4222,490 +1931,31 @@
             "type": "string",
             "title": "Project Key"
           },
+          "memories": {
+            "items": {
+              "$ref": "#/components/schemas/EpisodeOut"
+            },
+            "type": "array",
+            "title": "Memories",
+            "default": []
+          },
           "results": {
             "items": {
               "$ref": "#/components/schemas/FactOut"
             },
             "type": "array",
-            "title": "Results"
+            "title": "Results",
+            "default": []
           }
         },
         "type": "object",
         "required": [
           "query",
-          "project_key",
-          "results"
+          "project_key"
         ],
         "title": "SearchResponse"
       },
-      "SessionsResponse": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "sessions": {
-            "items": {
-              "$ref": "#/components/schemas/drymem_server__api__schemas__SessionOut"
-            },
-            "type": "array",
-            "title": "Sessions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key",
-          "sessions"
-        ],
-        "title": "SessionsResponse"
-      },
-      "SignupRequest": {
-        "properties": {
-          "org_name": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Org Name"
-          },
-          "email": {
-            "type": "string",
-            "maxLength": 320,
-            "minLength": 3,
-            "title": "Email"
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "Password"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Name",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "org_name",
-          "email",
-          "password"
-        ],
-        "title": "SignupRequest"
-      },
-      "SkillOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "topic": {
-            "type": "string",
-            "title": "Topic"
-          },
-          "content": {
-            "type": "string",
-            "title": "Content"
-          },
-          "author": {
-            "type": "string",
-            "title": "Author"
-          },
-          "model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model"
-          },
-          "memory_count": {
-            "type": "integer",
-            "title": "Memory Count",
-            "default": 0
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name",
-          "topic",
-          "content",
-          "author"
-        ],
-        "title": "SkillOut"
-      },
-      "SkillsResponse": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "skills": {
-            "items": {
-              "$ref": "#/components/schemas/SkillOut"
-            },
-            "type": "array",
-            "title": "Skills"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key",
-          "skills"
-        ],
-        "title": "SkillsResponse"
-      },
-      "TokenOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Label"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "last_used_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Used At"
-          },
-          "token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Token"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label",
-          "created_at",
-          "last_used_at"
-        ],
-        "title": "TokenOut"
-      },
-      "TokenRequest": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "maxLength": 200,
-            "title": "Label",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "title": "TokenRequest"
-      },
-      "TopicsResponse": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "topic_keys": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Topic Keys"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key",
-          "topic_keys"
-        ],
-        "title": "TopicsResponse"
-      },
-      "UpdateMemoryRequest": {
-        "properties": {
-          "project_key": {
-            "type": "string",
-            "title": "Project Key"
-          },
-          "update_summary": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Update Summary"
-          },
-          "replace": {
-            "type": "boolean",
-            "title": "Replace",
-            "description": "Delete prior episodes for this topic first",
-            "default": false
-          },
-          "tool": {
-            "type": "string",
-            "title": "Tool",
-            "default": "claude-code"
-          },
-          "type": {
-            "type": "string",
-            "title": "Type",
-            "default": "note"
-          },
-          "session_id": {
-            "type": "string",
-            "title": "Session Id",
-            "default": ""
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_key",
-          "update_summary"
-        ],
-        "title": "UpdateMemoryRequest"
-      },
-      "UserOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "memory_count": {
-            "type": "integer",
-            "title": "Memory Count",
-            "default": 0
-          },
-          "project_count": {
-            "type": "integer",
-            "title": "Project Count",
-            "default": 0
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "email"
-        ],
-        "title": "UserOut"
-      },
-      "UsersResponse": {
-        "properties": {
-          "users": {
-            "items": {
-              "$ref": "#/components/schemas/UserOut"
-            },
-            "type": "array",
-            "title": "Users"
-          }
-        },
-        "type": "object",
-        "required": [
-          "users"
-        ],
-        "title": "UsersResponse"
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
-      },
-      "WebSessionOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "user_agent": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Agent"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "last_seen_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Seen At"
-          },
-          "current": {
-            "type": "boolean",
-            "title": "Current"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "user_agent",
-          "created_at",
-          "last_seen_at",
-          "current"
-        ],
-        "title": "WebSessionOut"
-      },
-      "drymem_server__api__auth_routes__SessionOut": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role"
-          },
-          "org_id": {
-            "type": "string",
-            "title": "Org Id"
-          },
-          "org_name": {
-            "type": "string",
-            "title": "Org Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "email",
-          "name",
-          "role",
-          "org_id",
-          "org_name"
-        ],
-        "title": "SessionOut"
-      },
-      "drymem_server__api__schemas__SessionOut": {
+      "SessionOut": {
         "properties": {
           "session_id": {
             "type": "string",
@@ -4758,6 +2008,263 @@
           "ended_at"
         ],
         "title": "SessionOut"
+      },
+      "SessionsResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionOut"
+            },
+            "type": "array",
+            "title": "Sessions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "sessions"
+        ],
+        "title": "SessionsResponse"
+      },
+      "TopicsResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "topic_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Topic Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "topic_keys"
+        ],
+        "title": "TopicsResponse"
+      },
+      "TreeArea": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/TreeDecision"
+            },
+            "type": "array",
+            "title": "Decisions",
+            "default": []
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/TreeArea"
+            },
+            "type": "array",
+            "title": "Children",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "TreeArea"
+      },
+      "TreeDecision": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": ""
+          },
+          "author": {
+            "type": "string",
+            "title": "Author",
+            "default": ""
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "gist": {
+            "type": "string",
+            "title": "Gist",
+            "default": ""
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "default": []
+          },
+          "superseded_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "TreeDecision"
+      },
+      "TreeResponse": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "root": {
+            "$ref": "#/components/schemas/TreeArea"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "total_memories": {
+            "type": "integer",
+            "title": "Total Memories",
+            "default": 0
+          },
+          "unplaced": {
+            "type": "integer",
+            "title": "Unplaced",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "root"
+        ],
+        "title": "TreeResponse"
+      },
+      "UpdateMemoryRequest": {
+        "properties": {
+          "project_key": {
+            "type": "string",
+            "title": "Project Key"
+          },
+          "update_summary": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Update Summary"
+          },
+          "replace": {
+            "type": "boolean",
+            "title": "Replace",
+            "description": "Delete prior episodes for this topic first",
+            "default": false
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool",
+            "default": "claude-code"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "note"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_key",
+          "update_summary"
+        ],
+        "title": "UpdateMemoryRequest"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }
