@@ -126,19 +126,29 @@ export function createServer(): McpServer {
     },
     async ({ project_path, query, num_results }) =>
       guard(async () => {
-        const facts = await client().search(
+        const { memories, facts } = await client().search(
           resolveProjectKey(project_path),
           query,
           num_results ?? 10,
         );
-        if (facts.length === 0) return text("No memories found.");
+        if (memories.length === 0 && facts.length === 0) {
+          return text("No memories found.");
+        }
 
-        const lines = facts.map(
-          (f) =>
-            `- (${f.name}) ${f.fact}  (${formatDate(f.created_at)})` +
-            (f.superseded ? " [superseded]" : ""),
+        // The agent gets the memories, which it can read and cite. The facts
+        // are appended as corroboration, not as the answer.
+        const lines = memories.map(
+          (m) =>
+            `- ${m.title || m.name} (${m.type}, ${m.author ?? "unknown"}, ` +
+            `${formatDate(m.created_at)}) [${m.uuid}]`,
         );
-        return text(`Found ${facts.length} result(s):\n${lines.join("\n")}`);
+        if (facts.length > 0) {
+          lines.push("", `Related facts (${facts.length}):`);
+          for (const f of facts.slice(0, 8)) {
+            lines.push(`  - ${f.fact}${f.superseded ? " [superseded]" : ""}`);
+          }
+        }
+        return text(`Found ${memories.length} memory(ies):\n${lines.join("\n")}`);
       }),
   );
 

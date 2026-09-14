@@ -62,7 +62,10 @@ class FactOut(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     project_key: str
-    results: list[FactOut]
+    # The memories that match. What a person searching actually wants.
+    memories: list[EpisodeOut] = []
+    # The facts the graph drew out of them, kept as supporting detail.
+    results: list[FactOut] = []
 
 
 class EpisodeOut(BaseModel):

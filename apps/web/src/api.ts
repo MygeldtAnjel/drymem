@@ -452,9 +452,23 @@ export const api = {
     return (await request<{ episodes: Episode[] }>(`/v1/memories/context?${q}`)).episodes;
   },
 
-  search: async (projectKey: string, query: string, limit = 25): Promise<Fact[]> => {
+  /**
+   * What matched, as memories first and facts second.
+   *
+   * Someone searching "lockfile" wants the memory that talks about it. The
+   * facts are what the graph concluded — useful beside the memories, useless
+   * on their own, because a fact is a dead end with nothing to open.
+   */
+  search: async (
+    projectKey: string,
+    query: string,
+    limit = 25,
+  ): Promise<{ memories: Episode[]; facts: Fact[] }> => {
     const q = new URLSearchParams({ project_key: projectKey, q: query, limit: String(limit) });
-    return (await request<{ results: Fact[] }>(`/v1/memories/search?${q}`)).results;
+    const data = await request<{ memories: Episode[]; results: Fact[] }>(
+      `/v1/memories/search?${q}`,
+    );
+    return { memories: data.memories ?? [], facts: data.results ?? [] };
   },
 
   rate: (uuid: string, rating: 1 | -1, query: string) =>

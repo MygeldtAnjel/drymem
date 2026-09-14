@@ -57,7 +57,8 @@ function fakeClient(overrides: Partial<Record<string, unknown>> = {}): FakeClien
   return {
     projects: vi.fn().mockResolvedValue([project]),
     context: vi.fn().mockResolvedValue([episode]),
-    search: vi.fn().mockResolvedValue([superseded]),
+    // `search` returns memories and facts now; the terminal UI reads the facts.
+    search: vi.fn().mockResolvedValue({ memories: [], facts: [superseded] }),
     delete: vi.fn().mockResolvedValue(true),
     rate: vi.fn().mockResolvedValue(undefined),
     promote: vi.fn().mockResolvedValue({ scope: "team" }),

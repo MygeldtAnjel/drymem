@@ -137,14 +137,35 @@ async def search_memories(
     q: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=100),
 ) -> SearchResponse:
+    entries = await service.search_entries(project_key=project_key, query=q, limit=limit)
     facts = await service.search(project_key=project_key, query=q, limit=limit)
     return SearchResponse(
         query=q,
         project_key=project_key,
+        memories=[_episode_out(e) for e in entries],
         results=[
             FactOut(name=f.name, fact=f.fact, created_at=f.created_at, superseded=f.superseded)
             for f in facts
         ],
+    )
+
+
+def _episode_out(entry) -> EpisodeOut:
+    """One memory, as the API shows it. Shared by context and search."""
+    meta = entry.episode.metadata
+    return EpisodeOut(
+        uuid=entry.episode.uuid,
+        name=entry.episode.name,
+        content=entry.episode.content,
+        created_at=entry.episode.created_at,
+        author=meta.author if meta else None,
+        scope=meta.scope if meta else "private",
+        title=entry.title or entry.episode.name,
+        type=entry.memory_type,
+        session_id=entry.session_id,
+        topic_key=entry.topic_key,
+        promoted_at=entry.promoted_at,
+        rating=entry.rating,
     )
 
 
@@ -157,23 +178,7 @@ async def memory_context(
     entries = await service.entries(project_key=project_key, limit=limit)
     return ContextResponse(
         project_key=project_key,
-        episodes=[
-            EpisodeOut(
-                uuid=entry.episode.uuid,
-                name=entry.episode.name,
-                content=entry.episode.content,
-                created_at=entry.episode.created_at,
-                author=entry.episode.metadata.author if entry.episode.metadata else None,
-                scope=entry.episode.metadata.scope if entry.episode.metadata else "private",
-                title=entry.title or entry.episode.name,
-                type=entry.memory_type,
-                session_id=entry.session_id,
-                topic_key=entry.topic_key,
-                promoted_at=entry.promoted_at,
-                rating=entry.rating,
-            )
-            for entry in entries
-        ],
+        episodes=[_episode_out(entry) for entry in entries],
     )
 
 

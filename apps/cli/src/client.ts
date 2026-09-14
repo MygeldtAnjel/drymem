@@ -266,11 +266,16 @@ export class DrymemClient {
     });
   }
 
-  async search(projectKey: string, q: string, limit = 10): Promise<Fact[]> {
-    const data = await this.request<{ results: Fact[] }>(
+  /** Memories first, then the facts drawn out of them. */
+  async search(
+    projectKey: string,
+    q: string,
+    limit = 10,
+  ): Promise<{ memories: EpisodeOut[]; facts: Fact[] }> {
+    const data = await this.request<{ memories: EpisodeOut[]; results: Fact[] }>(
       `/v1/memories/search?${this.query({ project_key: projectKey, q, limit })}`,
     );
-    return data.results;
+    return { memories: data.memories ?? [], facts: data.results ?? [] };
   }
 
   async context(projectKey: string, limit = 10): Promise<EpisodeOut[]> {

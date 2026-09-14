@@ -43,6 +43,16 @@ class InMemoryStore:
         self.saved_bodies: list[str] = []
         self.superseded: list[tuple[str, list[str]]] = []
 
+    async def search_episodes(self, *, query, group_ids, limit) -> list[Episode]:
+        """Substring over content, which is what the full-text index approximates."""
+        needle = query.strip().lower()
+        out: list[Episode] = []
+        for group in group_ids:
+            for episode in self.episodes.get(group, []):
+                if needle and needle in (episode.content or "").lower():
+                    out.append(episode)
+        return out[:limit]
+
     async def link_supersedes(self, *, newer: str, older: list[str]) -> int:
         kept = [o for o in older if o != newer]
         if kept:

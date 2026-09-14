@@ -557,6 +557,86 @@ class TestPromotion:
         assert rows[0].target == saved["episode_uuid"]
 
 
+class TestSearchReturnsMemories:
+    """Searching "lockfile" should find the memory that says lockfile.
+
+    It used to return only the *facts* the graph drew out of memories, which
+    for a loose query is thirty low-relevance statements and no way back to
+    anything you can read.
+    """
+
+    async def test_the_matching_memory_comes_back(self, client):
+        saved = (
+            await client.post(
+                "/v1/memories",
+                json={
+                    "project_key": PROJECT,
+                    "summary": "# Lockfile\n\nCommit .drymem/skills.lock so teammates get it.",
+                },
+                headers=auth(client),
+            )
+        ).json()
+
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=lockfile", headers=auth(client)
+        )
+
+        assert r.status_code == 200
+        uuids = [m["uuid"] for m in r.json()["memories"]]
+        assert saved["episode_uuid"] in uuids
+
+    async def test_a_memory_carries_what_the_list_needs(self, client):
+        await save(client, summary="# Retry cap\n\nThe backoff caps at 30 seconds.")
+
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=backoff", headers=auth(client)
+        )
+        memory = r.json()["memories"][0]
+
+        # The same shape `context` returns, so the list renders it identically.
+        for field in ("uuid", "title", "type", "author", "scope", "created_at"):
+            assert field in memory
+
+    async def test_a_word_nobody_wrote_finds_nothing(self, client):
+        await save(client)
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=zzzznothing", headers=auth(client)
+        )
+        assert r.json()["memories"] == []
+
+    async def test_another_org_cannot_search_this_one(self, client):
+        await save(client, summary="# Lockfile\n\nCommit the lockfile.")
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=lockfile",
+            headers=auth(client, "outsider"),
+        )
+        assert r.json()["memories"] == []
+
+
+class TestSearchIsNotRepetitive:
+    async def test_the_same_fact_is_listed_once(self, client, store):
+        # Extraction draws the same conclusion from several memories, and a
+        # promoted memory lives in two groups. One sentence came back three
+        # times, identically, with nothing to tell them apart.
+        from drymem_server.memory_store import Fact
+
+        same = "The source files live in the frontend components."
+        store.facts = [
+            Fact(name="LOCATED_IN", fact=same),
+            Fact(name="LOCATED_IN", fact=same),
+            Fact(name="LOCATED_IN", fact="  The source files live   in the frontend components. "),
+            Fact(name="OTHER", fact="Something else entirely."),
+        ]
+
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=components", headers=auth(client)
+        )
+        facts = [f["fact"] for f in r.json()["results"]]
+
+        assert len(facts) == len(set(facts))
+        assert len(facts) == 2
+
+
 class TestScrubberIsAudited:
     """D30: "has anyone pasted a credential this month?" from one screen."""
 

@@ -115,9 +115,35 @@ class MemoryStore(Protocol):
 
     async def search(self, *, query: str, group_ids: list[str], limit: int) -> list[Fact]: ...
 
+    async def search_episodes(
+        self, *, query: str, group_ids: list[str], limit: int
+    ) -> list[Episode]: ...
+
     async def recent(self, *, group_ids: list[str], limit: int) -> list[Episode]: ...
 
     async def delete(self, episode_id: str) -> None: ...
+
+
+# Lucene's own operators, which a person typing a path or a package name has no
+# idea they are using. `apps/api` and `foo:bar` are queries, not syntax.
+_LUCENE_SPECIAL = r'+-&|!(){}[]^"~*?:\\/'
+
+
+def _lucene_safe(query: str) -> str:
+    """Escape a person's words so the index reads them as words."""
+    out = []
+    for char in query.strip():
+        if char in _LUCENE_SPECIAL:
+            out.append("\\")
+        out.append(char)
+    return "".join(out)
+
+
+def _as_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    to_native = getattr(value, "to_native", None)
+    return to_native() if callable(to_native) else None
 
 
 @dataclass
@@ -213,6 +239,52 @@ class GraphitiMemoryStore:
                 invalid_at=getattr(edge, "invalid_at", None),
             )
             for edge in edges
+        ]
+
+    async def search_episodes(
+        self, *, query: str, group_ids: list[str], limit: int
+    ) -> list[Episode]:
+        """The memories that match, rather than the facts drawn out of them.
+
+        Someone searching "lockfile" wants the memory that talks about the
+        lockfile. The edge search answers a different question — it returns
+        what the graph *concluded*, which for a loose query is thirty
+        low-relevance statements with no way back to anything you can read.
+
+        Neo4j's own full-text index over episode content, which Graphiti
+        maintains anyway. Lucene syntax is escaped rather than passed through:
+        a person typing `apps/api` or `a:b` should get results, not a parser
+        error.
+        """
+        graphiti = await self._graphiti()
+        escaped = _lucene_safe(query)
+        if not escaped:
+            return []
+
+        records, _, _ = await graphiti.driver.execute_query(
+            """
+            CALL db.index.fulltext.queryNodes('episode_content', $query)
+            YIELD node, score
+            WITH node, score WHERE node.group_id IN $group_ids
+            RETURN node.uuid AS uuid, node.name AS name, node.content AS content,
+                   node.created_at AS created_at,
+                   node.source_description AS meta
+            ORDER BY score DESC
+            LIMIT $limit
+            """,
+            query=escaped,
+            group_ids=group_ids,
+            limit=limit,
+        )
+        return [
+            Episode(
+                uuid=r["uuid"],
+                name=r["name"] or "",
+                content=r["content"] or "",
+                created_at=_as_datetime(r["created_at"]),
+                metadata=Metadata.decode(r["meta"]),
+            )
+            for r in records
         ]
 
     async def recent(self, *, group_ids: list[str], limit: int) -> list[Episode]:

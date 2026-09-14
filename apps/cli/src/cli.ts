@@ -215,14 +215,26 @@ async function main(argv: string[]): Promise<number> {
     case "search": {
       const query = rest.join(" ").trim();
       if (!query) fail("Nothing to search for.");
-      const facts = await client.search(projectKey, query);
-      if (facts.length === 0) {
+      const { memories, facts } = await client.search(projectKey, query);
+      if (memories.length === 0 && facts.length === 0) {
         console.log("No memories found.");
         return 0;
       }
-      for (const fact of facts) {
-        const stale = fact.superseded ? " [superseded]" : "";
-        console.log(`- (${fact.name}) ${fact.fact}  (${when(fact.created_at)})${stale}`);
+
+      // The memories are the answer; the facts are corroboration. Printing the
+      // facts first was printing the footnotes before the paragraph.
+      for (const memory of memories) {
+        console.log(`  ${memory.title || memory.name}`);
+        console.log(
+          `    ${memory.type} · ${memory.author ?? "unknown"} · ${when(memory.created_at)} · ${memory.uuid}`,
+        );
+      }
+      if (facts.length > 0) {
+        console.log(`\n  ${facts.length} related fact(s):`);
+        for (const fact of facts.slice(0, 5)) {
+          const stale = fact.superseded ? " [superseded]" : "";
+          console.log(`    - ${fact.fact}${stale}`);
+        }
       }
       return 0;
     }

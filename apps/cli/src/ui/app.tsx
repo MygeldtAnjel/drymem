@@ -57,8 +57,10 @@ export function App({ client, projectKey, onState }: AppProps) {
             return;
           }
           case "search": {
-            const facts = await client.search(effect.projectKey || projectKey, effect.query, 25);
-            dispatch({ type: "facts", facts, query: effect.query });
+            // The terminal UI still shows facts; its list view is the memory
+            // browser beside it, so the two halves stay distinct there.
+            const found = await client.search(effect.projectKey || projectKey, effect.query, 25);
+            dispatch({ type: "facts", facts: found.facts, query: effect.query });
             return;
           }
           case "rate": {

@@ -179,6 +179,7 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const [auditLoading, setAuditLoading] = useState(false);
 
   const [facts, setFacts] = useState<Fact[] | null>(null);
+  const [hits, setHits] = useState<Episode[] | null>(null);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -272,6 +273,7 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
 
   useEffect(() => {
     setFacts(null);
+    setHits(null);
     setDrafts({});
     void load(active);
   }, [active, load]);
@@ -321,7 +323,9 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     if (!trimmed) return;
     setSearching(true);
     try {
-      setFacts(await api.search(active, trimmed, 30));
+      const found = await api.search(active, trimmed, 30);
+      setHits(found.memories);
+      setFacts(found.facts);
     } catch (e) {
       fail(e, "Search");
     } finally {
@@ -599,13 +603,17 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         members={members}
         projects={projects}
         facts={facts}
+        hits={hits}
         query={query}
         searching={searching}
         drafts={drafts}
         drafting={drafting}
         setQuery={setQuery}
         onSearch={search}
-        onClearSearch={() => setFacts(null)}
+        onClearSearch={() => {
+          setFacts(null);
+          setHits(null);
+        }}
         onRate={rate}
         onPromote={promote}
         onDelete={remove}
@@ -664,6 +672,7 @@ function Screen(props: {
   members: Member[];
   projects: Project[];
   facts: Fact[] | null;
+  hits: Episode[] | null;
   query: string;
   searching: boolean;
   drafts: Record<string, Draft>;
@@ -723,6 +732,7 @@ function Screen(props: {
           episodes={props.episodes}
           loading={props.loading}
           facts={props.facts}
+          hits={props.hits}
           searching={props.searching}
           query={props.query}
           onQuery={props.setQuery}

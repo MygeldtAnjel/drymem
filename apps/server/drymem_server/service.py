@@ -297,9 +297,38 @@ class MemoryService:
         )
 
     async def search(self, *, project_key: str, query: str, limit: int) -> list[Fact]:
-        return await self.store.search(
+        """Facts matching a query, each one listed once.
+
+        Extraction draws the same conclusion from several memories, and
+        promotion copies an episode into the team group — so one sentence came
+        back three times, identically, with nothing to tell the copies apart.
+        Deduplicating here rather than in the store keeps every store honest
+        about it, including the one the tests use.
+        """
+        facts = await self.store.search(
             query=query, group_ids=await self.readable_groups(project_key), limit=limit
         )
+
+        seen: set[str] = set()
+        out: list[Fact] = []
+        for fact in facts:
+            key = " ".join((fact.fact or "").lower().split())
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(fact)
+        return out
+
+    async def search_memories(self, *, project_key: str, query: str, limit: int) -> list[Episode]:
+        """The memories that match, deduplicated the way `context` is.
+
+        Promotion copies an episode into the team group, so the author reads
+        both and a shared memory would come back twice.
+        """
+        found = await self.store.search_episodes(
+            query=query, group_ids=await self.readable_groups(project_key), limit=limit * 2
+        )
+        return self._dedupe(found)[:limit]
 
     async def context(self, *, project_key: str, limit: int) -> list[Episode]:
         """Recent memories, team first, each appearing once.
@@ -315,24 +344,37 @@ class MemoryService:
             group_ids=await self.readable_groups(project_key), limit=limit * 2
         )
 
-        # Same name and same text is the same memory. The team copy wins,
-        # because "shared" is the more useful of the two things to be told.
-        by_identity: dict[tuple[str, str], Episode] = {}
-        for episode in episodes:
-            key = (episode.name, episode.content)
-            current = by_identity.get(key)
-            shared = episode.metadata is not None and episode.metadata.scope == SCOPE_TEAM
-            if current is None or (shared and not self._is_shared(current)):
-                by_identity[key] = episode
-
         unique = sorted(
-            by_identity.values(),
+            self._dedupe(episodes),
             key=lambda e: e.created_at or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         shared = [e for e in unique if self._is_shared(e)]
         own = [e for e in unique if not self._is_shared(e)]
         return (shared + own)[:limit]
+
+    def _dedupe(self, episodes: list[Episode]) -> list[Episode]:
+        """One entry per memory, in the order they arrived.
+
+        Same name and same text is the same memory: promotion copies an episode
+        into the team group, so the author reads both. The team copy wins,
+        because "shared" is the more useful of the two things to be told.
+
+        Order is preserved rather than imposed — `context` wants newest first,
+        search wants best match first, and only the caller knows which.
+        """
+        by_identity: dict[tuple[str, str], Episode] = {}
+        order: list[tuple[str, str]] = []
+        for episode in episodes:
+            key = (episode.name, episode.content)
+            current = by_identity.get(key)
+            shared = episode.metadata is not None and episode.metadata.scope == SCOPE_TEAM
+            if current is None:
+                order.append(key)
+                by_identity[key] = episode
+            elif shared and not self._is_shared(current):
+                by_identity[key] = episode
+        return [by_identity[key] for key in order]
 
     @staticmethod
     def _is_shared(episode: Episode) -> bool:
@@ -345,7 +387,15 @@ class MemoryService:
         list view is the most-hit read in the product and N+1 on it is the
         difference between instant and noticeable.
         """
-        episodes = await self.context(project_key=project_key, limit=limit)
+        return await self._entries_for(await self.context(project_key=project_key, limit=limit))
+
+    async def search_entries(self, *, project_key: str, query: str, limit: int) -> list[Entry]:
+        """Memories matching a query, best match first, with their index rows."""
+        return await self._entries_for(
+            await self.search_memories(project_key=project_key, query=query, limit=limit)
+        )
+
+    async def _entries_for(self, episodes: list[Episode]) -> list[Entry]:
         if not episodes:
             return []
 

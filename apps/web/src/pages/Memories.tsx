@@ -4,7 +4,7 @@
  * The list is filterable by kind and by whether it is shared, because the
  * question people actually arrive with is "what did we decide about X", not
  * "show me everything". Search is separate and deliberately labelled: it
- * searches *facts* drawn from memories, not the memories themselves, and
+ * searches memories, with the facts the graph drew out of them underneath, and
  * conflating the two would make the results look broken.
  */
 
@@ -43,6 +43,7 @@ export function MemoriesPage({
   episodes,
   loading,
   facts,
+  hits,
   searching,
   query,
   onQuery,
@@ -52,6 +53,7 @@ export function MemoriesPage({
   episodes: Episode[];
   loading: boolean;
   facts: Fact[] | null;
+  hits: Episode[] | null;
   searching: boolean;
   query: string;
   onQuery: (value: string) => void;
@@ -90,7 +92,7 @@ export function MemoriesPage({
             className="pl-8"
             value={query}
             onChange={(e) => onQuery(e.target.value)}
-            placeholder="Search facts — one or two short words, like “auth”"
+            placeholder="Search this project — one or two short words, like “auth”"
             aria-label="Search the knowledge graph"
             spellCheck={false}
           />
@@ -98,15 +100,15 @@ export function MemoriesPage({
         <Button type="submit" disabled={!query.trim() || searching}>
           {searching ? "Searching…" : "Search"}
         </Button>
-        {facts && (
+        {hits && (
           <Button type="button" variant="ghost" onClick={onClearSearch}>
             Clear
           </Button>
         )}
       </form>
 
-      {facts ? (
-        <FactResults facts={facts} query={query} />
+      {hits ? (
+        <SearchResults hits={hits} facts={facts ?? []} query={query} />
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
@@ -143,30 +145,7 @@ export function MemoriesPage({
             ) : (
               <ul className="flex flex-col">
                 {shown.map((episode) => (
-                  <li key={episode.uuid} className="border-t first:border-t-0">
-                    <button
-                      className="flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                      onClick={() => go("memories", episode.uuid)}
-                    >
-                      <span className="flex flex-wrap items-center gap-2">
-                        <TypeChip type={episode.type} />
-                        <span className="min-w-0 flex-1 truncate font-medium">
-                          {episode.title || episode.name}
-                        </span>
-                        <ScopeChip scope={episode.scope} />
-                        <RatingChip rating={episode.rating} />
-                      </span>
-                      <span className="line-clamp-2 text-sm text-muted-foreground">
-                        {firstLine(episode.content, 180)}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {episode.author ?? "unknown"} · {relative(episode.created_at)}
-                        {episode.topic_key && (
-                          <span className="font-mono"> · {episode.topic_key}</span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
+                  <MemoryRow key={episode.uuid} episode={episode} />
                 ))}
               </ul>
             )}
@@ -177,40 +156,105 @@ export function MemoriesPage({
   );
 }
 
-function FactResults({ facts, query }: { facts: Fact[]; query: string }) {
+/** One memory in a list. The same row whether you browsed to it or searched. */
+function MemoryRow({ episode }: { episode: Episode }) {
   return (
-    <Card className="overflow-hidden p-0">
-      <CardHeader className="border-b p-4">
-        <CardTitle className="text-sm">
-          {facts.length} {facts.length === 1 ? "fact" : "facts"} about “{query}”
-        </CardTitle>
-        <CardDescription>
-          These are facts the graph drew out of your memories, not the memories themselves.
-        </CardDescription>
-      </CardHeader>
-      {facts.length === 0 ? (
-        <Blank icon={SearchIcon} title="Nothing found">
-          Shorter keywords work better — “auth”, not “authentication setup”.
-        </Blank>
-      ) : (
-        <ul className="flex flex-col">
-          {facts.map((fact, i) => (
-            <li key={`${fact.name}-${i}`} className="flex flex-col gap-1.5 border-t px-4 py-3">
-              <p className="text-sm">{fact.fact}</p>
-              <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-mono">{fact.name}</span>
-                <span>· {relative(fact.created_at)}</span>
-                {fact.superseded && (
-                  <Badge variant="outline" className="text-destructive">
-                    <Ban /> Superseded
-                  </Badge>
-                )}
-              </p>
-            </li>
-          ))}
-        </ul>
+    <li className="border-t first:border-t-0">
+      <button
+        className="hover:bg-muted/40 flex w-full flex-col gap-1.5 px-4 py-3 text-left transition-colors"
+        onClick={() => go("memories", episode.uuid)}
+      >
+        <span className="flex flex-wrap items-center gap-2">
+          <TypeChip type={episode.type} />
+          <span className="min-w-0 flex-1 truncate font-medium">
+            {episode.title || episode.name}
+          </span>
+          <ScopeChip scope={episode.scope} />
+          <RatingChip rating={episode.rating} />
+        </span>
+        <span className="text-muted-foreground line-clamp-2 text-sm">
+          {firstLine(episode.content, 180)}
+        </span>
+        <span className="text-muted-foreground truncate text-xs">
+          {episode.author ?? "unknown"} · {relative(episode.created_at)}
+          {episode.topic_key && <span className="font-mono"> · {episode.topic_key}</span>}
+        </span>
+      </button>
+    </li>
+  );
+}
+
+/**
+ * What a search found.
+ *
+ * Memories first, because that is what somebody looking for "the lockfile
+ * decision" wants — something they can open and read. The facts the graph drew
+ * out of them sit underneath, collapsed: useful as corroboration, useless on
+ * their own, since a fact has nothing behind it to click.
+ */
+function SearchResults({
+  hits,
+  facts,
+  query,
+}: {
+  hits: Episode[];
+  facts: Fact[];
+  query: string;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="overflow-hidden p-0">
+        <CardHeader className="border-b p-4">
+          <CardTitle className="text-sm">
+            {hits.length} {hits.length === 1 ? "memory" : "memories"} about “{query}”
+          </CardTitle>
+          <CardDescription>Best match first. Click one to read it.</CardDescription>
+        </CardHeader>
+        {hits.length === 0 ? (
+          <Blank icon={SearchIcon} title="Nothing found">
+            Shorter keywords work better — “auth”, not “authentication setup”.
+          </Blank>
+        ) : (
+          <ul className="flex flex-col">
+            {hits.map((episode) => (
+              <MemoryRow key={episode.uuid} episode={episode} />
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {facts.length > 0 && (
+        <Card className="overflow-hidden p-0">
+          <details>
+            <summary className="hover:bg-muted/40 cursor-pointer px-4 py-3 text-sm">
+              <span className="font-medium">
+                {facts.length} related {facts.length === 1 ? "fact" : "facts"}
+              </span>
+              <span className="text-muted-foreground">
+                {" "}
+                — what the graph concluded from these memories
+              </span>
+            </summary>
+            <ul className="flex flex-col">
+              {facts.map((fact, i) => (
+                <li key={`${fact.name}-${i}`} className="flex flex-col gap-1.5 border-t px-4 py-3">
+                  <p className="text-sm">{fact.fact}</p>
+                  <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-mono">{fact.name}</span>
+                    <span>· {relative(fact.created_at)}</span>
+                    {fact.superseded && (
+                      <Badge variant="outline" className="text-destructive">
+                        <Ban /> Superseded
+                      </Badge>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </Card>
       )}
-    </Card>
+    </div>
   );
 }
 
