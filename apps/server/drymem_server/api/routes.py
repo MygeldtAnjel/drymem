@@ -417,7 +417,11 @@ async def ask_question(body: AskRequest, service: ServiceDep) -> AskResponse:
     Every claim points at a memory or is not made. When nothing matches, the
     answer says so rather than inventing one that reads like a fact.
     """
-    result = await service.ask(project_key=body.project_key, question=body.question)
+    result = await service.ask(
+        project_key=body.project_key,
+        question=body.question,
+        history=[t.model_dump() for t in body.history],
+    )
     return AskResponse(
         question=result.question,
         answer=result.text,

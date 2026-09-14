@@ -763,7 +763,9 @@ class MemoryService:
                     node.label = titles.get(node.id) or node.label
         return view
 
-    async def ask(self, *, project_key: str, question: str, limit: int = 6):
+    async def ask(
+        self, *, project_key: str, question: str, limit: int = 6, history: list[dict] | None = None
+    ):
         """Answer from this project's memories, with citations.
 
         Retrieval is two passes because the two halves fail differently: the
@@ -776,14 +778,28 @@ class MemoryService:
 
         entries = await self.entries(project_key=project_key, limit=40)
         if not entries:
-            return await ask_module.answer(question=question, sources=[], bodies={})
+            return await ask_module.answer(
+                question=question, sources=[], bodies={}, history=history
+            )
 
-        facts = await self.search(project_key=project_key, query=question, limit=10)
+        # Retrieval reads the last question too.
+        #
+        # "And why?" has no searchable word in it. On its own it retrieved
+        # nothing and the answer — correctly, and uselessly — said the memories
+        # did not cover it. Folding in the previous question is what makes a
+        # follow-up a follow-up. The *model* still answers the new question; this
+        # only decides what it is shown.
+        previous = next(
+            (t["content"] for t in reversed(history or []) if t.get("role") == "user"), ""
+        )
+        retrieval = f"{previous} {question}".strip() if previous else question
+
+        facts = await self.search(project_key=project_key, query=retrieval, limit=10)
         # `Fact.name` is the episode's name, which is how a hit points back at
         # the memory it came from.
         named = {f.name for f in facts}
 
-        words = {w for w in question.lower().split() if len(w) > 3}
+        words = {w for w in retrieval.lower().split() if len(w) > 3}
 
         def score(entry) -> tuple[int, int]:
             episode = entry.episode
@@ -811,7 +827,9 @@ class MemoryService:
             for i, entry in enumerate(picked, start=1)
         ]
         bodies = {e.episode.uuid: e.episode.content for e in picked}
-        return await ask_module.answer(question=question, sources=sources, bodies=bodies)
+        return await ask_module.answer(
+            question=question, sources=sources, bodies=bodies, history=history
+        )
 
     async def capture_mode(self, *, project_key: str) -> str:
         """How this project wants sessions captured. See PLAN.md D38."""

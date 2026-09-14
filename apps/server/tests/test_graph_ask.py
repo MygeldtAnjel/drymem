@@ -42,8 +42,10 @@ def no_model(monkeypatch):
     """
     from drymem_server import ask as ask_module
 
-    async def fake(prompt: str) -> tuple[str, str]:
-        return f"ANSWERED FROM:\n{prompt}", "fake-model"
+    async def fake(prompt: str, turns: list[dict] | None = None) -> tuple[str, str]:
+        # The turns are echoed too, so a test can assert what the model saw.
+        seen = "".join(f"\nTURN {t['role']}: {t['content']}" for t in turns or [])
+        return f"ANSWERED FROM:\n{prompt}{seen}", "fake-model"
 
     monkeypatch.setattr(ask_module, "_answer_with_local", fake)
     monkeypatch.setattr(ask_module.settings, "anthropic_api_key", None)
@@ -192,7 +194,7 @@ async def test_an_empty_model_response_is_reported_rather_than_shown(client, mon
     """A blank answer reads as 'your team never wrote this down'. It is not."""
     from drymem_server import ask as ask_module
 
-    async def silent(prompt: str) -> tuple[str, str]:
+    async def silent(prompt: str, turns: list[dict] | None = None) -> tuple[str, str]:
         return "   ", "fake-model"
 
     monkeypatch.setattr(ask_module, "_answer_with_local", silent)
@@ -286,3 +288,97 @@ async def test_graph_min_mentions_is_bounded(client):
     )
     assert too_low.status_code == 422
     assert too_high.status_code == 422
+
+
+async def test_earlier_turns_reach_the_model(client, no_model):
+    """"And why?" only means something if the model saw the question before it."""
+    await save(client, summary="Retries cap at 30 seconds.", topic="pay/retry")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={
+                "project_key": PROJECT,
+                "question": "And why?",
+                "history": [
+                    {"role": "user", "content": "What is the retry cap?"},
+                    {"role": "assistant", "content": "Thirty seconds [1]."},
+                ],
+            },
+            headers=auth(client),
+        )
+    ).json()
+
+    assert "TURN user: What is the retry cap?" in body["answer"]
+    assert "TURN assistant: Thirty seconds." in body["answer"]
+
+
+async def test_an_earlier_answers_citations_do_not_reach_the_model(client, no_model):
+    """Its `[1]` meant that turn's memories, and would collide with this one's."""
+    await save(client, summary="Retries cap at 30 seconds.", topic="pay/retry")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={
+                "project_key": PROJECT,
+                "question": "And why?",
+                "history": [{"role": "assistant", "content": "Ana decided it [2] on Tuesday [3]."}],
+            },
+            headers=auth(client),
+        )
+    ).json()
+
+    turn = next(l for l in body["answer"].splitlines() if l.startswith("TURN assistant:"))
+    assert "[2]" not in turn and "[3]" not in turn
+    assert "Ana decided it" in turn
+
+
+async def test_no_history_is_the_normal_case(client, no_model):
+    await save(client, summary="Retries cap at 30 seconds.", topic="pay/retry")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={"project_key": PROJECT, "question": "What is the retry cap?"},
+            headers=auth(client),
+        )
+    ).json()
+
+    assert "TURN" not in body["answer"]
+    assert body["grounded"] is True
+
+
+async def test_a_follow_up_retrieves_on_the_subject_of_the_last_question(client, no_model):
+    """"And why?" has no searchable word in it."""
+    await save(client, summary="The retry cap is thirty seconds.", topic="pay/retry")
+    await save(client, summary="Invoices are generated nightly.", topic="billing/invoices")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={
+                "project_key": PROJECT,
+                "question": "And why?",
+                "history": [{"role": "user", "content": "What is the retry cap?"}],
+            },
+            headers=auth(client),
+        )
+    ).json()
+
+    # The fake model echoes the prompt, so the chosen memories are visible.
+    assert "retry cap is thirty seconds" in body["answer"]
+
+
+async def test_a_first_question_retrieves_on_itself_alone(client, no_model):
+    await save(client, summary="The retry cap is thirty seconds.", topic="pay/retry")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={"project_key": PROJECT, "question": "What is the retry cap?"},
+            headers=auth(client),
+        )
+    ).json()
+
+    assert "retry cap is thirty seconds" in body["answer"]

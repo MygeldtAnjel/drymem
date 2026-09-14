@@ -46,6 +46,7 @@ import { MembersPage } from "@/pages/Members";
 import { OverviewPage } from "@/pages/Overview";
 import { ProjectsPage } from "@/pages/Projects";
 import { SessionsPage } from "@/pages/Sessions";
+import { ChatPage } from "@/pages/Chat";
 import { GraphPage } from "@/pages/Graph";
 import { SkillsPage, type Draft } from "@/pages/Skills";
 import { SkillPage } from "@/pages/Skill";
@@ -65,9 +66,13 @@ const TITLES: Record<string, { title: string; description?: string }> = {
     title: "Memories",
     description: "Everything your agents have written down, newest first.",
   },
+  chat: {
+    title: "Chat",
+    description: "Ask this project anything. Every claim points at a memory you can open.",
+  },
   graph: {
     title: "Decisions",
-    description: "Ask a question, or walk what was decided and where it landed.",
+    description: "What was decided, and where it landed.",
   },
   audit: {
     title: "Audit",
@@ -710,6 +715,8 @@ function Screen(props: {
           onClearSearch={props.onClearSearch}
         />
       );
+    case "chat":
+      return <ChatPage projectKey={props.active} />;
     case "graph":
       return (
         <GraphPage projectKey={props.active} />

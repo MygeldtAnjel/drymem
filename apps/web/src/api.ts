@@ -78,6 +78,32 @@ export interface Member {
   role: string;
 }
 
+export interface ChatSource {
+  index: number;
+  uuid: string;
+  title: string;
+  author: string;
+  type: string;
+  created_at: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources: ChatSource[];
+  grounded: boolean;
+  model: string;
+  created_at: string | null;
+}
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+  messages: number;
+}
+
 export interface TreeDecision {
   id: string;
   title: string;
@@ -470,6 +496,25 @@ export const api = {
   },
 
   usage: () => request<Usage>("/v1/usage"),
+
+  /** Conversations with this project's memory. Private to whoever asked. */
+  chats: async (projectKey: string): Promise<ChatSummary[]> =>
+    (
+      await request<{ chats: ChatSummary[] }>(
+        `/v1/chats?${new URLSearchParams({ project_key: projectKey })}`,
+      )
+    ).chats,
+
+  chat: (id: string) =>
+    request<{ id: string; title: string; messages: ChatMessage[] }>(`/v1/chats/${id}`),
+
+  deleteChat: (id: string) => request<void>(`/v1/chats/${id}`, { method: "DELETE" }),
+
+  askInChat: (projectKey: string, question: string, chatId?: string) =>
+    request<{ chat_id: string; title: string; message: ChatMessage }>("/v1/chats/ask", {
+      method: "POST",
+      body: JSON.stringify({ project_key: projectKey, question, chat_id: chatId }),
+    }),
 
   /** The decision tree: areas of the codebase and what was decided about them. */
   tree: (projectKey: string, kinds: string[] = []) => {

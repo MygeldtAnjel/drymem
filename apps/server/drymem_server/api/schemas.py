@@ -332,9 +332,17 @@ class TreeResponse(BaseModel):
     unplaced: int = 0
 
 
+class AskTurn(BaseModel):
+    role: str
+    content: str = Field(..., max_length=4000)
+
+
 class AskRequest(BaseModel):
     project_key: str
     question: str = Field(..., min_length=3, max_length=500)
+    # Earlier turns, so "and why?" means something. Retrieval still runs on the
+    # question alone — the history is context for the model, not a search term.
+    history: list[AskTurn] = Field(default_factory=list, max_length=20)
 
 
 class AskSource(BaseModel):

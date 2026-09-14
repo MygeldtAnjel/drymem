@@ -17,6 +17,7 @@ only ever be built out of what the asker was already allowed to read.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -33,6 +34,10 @@ MAX_SOURCE_CHARS = 1200
 # allowance reasoning and returned an empty `content`, which read as "drymem
 # knows nothing" rather than as a misconfiguration.
 MAX_ANSWER_TOKENS = 1500
+
+# `[1]`, `[2]`, and runs like `[1][3]`. Used to strip an earlier turn's markers
+# out of what the model sees, since its numbers meant that turn's memories.
+_CITATION = re.compile(r"\[\d{1,2}\]")
 
 SYSTEM = """You answer questions about a software team's own history, using \
 only the memories you are given.
@@ -52,6 +57,12 @@ TEMPLATE = """Question: {question}
 Memories:
 
 {sources}"""
+
+# How much of the conversation the model sees. Enough for "and why?" to mean
+# something; short enough that the memories stay the bulk of the prompt, which
+# is the whole point of a grounded answer.
+HISTORY_TURNS = 6
+HISTORY_CHARS = 600
 
 
 @dataclass
@@ -89,7 +100,7 @@ def _render(sources: list[Source], bodies: dict[str, str]) -> str:
     return "\n\n".join(blocks)
 
 
-async def _answer_with_anthropic(prompt: str) -> tuple[str, str]:
+async def _answer_with_anthropic(prompt: str, turns: list[dict] | None = None) -> tuple[str, str]:
     from anthropic import AsyncAnthropic
 
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
@@ -97,13 +108,40 @@ async def _answer_with_anthropic(prompt: str) -> tuple[str, str]:
         model=settings.distill_model,
         max_tokens=MAX_ANSWER_TOKENS,
         system=SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[*(turns or []), {"role": "user", "content": prompt}],
     )
     text = "".join(block.text for block in response.content if block.type == "text")
     return text, settings.distill_model
 
 
-async def _answer_with_local(prompt: str) -> tuple[str, str]:
+def _as_turns(history: list[dict] | None) -> list[dict]:
+    """Earlier turns, trimmed, in the shape both clients want.
+
+    Applied once in `answer`, not inside each client: doing it per-client
+    duplicated the rule and meant anything substituted for a client — a test
+    double, a third provider — silently skipped it.
+
+    Answers are stored with their `[1]` markers, and those numbers refer to a
+    *previous* turn's memories. Carried in verbatim they would collide with this
+    turn's numbering, so the markers are stripped from what the model sees while
+    the stored text keeps them for the reader.
+    """
+    if not history:
+        return []
+    out: list[dict] = []
+    for turn in history[-HISTORY_TURNS:]:
+        role = turn.get("role")
+        content = (turn.get("content") or "").strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        if role == "assistant":
+            content = _CITATION.sub("", content)
+            content = re.sub(r"\s{2,}", " ", content).replace(" .", ".").replace(" ,", ",")
+        out.append({"role": role, "content": content[:HISTORY_CHARS]})
+    return out
+
+
+async def _answer_with_local(prompt: str, turns: list[dict] | None = None) -> tuple[str, str]:
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(api_key="not-needed", base_url=settings.local_llm_url)
@@ -112,18 +150,33 @@ async def _answer_with_local(prompt: str) -> tuple[str, str]:
         max_tokens=MAX_ANSWER_TOKENS,
         messages=[
             {"role": "system", "content": SYSTEM},
+            *(turns or []),
             {"role": "user", "content": prompt},
         ],
-        # Thinking is turned off rather than budgeted for. The answer is a
-        # summary of text the model was handed; there is nothing to reason
-        # about, and a thinking pass here only competes for the token budget.
-        # Unknown keys are ignored by servers that do not support them.
-        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        # Thinking off, and this is the key that does it.
+        #
+        # `chat_template_kwargs.enable_thinking` was here for months and was
+        # silently ignored — measured: `finish_reason: length`, all 1500
+        # tokens in `reasoning_content`, `content` empty. Which reads to a
+        # person as "drymem knows nothing" rather than as a setting that never
+        # took. `reasoning_effort` is the OpenAI-standard parameter and Ollama
+        # honours it: the same prompt then answers in 41 tokens.
+        #
+        # There is nothing here to reason about anyway — the answer is a
+        # summary of text the model was handed.
+        
+        extra_body={"reasoning_effort": "none"},
     )
     return response.choices[0].message.content or "", settings.local_llm_model
 
 
-async def answer(*, question: str, sources: list[Source], bodies: dict[str, str]) -> Answer:
+async def answer(
+    *,
+    question: str,
+    sources: list[Source],
+    bodies: dict[str, str],
+    history: list[dict] | None = None,
+) -> Answer:
     """Write the answer. With no sources, say so rather than asking a model."""
     if not sources:
         return Answer(
@@ -135,10 +188,11 @@ async def answer(*, question: str, sources: list[Source], bodies: dict[str, str]
         )
 
     prompt = TEMPLATE.format(question=question, sources=_render(sources, bodies))
+    turns = _as_turns(history)
     if settings.anthropic_api_key:
-        text, model = await _answer_with_anthropic(prompt)
+        text, model = await _answer_with_anthropic(prompt, turns)
     else:
-        text, model = await _answer_with_local(prompt)
+        text, model = await _answer_with_local(prompt, turns)
 
     written = text.strip()
     if not written:

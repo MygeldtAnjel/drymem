@@ -12,6 +12,7 @@ import {
   Boxes,
   FolderGit2,
   LayoutDashboard,
+  MessagesSquare,
   Network,
   NotebookPen,
   ScrollText,
@@ -48,6 +49,7 @@ type Destination = { page: string; label: string; icon: LucideIcon };
 export const WORK: Destination[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
   { page: "memories", label: "Memories", icon: NotebookPen },
+  { page: "chat", label: "Chat", icon: MessagesSquare },
   { page: "graph", label: "Decisions", icon: Network },
   { page: "sessions", label: "Sessions", icon: Boxes },
   { page: "skills", label: "Skills", icon: Sparkles },

@@ -28,6 +28,7 @@ import {
   index,
   integer,
   json,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -310,6 +311,64 @@ export const skillUses = pgTable(
   },
   (t) => [index("ix_skill_uses_skill").on(t.skillId, t.createdAt)],
 );
+
+// ---- chats -------------------------------------------------------------------------
+
+/**
+ * A conversation with the project's memory.
+ *
+ * Private to the person who asked: a chat is a record of what somebody did not
+ * know, which is not a thing to share with their team by default. There is no
+ * scope column because there is no sharing to describe yet.
+ */
+export const chats = pgTable(
+  "chats",
+  {
+    id: uuid("id").primaryKey().$defaultFn(randomUUID),
+    orgId: uuid("org_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    userId: uuid("user_id").notNull(),
+    /** The first question, trimmed. A list of "New chat" is a list of nothing. */
+    title: varchar("title", { length: 200 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Touched on every turn: the list is ordered by activity, not by age. */
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ix_chats_user_updated").on(t.userId, t.updatedAt)],
+);
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().$defaultFn(randomUUID),
+    chatId: uuid("chat_id").notNull(),
+    role: varchar("role", { length: 16 }).notNull(),
+    content: text("content").notNull(),
+    /**
+     * The memories the answer stood on, as the engine returned them. Stored
+     * rather than re-derived: a link in an old answer should point at what was
+     * cited, not at what the same question would retrieve today.
+     */
+    sources: jsonb("sources").$type<ChatSource[]>().notNull().default([]),
+    /** False when the memory had nothing, so nobody has to ask if it was invented. */
+    grounded: boolean("grounded").notNull().default(true),
+    model: varchar("model", { length: 100 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ix_chat_messages_chat").on(t.chatId, t.createdAt)],
+);
+
+export interface ChatSource {
+  index: number;
+  uuid: string;
+  title: string;
+  author: string;
+  type: string;
+  created_at: string | null;
+}
+
+export type Chat = typeof chats.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;
 
 // ---- billing -------------------------------------------------------------------------
 

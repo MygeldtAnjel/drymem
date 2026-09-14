@@ -49,7 +49,7 @@ function stubGithub(emails: { email: string; primary: boolean; verified: boolean
   // Anything that is not github.com goes to the real `fetch` — the test client
   // talks to the server under test the same way.
   const real = globalThis.fetch;
-  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+  vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     const json = (body: unknown) =>
       new Response(JSON.stringify(body), {

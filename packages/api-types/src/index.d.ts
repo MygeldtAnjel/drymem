@@ -376,6 +376,8 @@ export interface components {
             project_key: string;
             /** Question */
             question: string;
+            /** History */
+            history?: components["schemas"]["AskTurn"][];
         };
         /** AskResponse */
         AskResponse: {
@@ -422,6 +424,13 @@ export interface components {
              * @default private
              */
             scope: string;
+        };
+        /** AskTurn */
+        AskTurn: {
+            /** Role */
+            role: string;
+            /** Content */
+            content: string;
         };
         /** CaptureModeResponse */
         CaptureModeResponse: {

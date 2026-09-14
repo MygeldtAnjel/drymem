@@ -1136,6 +1136,14 @@
             "maxLength": 500,
             "minLength": 3,
             "title": "Question"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/AskTurn"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
           }
         },
         "type": "object",
@@ -1231,6 +1239,25 @@
           "title"
         ],
         "title": "AskSource"
+      },
+      "AskTurn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "AskTurn"
       },
       "CaptureModeResponse": {
         "properties": {

@@ -22,6 +22,7 @@ import { badRequest, handleErrors } from "./lib/errors.js";
 import { resolvePrincipal } from "./middleware/auth.js";
 import { auditRouter } from "./routes/audit.js";
 import { authRouter } from "./routes/auth.js";
+import { chatRouter } from "./routes/chats.js";
 import { deviceRouter } from "./routes/device.js";
 import { healthRouter, memoryRouter } from "./routes/memory.js";
 import { inviteRouter } from "./routes/invites.js";
@@ -52,6 +53,7 @@ export function createApp() {
   app.use("/v1/overview", overviewRouter);
   app.use("/v1/audit", auditRouter);
   app.use("/v1/usage", usageRouter);
+  app.use("/v1/chats", chatRouter);
   // Registry CRUD here; `/v1/skills/discover` and `/distill` fall through to
   // the engine, so this router must not answer them.
   app.use("/v1/skills", skillRouter);
