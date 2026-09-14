@@ -18,38 +18,62 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare, Plus, Send, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUpRight, MessageSquare, Plus, Send, Sparkles, Trash2 } from "lucide-react";
 
-import { Blank } from "@/components/Bits";
+import { Blank, TypeChip } from "@/components/Bits";
+import { CatMark } from "@/components/Logo";
 import { Markdown } from "@/Markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import type { ChatMessage, ChatSummary } from "@/api";
-import { relative } from "@/format";
+import { count, relative } from "@/format";
 import { go } from "@/router";
 
-/** The memories an answer stood on. Each one opens. */
+/**
+ * The memories an answer stood on.
+ *
+ * Cards, not a list of lines. These are the reason to trust the paragraph above
+ * them, and a row of `[1] title … author · date` reads as a log dump — the eye
+ * has nothing to land on and the numbers stop meaning anything. A card gives
+ * each source the number, the kind and the title as three separate things, in
+ * that order, which is the order somebody checks them in.
+ */
 function Sources({ message }: { message: ChatMessage }) {
   if (message.sources.length === 0) return null;
   return (
-    <ul className="border-border mt-3 flex flex-col gap-1 border-t pt-3">
-      {message.sources.map((source) => (
-        <li key={source.uuid}>
-          <button
-            className="hover:text-foreground flex w-full items-center gap-2 text-left text-xs"
-            onClick={() => go("memories", source.uuid)}
-          >
-            <span className="text-muted-foreground font-mono">[{source.index}]</span>
-            <span className="min-w-0 flex-1 truncate">{source.title}</span>
-            <span className="text-muted-foreground shrink-0">
-              {source.author?.split("@")[0] ?? "unknown"} · {relative(source.created_at)}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="mt-4 min-w-0">
+      <p className="text-muted-foreground mb-2 text-xs font-medium">
+        {count(message.sources.length, "source")}
+      </p>
+      <ul className="grid min-w-0 gap-2 sm:grid-cols-2">
+        {message.sources.map((source) => (
+          <li key={source.uuid} className="min-w-0">
+            <button
+              className="border-border bg-background hover:border-input hover:bg-muted/40 group flex h-full w-full min-w-0 flex-col gap-1.5 rounded-lg border p-2.5 text-left transition-colors"
+              onClick={() => go("memories", source.uuid)}
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="bg-muted text-muted-foreground flex size-4 shrink-0 items-center justify-center rounded font-mono text-[10px]">
+                  {source.index}
+                </span>
+                <TypeChip type={source.type} />
+              </span>
+              <span className="line-clamp-2 min-w-0 text-xs leading-snug font-medium">
+                {source.title}
+              </span>
+              <span className="text-muted-foreground mt-auto flex min-w-0 items-center gap-1 text-[11px]">
+                <span className="min-w-0 truncate">
+                  {source.author?.split("@")[0] ?? "unknown"} · {relative(source.created_at)}
+                </span>
+                <ArrowUpRight className="ml-auto size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -57,7 +81,7 @@ function Turn({ message }: { message: ChatMessage }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
-        <p className="bg-secondary max-w-[80%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap">
+        <p className="bg-secondary max-w-[80%] rounded-lg px-3.5 py-2.5 text-sm whitespace-pre-wrap">
           {message.content}
         </p>
       </div>
@@ -65,16 +89,23 @@ function Turn({ message }: { message: ChatMessage }) {
   }
 
   return (
-    <div className="border-border bg-card min-w-0 rounded-lg border p-3">
-      <Markdown source={message.content} />
-      <Sources message={message} />
-      <p className="text-muted-foreground mt-2 text-[11px]">
-        {message.grounded ? (
-          <>Written by {message.model} from the memories above, and nothing else.</>
-        ) : (
-          <>Nothing in this project's memory matched. No model wrote this.</>
-        )}
-      </p>
+    <div className="flex min-w-0 gap-3">
+      {/* The cat, small. It marks whose turn this is without a bubble around
+          it — an answer is often long, and a box makes it feel quoted. */}
+      <span className="border-border bg-card mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border">
+        <CatMark className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[15px] leading-relaxed">
+          <Markdown source={message.content} />
+        </div>
+        <Sources message={message} />
+        <p className="text-muted-foreground mt-3 text-[11px]">
+          {message.grounded
+            ? `Written by ${message.model} from these memories, and nothing else.`
+            : "Nothing in this project's memory matched, so no model wrote this."}
+        </p>
+      </div>
     </div>
   );
 }

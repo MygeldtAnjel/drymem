@@ -46,11 +46,17 @@ Rules, in order of importance:
 1. Use ONLY the numbered memories. If they do not answer the question, say so \
 plainly. Never fill a gap with general knowledge.
 2. Cite every claim as [1], [2] — matching the numbers you were given. A \
-sentence with no citation must not appear.
+sentence with no citation must not appear. Separate several with a space: \
+"[2] [4]", never "[2][4]".
 3. Be short. Two or three sentences is usually right. A lead is scanning.
 4. Name people and dates when the memories do. "Jose decided X on 4 September \
 [2]" is worth far more than "it was decided".
-5. If the memories disagree, say that they disagree and cite both."""
+5. Write dates the way a person says them — "on 12 September", not \
+"2026-09-12" and not "logged on". Say what happened, not that it was recorded: \
+"Ask became Chat", not "a decision was logged".
+6. Lead with the answer. No "The provided memories indicate that" and no \
+"Based on the memories" — the citations already say where it came from.
+7. If the memories disagree, say that they disagree and cite both."""
 
 TEMPLATE = """Question: {question}
 
