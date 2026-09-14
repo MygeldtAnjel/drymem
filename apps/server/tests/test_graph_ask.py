@@ -382,3 +382,61 @@ async def test_a_first_question_retrieves_on_itself_alone(client, no_model):
     ).json()
 
     assert "retry cap is thirty seconds" in body["answer"]
+
+
+async def test_the_graph_search_outranks_a_keyword_match(client, store, no_model):
+    """The second retrieval pass has to be able to change the answer.
+
+    It used to compare `Fact.name` — the *relationship type* Graphiti assigned,
+    like `PUBLISHED_TO_PACKAGE_REGISTRY` — against an episode's name. Those can
+    never match, so the pass was silently always empty and ranking was keyword
+    overlap alone. Nothing noticed for months.
+
+    So the memory the graph points at shares no word with the question, and the
+    decoy has every word *and* is the more recent. Only the graph pass can put
+    the right one first.
+    """
+    from drymem_server.memory_store import Fact
+
+    wanted = await save(client, summary="Nothing lexical in common here.", topic="misc/thing")
+    await save(
+        client,
+        summary="A bad skill installed by anyone stops nothing.",
+        topic="decoy/keywords",
+    )
+
+    store.facts = [
+        Fact(
+            name="REJECTS_AND_LOGS_INPUT_OF",
+            fact="The scanner refuses a credential outright.",
+            episodes=[wanted["episode_uuid"]],
+        )
+    ]
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={"project_key": PROJECT, "question": "What stops a bad skill being installed?"},
+            headers=auth(client),
+        )
+    ).json()
+
+    assert body["sources"][0]["uuid"] == wanted["episode_uuid"], (
+        "the graph hit should outrank the keyword decoy"
+    )
+
+
+async def test_a_fact_carries_the_memories_it_came_from(client, store):
+    """`Fact.episodes` is the link back; `Fact.name` is a relationship type."""
+    from drymem_server.memory_store import Fact
+
+    saved = await save(client, summary="Retries cap at thirty seconds.", topic="pay/cap")
+    store.facts = [Fact(name="CAPS_AT", fact="Retries cap.", episodes=[saved["episode_uuid"]])]
+
+    body = (
+        await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=retries", headers=auth(client)
+        )
+    ).json()
+
+    assert body["results"][0]["name"] == "CAPS_AT"

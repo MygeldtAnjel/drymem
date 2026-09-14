@@ -795,9 +795,14 @@ class MemoryService:
         retrieval = f"{previous} {question}".strip() if previous else question
 
         facts = await self.search(project_key=project_key, query=retrieval, limit=10)
-        # `Fact.name` is the episode's name, which is how a hit points back at
-        # the memory it came from.
-        named = {f.name for f in facts}
+        # The memories the graph search hit, by uuid.
+        #
+        # This used to compare `Fact.name` against the episode's name and was
+        # silently always empty: `name` is the *relationship type* Graphiti
+        # assigned — `PUBLISHED_TO_PACKAGE_REGISTRY` — not an episode. So the
+        # docstring above described two passes while only one of them ran, and
+        # ranking was keyword overlap alone. The uuids are on `episodes`.
+        from_graph = {uuid for f in facts for uuid in f.episodes}
 
         words = {w for w in retrieval.lower().split() if len(w) > 3}
 
@@ -805,7 +810,7 @@ class MemoryService:
             episode = entry.episode
             text = f"{entry.title} {episode.name} {episode.content[:2000]}".lower()
             return (
-                1 if episode.name in named else 0,
+                1 if episode.uuid in from_graph else 0,
                 sum(1 for w in words if w in text),
             )
 

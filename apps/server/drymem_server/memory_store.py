@@ -90,6 +90,9 @@ class Fact:
     created_at: datetime | None = None
     valid_at: datetime | None = None
     invalid_at: datetime | None = None
+    # The memories this was drawn from. `name` is the *relationship type* —
+    # `PUBLISHED_TO_PACKAGE_REGISTRY` — and points back at nothing.
+    episodes: list[str] = field(default_factory=list)
 
     @property
     def superseded(self) -> bool:
@@ -130,13 +133,22 @@ _LUCENE_SPECIAL = r'+-&|!(){}[]^"~*?:\\/'
 
 
 def _lucene_safe(query: str) -> str:
-    """Escape a person's words so the index reads them as words."""
-    out = []
-    for char in query.strip():
-        if char in _LUCENE_SPECIAL:
-            out.append("\\")
-        out.append(char)
-    return "".join(out)
+    """A person's words, escaped, each one open at the end.
+
+    Escaped because Lucene's operators are characters people type without
+    meaning them — `apps/api` and `foo:bar` are queries, not syntax.
+
+    Open at the end because the index stores whole tokens and prose is full of
+    possessives and plurals: a memory saying "the scanner's `.env` rule" indexes
+    `scanner's`, and somebody searching "scanner" found nothing at all. A
+    trailing `*` matches the bare word too, so nothing is lost by it.
+    """
+    terms = []
+    for word in query.strip().split():
+        escaped = "".join(("\\" + c) if c in _LUCENE_SPECIAL else c for c in word)
+        if escaped:
+            terms.append(f"{escaped}*")
+    return " ".join(terms)
 
 
 def _as_datetime(value: object) -> datetime | None:
@@ -237,6 +249,7 @@ class GraphitiMemoryStore:
                 created_at=edge.created_at,
                 valid_at=getattr(edge, "valid_at", None),
                 invalid_at=getattr(edge, "invalid_at", None),
+                episodes=list(getattr(edge, "episodes", None) or []),
             )
             for edge in edges
         ]

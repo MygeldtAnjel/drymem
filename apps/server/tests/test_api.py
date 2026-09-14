@@ -597,6 +597,24 @@ class TestSearchReturnsMemories:
         for field in ("uuid", "title", "type", "author", "scope", "created_at"):
             assert field in memory
 
+    async def test_a_possessive_is_still_found_by_the_bare_word(self, client):
+        # Lucene indexes `scanner's` whole, so searching "scanner" found nothing
+        # at all — in prose that is most words with an apostrophe or a plural.
+        await save(client, summary="# Rules\n\nThe scanner's rule matched too much.")
+
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=scanner", headers=auth(client)
+        )
+        assert len(r.json()["memories"]) >= 1
+
+    async def test_a_plural_is_found_by_the_singular(self, client):
+        await save(client, summary="# Lockfiles\n\nCommit the lockfiles you generate.")
+
+        r = await client.get(
+            f"/v1/memories/search?project_key={PROJECT}&q=lockfile", headers=auth(client)
+        )
+        assert len(r.json()["memories"]) >= 1
+
     async def test_a_word_nobody_wrote_finds_nothing(self, client):
         await save(client)
         r = await client.get(
