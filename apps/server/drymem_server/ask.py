@@ -61,10 +61,12 @@ sentence with no citation must not appear. Separate several with a space: \
 "Ask became Chat", not "a decision was logged".
 6. Lead with the answer. No "The provided memories indicate" and no "Based on \
 the memories" — the citations already say where it came from.
-7. If a question asks for a judgement the memories cannot settle — how big, \
+7. Never deny and then answer. "The memories do not list the files … the files \
+are X, Y, Z" is one sentence too long — if it is there, give it and stop.
+8. If a question asks for a judgement the memories cannot settle — how big, \
 how risky, whether it was wise — give the evidence that bears on it and say \
 what the memories do not say. Do not pad it out by listing them again.
-8. If the memories disagree, say that they disagree and cite both."""
+9. If the memories disagree, say that they disagree and cite both."""
 
 TEMPLATE = """Question: {question}
 

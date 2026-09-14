@@ -495,6 +495,40 @@ class TestWhatTheModelSeesOfTheConversation:
         assert "restate" in SYSTEM.lower()
 
 
+async def test_naming_a_different_subject_beats_the_carried_one(client, no_model):
+    """Carrying is a bonus, not a pin.
+
+    It used to pin the previous subject to the front, so asking about a
+    different memory *by name* still got the thread you were already on in the
+    first slot — and the answer was about the wrong thing.
+    """
+    old_subject = await save(
+        client, summary="The canvas went away entirely.", topic="web/canvas"
+    )
+    named = await save(
+        client,
+        summary="A conversation's subject has to travel as uuids, not as words.",
+        topic="ask/subject-uuids",
+    )
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={
+                "project_key": PROJECT,
+                "question": "about the bugfix where a conversation subject has to travel as uuids, what happened?",
+                "history": [{"role": "user", "content": "was it complex?"}],
+                "carry": [old_subject["episode_uuid"]],
+            },
+            headers=auth(client),
+        )
+    ).json()
+
+    assert body["sources"][0]["uuid"] == named["episode_uuid"], (
+        "the memory the question names should outrank the one being carried"
+    )
+
+
 async def test_a_carried_memory_survives_a_subjectless_follow_up(client, no_model):
     """"And what files did he change?" has no subject of its own.
 

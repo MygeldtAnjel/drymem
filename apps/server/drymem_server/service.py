@@ -812,31 +812,35 @@ class MemoryService:
 
         words = {w for w in retrieval.lower().split() if len(w) > 3}
 
-        def score(entry) -> tuple[int, int]:
+        # The memories the conversation is already about.
+        #
+        # A follow-up can carry no subject at all — "was it complex?", then
+        # "and what files did he change?" — and retrieval on those words alone
+        # loses the thread. The subject of a conversation is the memories the
+        # last answer stood on.
+        carried = set(carry or [])
+
+        def score(entry) -> int:
+            """One number, so the three signals can outweigh each other.
+
+            Carrying used to *pin* the previous subject to the front. That is
+            too strong: asked about a different memory by name, the thread you
+            were on still won the first slot and the answer was about the wrong
+            thing. A bonus is beatable — three words of an explicit subject
+            outrank "we were just talking about this", and a question with no
+            subject of its own has nothing to beat it with.
+            """
             episode = entry.episode
             text = f"{entry.title} {episode.name} {episode.content[:2000]}".lower()
             return (
-                1 if episode.uuid in from_graph else 0,
-                sum(1 for w in words if w in text),
+                (3 if episode.uuid in from_graph else 0)
+                + (2 if episode.uuid in carried else 0)
+                + sum(1 for w in words if w in text)
             )
 
         ranked = sorted(entries, key=score, reverse=True)
-
-        # The memories the conversation is already about, kept in front.
-        #
-        # A follow-up can carry no subject at all — "was it complex?", then
-        # "and what files did he change?". Retrieval on those words alone
-        # pulled four unrelated memories, and the answer said, correctly for
-        # what it was shown, that it could not tell. The subject of a
-        # conversation is the memories the last answer stood on, so those are
-        # pinned and the query fills what is left.
-        wanted = list(carry or [])
-        pinned = [e for uuid in wanted for e in ranked if e.episode.uuid == uuid]
-        seen_uuids = {e.episode.uuid for e in pinned}
-
-        rest = [e for e in ranked if e.episode.uuid not in seen_uuids]
-        matched = [e for e in rest if any(score(e))]
-        picked = (pinned + (matched or rest))[: ask_module.MAX_SOURCES]
+        matched = [e for e in ranked if score(e) > 0]
+        picked = (matched or ranked)[: ask_module.MAX_SOURCES]
 
         sources = [
             ask_module.Source(
