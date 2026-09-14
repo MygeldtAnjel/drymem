@@ -1,39 +1,30 @@
 /**
- * The knowledge graph, and a question box over it.
+ * Decisions: a question box, and the tree of what was decided where.
  *
  * This is the screen that makes the product legible: what the team decided,
- * who decided it, and what it touched — drawn from data Graphiti has been
- * building since the first memory and that nobody had ever looked at.
- *
- * Two halves.
+ * who decided it, and what it touched.
  *
  * **Ask** is on top because it is what a lead actually arrives with: *"who
  * changed the payment component last?"*. Every claim in the answer carries a
  * citation, and the cited memories are listed under it, because an answer you
  * cannot check is worse than no answer.
  *
- * **The canvas** is underneath. Memories are coloured by kind and entities are
- * plain; an edge between two entities is a fact, drawn dashed and struck
- * through when a later memory contradicted it. Layout is computed here rather
- * than on the server, so changing how it looks never means changing a query.
+ * **The tree** is underneath: the parts of the codebase, and the decisions that
+ * touched each one. Clicking a decision opens it in a panel beside the tree
+ * rather than navigating away — people want to read the thing before deciding
+ * whether to leave the page they are exploring.
+ *
+ * There was a second view here, a canvas of every memory against every subject
+ * the extractor found. It drew 509 nouns for 20 memories and Miguel's verdict
+ * was "useless". It is gone rather than demoted: a view nobody opens is still a
+ * tab everybody reads past.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Background,
-  Controls,
-  MiniMap,
-  ReactFlow,
-  type Edge,
-  type Node,
-  type NodeMouseHandler,
-} from "@xyflow/react";
-import dagre from "dagre";
-import { Ban, Network, Search, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowUpRight, Search, Sparkles, X } from "lucide-react";
 
-import "@xyflow/react/dist/style.css";
-
-import { Blank, TypeChip } from "@/components/Bits";
+import { TypeChip } from "@/components/Bits";
+import { Markdown } from "@/Markdown";
 import { DecisionTreeCanvas } from "@/pages/DecisionTree";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,133 +38,85 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { AskResult, Graph, Tree } from "@/api";
+import type { AskResult, Tree, TreeDecision } from "@/api";
 import { MEMORY_TYPES } from "@/memory";
 import { relative } from "@/format";
 import { go } from "@/router";
 
-/** One hue per memory kind, matching the chips everywhere else. */
-const KIND_COLOR: Record<string, string> = {
-  decision: "#5b21b6",
-  architecture: "#1d4ed8",
-  bugfix: "#be123c",
-  discovery: "#a16207",
-  convention: "#047857",
-  note: "#666666",
-};
-
-/* The quiet greys the canvas draws on, as literals because React Flow's inline
-   styles are not in the cascade and cannot read a CSS variable. */
-const LINE = "#d4d4d4";
-const FACT = "#a3a3a3";
-const QUIET = "#e5e5e5";
-const QUIET_FILL = "#f5f5f5";
-
-const NODE_W = 210;
-const NODE_H = 40;
-
 /**
- * Lay the graph out left to right.
+ * One decision, beside the tree.
  *
- * Dagre rather than a force simulation: this is a graph of *what mentions
- * what*, which is a hierarchy, and a force layout turns a hierarchy into a
- * hairball that moves every time you look at it.
+ * Enough to answer "is this the one I meant" without leaving: the title, who
+ * and when, the opening of the body, and the files that put it in this branch.
+ * "Open" is there for when the answer is yes.
  */
-function layout(graph: Graph, showFacts: boolean): { nodes: Node[]; edges: Edge[] } {
-  // Memory → subject is the structure; subject → subject is detail. Drawing
-  // both by default put 77 crossing edges through the middle of a canvas that
-  // is otherwise a clean bipartite graph, so facts are opt-in.
-  const drawn = graph.edges.filter((e) => showFacts || e.kind === "mentions");
+function DecisionPanel({
+  decision,
+  onClose,
+}: {
+  decision: TreeDecision;
+  onClose: () => void;
+}) {
+  return (
+    // The same height as the tree beside it, so the "Open" button is on screen
+    // rather than below the fold of a panel that grew past its neighbour.
+    <aside className="border-border flex w-full shrink-0 flex-col border-t lg:h-[640px] lg:w-96 lg:border-t-0 lg:border-l">
+      <div className="border-border flex items-start gap-2 border-b p-4">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <TypeChip type={decision.type} />
+            {decision.superseded_by && (
+              <Badge variant="outline" className="text-destructive">
+                Replaced by a later memory
+              </Badge>
+            )}
+          </div>
+          <h3 className="text-sm leading-snug font-medium">{decision.title}</h3>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {decision.author || "unknown"} · {relative(decision.created_at)}
+          </p>
+        </div>
+        <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={onClose}>
+          <X />
+        </Button>
+      </div>
 
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "LR", nodesep: 14, ranksep: 220, marginx: 24, marginy: 24 });
+      <div className="min-w-0 flex-1 overflow-y-auto p-4">
+        {decision.gist ? (
+          <Markdown source={decision.gist} />
+        ) : (
+          <p className="text-muted-foreground text-sm">No summary was written for this one.</p>
+        )}
 
-  for (const node of graph.nodes) g.setNode(node.id, { width: NODE_W, height: NODE_H });
-  for (const edge of drawn) {
-    if (g.hasNode(edge.source) && g.hasNode(edge.target)) g.setEdge(edge.source, edge.target);
-  }
-  dagre.layout(g);
+        {decision.paths.length > 0 && (
+          <div className="mt-4">
+            <p className="text-muted-foreground mb-1.5 text-xs font-medium">Files it names</p>
+            <ul className="flex flex-col gap-1">
+              {decision.paths.map((path) => (
+                <li key={path} className="text-muted-foreground truncate font-mono text-xs">
+                  {path}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
-  const nodes: Node[] = graph.nodes.map((node) => {
-    const placed = g.node(node.id);
-    const memory = node.kind === "memory";
-    const colour = memory ? (KIND_COLOR[node.type] ?? KIND_COLOR.note!) : QUIET;
-    return {
-      id: node.id,
-      position: { x: placed?.x ?? 0, y: placed?.y ?? 0 },
-      data: { label: node.label, kind: node.kind },
-      style: {
-        width: NODE_W,
-        // Memories are the thing you click through to, so they carry the hue
-        // and the entities stay quiet. A canvas where everything is coloured
-        // is a canvas where nothing is.
-        background: memory ? `${colour}14` : QUIET_FILL,
-        border: `1px solid ${memory ? colour : QUIET}`,
-        borderRadius: memory ? 8 : 999,
-        color: "#0a0a0a",
-        fontSize: 12,
-        padding: "7px 10px",
-        textAlign: "left" as const,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap" as const,
-        cursor: memory ? "pointer" : "default",
-      },
-    };
-  });
-
-  const edges: Edge[] = drawn.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    label: edge.kind === "fact" ? edge.label.slice(0, 60) : undefined,
-    animated: false,
-    style: {
-      // The mentions edges are the structure and were nearly invisible at
-      // `border` grey; they need to read against the canvas, not blend into it.
-      stroke: edge.superseded ? "#be123c" : edge.kind === "fact" ? FACT : LINE,
-      strokeWidth: edge.kind === "fact" ? 1.4 : 1,
-      // A contradicted fact is struck, not hidden: "we changed our mind" is the
-      // most useful thing a decision graph can show.
-      strokeDasharray: edge.superseded ? "4 3" : undefined,
-    },
-    labelStyle: { fill: "#98a1ad", fontSize: 9 },
-    labelBgStyle: { fill: "#ffffff" },
-  }));
-
-  return { nodes, edges };
+      <div className="border-border border-t p-4">
+        <Button className="w-full" onClick={() => go("memories", decision.id)}>
+          Open this memory <ArrowUpRight data-icon="inline-end" />
+        </Button>
+      </div>
+    </aside>
+  );
 }
 
-export function GraphPage({
-  projectKey,
-  loading,
-  graph,
-  onReload,
-}: {
-  projectKey: string;
-  loading: boolean;
-  graph: Graph | null;
-  onReload: (kinds: string[], minMentions: number) => void;
-}) {
+export function GraphPage({ projectKey }: { projectKey: string }) {
   const [kind, setKind] = useState("all");
-  /**
-   * How much of the graph to draw.
-   *
-   * "Connected" keeps only the subjects two or more memories mention, which is
-   * what makes the canvas a picture of how things relate rather than a list of
-   * every noun anyone typed. Drawing all of them first produced 173 nodes and
-   * 447 edges, which is the whole graph and a view of nothing.
-   */
-  // "Core" by default. A project's whole graph is taller than any screen, so
-  // the first view is the sparse one that fits and reads; the other two are a
-  // click away for someone who came to explore rather than to orient.
-  const [density, setDensity] = useState("3");
-  const [showFacts, setShowFacts] = useState(false);
-  // The tree opens first. It is the view that answers a question; the canvas
-  // is the one you explore, and exploring is the rarer errand.
-  const [view, setView] = useState("tree");
   const [tree, setTree] = useState<Tree | null>(null);
+  // Clicking a decision opens it beside the tree rather than navigating away:
+  // people want to read the thing, then decide whether to leave the page.
+  const [picked, setPicked] = useState<TreeDecision | null>(null);
   const [treeLoading, setTreeLoading] = useState(true);
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
@@ -193,23 +136,9 @@ export function GraphPage({
     };
   }, [projectKey, kind]);
 
-  useEffect(() => {
-    onReload(kind === "all" ? [] : [kind], Number(density));
-    // `onReload` is stable in the parent; re-running on it would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, density, projectKey]);
-
-  const laid = useMemo(
-    () => (graph ? layout(graph, showFacts) : { nodes: [], edges: [] }),
-    [graph, showFacts],
-  );
-
-  const openNode: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      if (node.data?.kind === "memory") go("memories", node.id);
-    },
-    [],
-  );
+  // A filter change rebuilds the tree, so the open decision may no longer be
+  // in it. Closing is honest; leaving it open beside a tree it is not in is not.
+  useEffect(() => setPicked(null), [projectKey, kind]);
 
   const ask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,9 +155,6 @@ export function GraphPage({
       setAsking(false);
     }
   };
-
-  const memories = graph?.nodes.filter((n) => n.kind === "memory").length ?? 0;
-  const entities = graph?.nodes.filter((n) => n.kind === "entity").length ?? 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -302,122 +228,50 @@ export function GraphPage({
         <CardHeader className="flex-wrap gap-3 border-b p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle className="text-sm">
-                {view === "tree" ? "What was decided, and where" : "Everything, connected"}
-              </CardTitle>
+              <CardTitle className="text-sm">What was decided, and where</CardTitle>
               <CardDescription>
-                {view === "tree"
-                  ? "Your codebase, and the decisions that touched each part. Newest first. Click a branch to open it."
-                  : graph
-                    ? `${memories} memories and ${entities} subjects. Click a memory to read it.`
-                    : "What this project knows, and how it connects."}
+                Your codebase, and the decisions that touched each part. Newest first. Click a
+                branch to open it, a decision to read it.
               </CardDescription>
             </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Tabs value={view} onValueChange={setView}>
-                <TabsList>
-                  <TabsTrigger value="tree">Tree</TabsTrigger>
-                  <TabsTrigger value="graph">Everything</TabsTrigger>
+            <div className="min-w-0 overflow-x-auto">
+              <Tabs value={kind} onValueChange={setKind}>
+                <TabsList className="w-max">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  {Object.keys(MEMORY_TYPES).map((t) => (
+                    <TabsTrigger key={t} value={t} className="capitalize">
+                      {t}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
               </Tabs>
-              {view === "graph" && (
-                <>
-                  <Tabs value={density} onValueChange={setDensity}>
-                    <TabsList>
-                      <TabsTrigger value="3">Core</TabsTrigger>
-                      <TabsTrigger value="2">Connected</TabsTrigger>
-                      <TabsTrigger value="1">Everything</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <Tabs
-                    value={showFacts ? "facts" : "structure"}
-                    onValueChange={(v) => setShowFacts(v === "facts")}
-                  >
-                    <TabsList>
-                      <TabsTrigger value="structure">Structure</TabsTrigger>
-                      <TabsTrigger value="facts">With facts</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </>
-              )}
-              <div className="min-w-0 overflow-x-auto">
-                <Tabs value={kind} onValueChange={setKind}>
-                  <TabsList className="w-max">
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    {Object.keys(MEMORY_TYPES).map((t) => (
-                      <TabsTrigger key={t} value={t} className="capitalize">
-                        {t}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              </div>
             </div>
           </div>
-          {graph?.truncated && (
-            <Badge variant="outline" className="w-fit text-muted-foreground">
-              Showing the most recent slice of {graph.total_memories} memories
+          {tree?.truncated && (
+            <Badge variant="outline" className="text-muted-foreground w-fit">
+              Showing the most recent slice of {tree.total_memories} memories
             </Badge>
           )}
         </CardHeader>
         <CardContent className="p-0">
-          {view === "tree" ? (
-            treeLoading && !tree ? (
-              <Skeleton className="h-[40rem] rounded-none" />
-            ) : (
-              <DecisionTreeCanvas
-                root={tree?.root ?? null}
-                unplaced={tree?.unplaced ?? 0}
-                onOpenMemory={(id) => go("memories", id)}
-              />
-            )
-          ) : loading && !graph ? (
+          {treeLoading && !tree ? (
             <Skeleton className="h-[40rem] rounded-none" />
-          ) : laid.nodes.length === 0 ? (
-            <Blank icon={Network} title="Nothing to draw yet">
-              The graph fills in as memories are saved. Each one adds the subjects it mentions
-              and the facts drawn between them.
-            </Blank>
           ) : (
-            <div className="h-[40rem] w-full">
-              <ReactFlow
-                nodes={laid.nodes}
-                edges={laid.edges}
-                onNodeClick={openNode}
-                fitView
-                fitViewOptions={{ padding: 0.1, maxZoom: 0.9 }}
-                minZoom={0.1}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background color="#232932" gap={18} />
-                <Controls showInteractive={false} />
-                <MiniMap
-                  pannable
-                  zoomable
-                  nodeColor={(n) =>
-                    n.data?.kind === "memory" ? (KIND_COLOR.decision ?? "#5b21b6") : QUIET
-                  }
-                  maskColor="rgb(11 13 16 / 0.7)"
-                  style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+            <div className="flex min-w-0 flex-col lg:flex-row">
+              <div className="min-w-0 flex-1">
+                <DecisionTreeCanvas
+                  root={tree?.root ?? null}
+                  unplaced={tree?.unplaced ?? 0}
+                  selectedId={picked?.id ?? null}
+                  onSelect={setPicked}
                 />
-              </ReactFlow>
+              </div>
+              {picked && (
+                <DecisionPanel decision={picked} onClose={() => setPicked(null)} />
+              )}
             </div>
           )}
         </CardContent>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-4 py-2.5 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm border border-chart-1 bg-chart-1/15" /> memory
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full border border-input bg-muted" /> subject
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-px w-4 bg-input" /> fact (shown under “With facts”)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Ban className="size-3 text-destructive" /> superseded by a later memory
-          </span>
-        </div>
       </Card>
     </div>
   );

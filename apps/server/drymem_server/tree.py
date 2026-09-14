@@ -299,13 +299,27 @@ def _title(name: str, content: str) -> str:
     return (name or "").rsplit("/", 1)[-1].replace("-", " ").strip() or "Untitled"
 
 
+# One line under a title in the tree; a readable paragraph in the panel beside
+# it. The panel is where somebody decides whether to open the memory at all, and
+# a truncated first sentence is not enough to decide on.
+GIST_CHARS = 700
+
+
 def _gist(content: str) -> str:
-    """The first real sentence, for the line under the title."""
+    """The memory's summary — the paragraph a person wrote to explain it."""
     body = content
     if "## Summary" in body:
         body = body.split("## Summary", 1)[1]
+
+    # Consecutive prose lines are one paragraph; memories are hard-wrapped at 80
+    # columns, so taking a single line gives you half a sentence.
+    paragraph: list[str] = []
     for line in body.splitlines():
         stripped = line.strip()
-        if stripped and not stripped.startswith(("#", "-", "*", "|", "```")):
-            return stripped[:160]
-    return ""
+        if not stripped or stripped.startswith(("#", "|", "```")):
+            if paragraph:
+                break
+            continue
+        paragraph.append(stripped)
+
+    return " ".join(paragraph)[:GIST_CHARS]

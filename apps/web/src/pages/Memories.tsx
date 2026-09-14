@@ -8,7 +8,7 @@
  * conflating the two would make the results look broken.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Ban,
   NotebookPen,
@@ -34,8 +34,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Episode, Fact } from "@/api";
-import { MEMORY_TYPES, split } from "@/memory";
+import type { Episode, Fact, TreeArea, TreeDecision } from "@/api";
+import { MEMORY_TYPES, TYPE_FILL, split } from "@/memory";
 import { firstLine, relative, stamp } from "@/format";
 import { go } from "@/router";
 
@@ -408,8 +408,90 @@ export function MemoryDetail({
               </Button>
             </CardContent>
           </Card>
+
+          <Related episode={episode} projectKey={projectKey} />
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The other memories about the same part of the codebase.
+ *
+ * Built from the decision tree, which already knows which areas a memory
+ * belongs to — no new endpoint, and the same answer the tree gives, so the two
+ * screens never disagree about what "related" means.
+ *
+ * Absent entirely when this memory names no file: there is no relationship to
+ * claim, and a card saying "none" is a card that earns nothing.
+ */
+function Related({ episode, projectKey }: { episode: Episode; projectKey: string }) {
+  const [areas, setAreas] = useState<{ area: string; decisions: TreeDecision[] }[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    import("@/api")
+      .then(({ api }) => api.tree(projectKey))
+      .then((tree) => {
+        if (!live) return;
+        const found: { area: string; decisions: TreeDecision[] }[] = [];
+        const walk = (node: TreeArea) => {
+          // A leaf area holds the decisions; the branches above only group.
+          if (node.decisions.some((d) => d.id === episode.uuid)) {
+            const others = node.decisions.filter((d) => d.id !== episode.uuid);
+            if (others.length > 0) found.push({ area: node.id, decisions: others.slice(0, 5) });
+          }
+          node.children.forEach(walk);
+        };
+        walk(tree.root);
+        setAreas(found);
+      })
+      .catch(() => live && setAreas([]));
+    return () => {
+      live = false;
+    };
+  }, [projectKey, episode.uuid]);
+
+  if (!areas || areas.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Related</CardTitle>
+        <CardDescription>Other memories about the same part of the codebase.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {areas.map(({ area, decisions }) => (
+          <div key={area} className="min-w-0">
+            <p className="text-muted-foreground mb-1.5 truncate font-mono text-xs">{area}</p>
+            <ul className="flex flex-col gap-1.5">
+              {decisions.map((d) => (
+                <li key={d.id}>
+                  <button
+                    className="hover:text-foreground w-full text-left"
+                    onClick={() => go("memories", d.id)}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${TYPE_FILL[d.type] ?? TYPE_FILL.note}`}
+                      />
+                      <span
+                        className={`min-w-0 flex-1 truncate text-xs ${d.superseded_by ? "line-through opacity-60" : ""}`}
+                      >
+                        {d.title}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground block truncate pl-3 text-[11px]">
+                      {d.author?.split("@")[0] ?? "unknown"} · {relative(d.created_at)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

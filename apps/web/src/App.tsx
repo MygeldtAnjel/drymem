@@ -24,7 +24,6 @@ import {
   type Cluster,
   type Episode,
   type Fact,
-  type Graph,
   type Health,
   type Me,
   type Member,
@@ -169,8 +168,6 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [graph, setGraph] = useState<Graph | null>(null);
-  const [graphLoading, setGraphLoading] = useState(false);
 
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
@@ -277,27 +274,6 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     setDrafts({});
     void load(active);
   }, [active, load]);
-
-  /**
-   * The graph is fetched on demand, not with everything else.
-   *
-   * It is the one read that walks Neo4j, and most visits never open the screen.
-   */
-  const loadGraph = useCallback(
-    async (kinds: string[], minMentions: number) => {
-      if (!active) return;
-      setGraphLoading(true);
-      try {
-        setGraph(await api.graph(active, { kinds, limit: 120, minMentions }));
-      } catch (e) {
-        fail(e, "Loading the graph");
-        setGraph(null);
-      } finally {
-        setGraphLoading(false);
-      }
-    },
-    [active, fail],
-  );
 
   const chooseProject = (key: string) => {
     setActive(key);
@@ -586,9 +562,6 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         stats={stats}
         episodes={episodes}
         sessions={sessions}
-        graph={graph}
-        graphLoading={graphLoading}
-        onLoadGraph={loadGraph}
         skills={skills}
         catalogue={catalogue}
         auditEvents={auditEvents}
@@ -655,9 +628,6 @@ function Screen(props: {
   stats: Overview | null;
   episodes: Episode[];
   sessions: AgentSession[];
-  graph: Graph | null;
-  graphLoading: boolean;
-  onLoadGraph: (kinds: string[], minMentions: number) => void;
   skills: Skill[];
   catalogue: CatalogueSkill[];
   auditEvents: AuditEvent[];
@@ -742,12 +712,7 @@ function Screen(props: {
       );
     case "graph":
       return (
-        <GraphPage
-          projectKey={props.active}
-          loading={props.graphLoading}
-          graph={props.graph}
-          onReload={props.onLoadGraph}
-        />
+        <GraphPage projectKey={props.active} />
       );
     case "sessions":
       return <SessionsPage sessions={props.sessions} loading={props.loading} />;

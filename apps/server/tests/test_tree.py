@@ -173,3 +173,45 @@ class TestShape:
 )
 def test_a_real_memory_line_lands_where_a_person_would_expect(text, expected):
     assert area_of(paths_in(text)[0]) == expected
+
+
+class TestTheSummaryShownInThePanel:
+    """The panel beside the tree is where somebody decides whether to open a
+    memory, so a truncated first sentence is not enough to decide on."""
+
+    def test_a_hard_wrapped_paragraph_arrives_whole(self):
+        from drymem_server.tree import _gist
+
+        content = (
+            "# Retry cap\n\n## Summary\n"
+            "The backoff caps at thirty seconds because Adyen\n"
+            "rejects anything longer on the retry path.\n\n"
+            "## Why\nSomething else entirely.\n"
+        )
+        assert _gist(content) == (
+            "The backoff caps at thirty seconds because Adyen "
+            "rejects anything longer on the retry path."
+        )
+
+    def test_it_stops_at_the_next_section(self):
+        from drymem_server.tree import _gist
+
+        assert "Something else entirely" not in _gist(
+            "## Summary\nFirst paragraph.\n\n## Why\nSomething else entirely.\n"
+        )
+
+    def test_it_falls_back_to_the_body_when_there_is_no_summary(self):
+        from drymem_server.tree import _gist
+
+        assert _gist("# Title\n\nJust prose, no sections.\n") == "Just prose, no sections."
+
+    def test_it_is_capped(self):
+        from drymem_server.tree import GIST_CHARS, _gist
+
+        assert len(_gist("## Summary\n" + "word " * 500)) <= GIST_CHARS
+
+    def test_nothing_to_summarise_is_empty_not_a_crash(self):
+        from drymem_server.tree import _gist
+
+        assert _gist("") == ""
+        assert _gist("# Only a heading\n") == ""

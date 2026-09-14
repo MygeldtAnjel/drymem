@@ -55,6 +55,7 @@ type AreaData = {
 
 type DecisionData = {
   decision: TreeDecision;
+  selected: boolean;
   onOpen: () => void;
 };
 
@@ -83,14 +84,18 @@ function AreaNode({ data }: NodeProps) {
 }
 
 function DecisionNode({ data }: NodeProps) {
-  const { decision, onOpen } = data as unknown as DecisionData;
+  const { decision, selected, onOpen } = data as unknown as DecisionData;
   const dead = Boolean(decision.superseded_by);
   return (
     <button
       type="button"
       onClick={onOpen}
       style={{ width: DECISION_W, height: DECISION_H }}
-      className={`border-border bg-card hover:border-input flex flex-col justify-center gap-1 rounded-lg border px-3 py-2 text-left transition-colors ${dead ? "opacity-60" : ""}`}
+      className={
+        "bg-card hover:border-input flex flex-col justify-center gap-1 rounded-lg border px-3 py-2 text-left transition-colors " +
+        (selected ? "border-foreground ring-foreground/20 ring-2 " : "border-border ") +
+        (dead ? "opacity-60" : "")
+      }
     >
       <Handle type="target" position={Position.Left} className="!opacity-0" />
       <div className="flex items-center gap-1.5">
@@ -161,7 +166,9 @@ function layout(nodes: Node[], edges: Edge[]): Node[] {
 interface Props {
   root: TreeArea | null;
   unplaced: number;
-  onOpenMemory: (id: string) => void;
+  /** Which decision is open in the panel beside the tree, if any. */
+  selectedId?: string | null;
+  onSelect: (decision: TreeDecision) => void;
 }
 
 /** The provider is what `useReactFlow` needs to exist above it. */
@@ -173,7 +180,7 @@ export function DecisionTreeCanvas(props: Props) {
   );
 }
 
-function Tree({ root, unplaced, onOpenMemory }: Props) {
+function Tree({ root, unplaced, selectedId, onSelect }: Props) {
   const flow = useReactFlow();
   const [open, setOpen] = useState<Set<string>>(new Set());
 
@@ -228,7 +235,8 @@ function Tree({ root, unplaced, onOpenMemory }: Props) {
           position: { x: 0, y: 0 },
           data: {
             decision,
-            onOpen: () => onOpenMemory(decision.id),
+            selected: decision.id === selectedId,
+            onOpen: () => onSelect(decision),
           } satisfies DecisionData as unknown as Record<string, unknown>,
         });
         edges.push({
@@ -242,7 +250,7 @@ function Tree({ root, unplaced, onOpenMemory }: Props) {
 
     walk(root, null);
     return { nodes: layout(nodes, edges), edges };
-  }, [root, open, toggle, onOpenMemory]);
+  }, [root, open, toggle, selectedId, onSelect]);
 
   /*
    * Re-fit whenever a branch opens or closes.
@@ -253,9 +261,14 @@ function Tree({ root, unplaced, onOpenMemory }: Props) {
    */
   useEffect(() => {
     if (nodes.length === 0) return;
-    const at = window.setTimeout(() => flow.fitView({ padding: 0.12, maxZoom: 1, duration: 250 }), 40);
+    // `selectedId` too: opening the panel takes a third of the width, and a
+    // tree laid out for the full width then sits under it.
+    const at = window.setTimeout(
+      () => flow.fitView({ padding: 0.12, maxZoom: 1, duration: 250 }),
+      60,
+    );
     return () => window.clearTimeout(at);
-  }, [nodes.length, flow]);
+  }, [nodes.length, selectedId, flow]);
 
   if (!root || root.total === 0) {
     return (
