@@ -424,15 +424,15 @@ export function SkillsPage({
         <TabsContent value="suggested">
           <Card className="overflow-hidden p-0">
             <CardHeader className="border-b p-4">
-              <CardTitle className="text-sm">Subjects this project keeps returning to</CardTitle>
+              <CardTitle className="text-sm">Parts of the codebase with no skill</CardTitle>
               <CardDescription>
-                Drafting reads the memories about a subject and writes a SKILL.md. Nothing is
-                installed until a person reads it and publishes it.
+                Drafting reads what the team decided while working here and writes a SKILL.md.
+                Nothing is installed until a person reads it and publishes it.
               </CardDescription>
             </CardHeader>
             {suggestions.length === 0 ? (
               <Blank icon={Sparkles} title="No suggestions">
-                A subject appears here once two or more memories mention it and no skill covers it.
+                A part of the codebase appears here once two or more memories name a file in it.
               </Blank>
             ) : (
               <ul className="flex max-h-[32rem] flex-col overflow-y-auto">
@@ -450,7 +450,9 @@ export function SkillsPage({
                         onClick={() => ready && setReadingDraft(cluster.topic)}
                       >
                         <span className="flex items-center gap-2">
-                          <span className="truncate font-medium">{cluster.topic}</span>
+                          <span className="truncate font-mono text-sm font-medium">
+                            {cluster.topic}
+                          </span>
                           {ready && <Badge variant="outline">Draft ready</Badge>}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">

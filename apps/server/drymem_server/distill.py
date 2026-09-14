@@ -37,13 +37,16 @@ rejected, that is the most valuable part — say it and say why.
 - Be brief. A skill people actually read is under a screen.
 - Do not mention that this was generated, or reference "the memories"."""
 
-TEMPLATE = """Subject: {topic}
+# The subject is a part of the codebase now (`apps/api`, `packages/skills`),
+# not an extracted noun, so the prompt names it as one — otherwise the model
+# writes about the folder rather than about working in it.
+TEMPLATE = """Part of the codebase: {topic}
 
-Memories the team recorded about it:
+Memories the team recorded while working on it:
 
 {memories}
 
-Write the SKILL.md."""
+Write the SKILL.md an agent should read before it touches {topic}."""
 
 
 @dataclass(frozen=True)
@@ -133,7 +136,7 @@ def _ensure_frontmatter(content: str, name: str, topic: str) -> str:
         return f"---\n{head}\n---\n\n{body}"
 
     return (
-        f"---\nname: {name}\ndescription: What this team learned about {topic}.\n---\n\n{stripped}"
+        f"---\nname: {name}\ndescription: What this team learned working on {topic}.\n---\n\n{stripped}"
     )
 
 

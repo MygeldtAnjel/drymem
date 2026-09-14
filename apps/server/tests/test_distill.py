@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from drymem_server import distill
-from drymem_server.discover import GENERIC, Cluster, _is_generic
+from drymem_server.discover import NOT_A_SUBJECT, Cluster
 from drymem_server.distill import Draft, _slug, _tidy, draft_skill
 
 MEMORIES = [
@@ -21,23 +21,30 @@ MEMORIES = [
 
 
 class TestClustering:
-    def test_a_project_wide_name_is_not_a_topic(self):
-        """'drymem' appears in every memory; it says nothing about what is hard."""
-        for name in GENERIC:
-            assert _is_generic(name)
+    """Subjects are areas of the codebase now, not extracted entities.
 
-    def test_a_real_subject_is(self):
-        assert not _is_generic("Adyen")
-        assert not _is_generic("token refresh")
+    Ranking entities by frequency suggested drafting skills about `npm`,
+    `Docker` and `TypeScript`; no filter fixed it, because the store cannot tell
+    a language from a component. An area can.
+    """
 
-    def test_very_short_names_are_noise(self):
-        assert _is_generic("a")
-        assert _is_generic("x")
+    def test_the_tool_s_own_folders_are_not_subjects(self):
+        # A skill about `.claude` is a skill about the agent's config directory.
+        assert ".claude" in NOT_A_SUBJECT
+        assert ".drymem" in NOT_A_SUBJECT
+
+    def test_the_repo_root_is_not_a_subject(self):
+        # READMEs and lockfiles, which no team skill is about.
+        assert "repo root" in NOT_A_SUBJECT
+
+    def test_a_real_area_is_not_excluded(self):
+        assert "apps/api" not in NOT_A_SUBJECT
+        assert "packages/skills" not in NOT_A_SUBJECT
 
     def test_a_cluster_serialises_for_the_api(self):
-        cluster = Cluster(topic="Adyen", memory_count=3, episode_uuids=["a"], facts=["f"])
+        cluster = Cluster(topic="apps/api", memory_count=3, episode_uuids=["a"], facts=["f"])
         assert cluster.as_dict() == {
-            "topic": "Adyen",
+            "topic": "apps/api",
             "memory_count": 3,
             "episode_uuids": ["a"],
             "facts": ["f"],
@@ -197,33 +204,18 @@ class TestDrafting:
         assert len(seen["prompt"]) < 5_000
 
 
-class TestPeopleFiltering:
-    """A teammate's name is always among the most-mentioned entities."""
+class TestPeopleAreNotSubjects:
+    """A teammate's name used to be among the most-suggested subjects.
 
-    def test_an_email_excludes_the_person_every_way_they_appear(self):
-        from drymem_server.discover import _names_from
+    Every memory has an author, so ranking extracted entities by frequency put
+    "write a skill about Miguel" near the top, and a whole filter existed to
+    strip a person's name, email and each part of it. Areas come from file
+    paths, so the class of bug is gone rather than filtered.
+    """
 
-        names = _names_from(["miguel.barrientos@ciudadela.eu"])
+    def test_a_person_cannot_be_an_area(self):
+        from drymem_server.tree import area_of, paths_in
 
-        assert "miguel" in names
-        assert "barrientos" in names
-        assert "miguel.barrientos" in names
-        assert "miguel.barrientos@ciudadela.eu" in names
+        assert paths_in("Miguel decided this with miguel.barrientos@ciudadela.eu") == []
+        assert area_of("apps/api/src/routes/skills.ts") == "apps/api"
 
-    def test_a_display_name_excludes_each_part(self):
-        from drymem_server.discover import _names_from
-
-        names = _names_from(["Jose Garcia"])
-        assert {"jose", "garcia", "jose garcia"} <= names
-
-    def test_short_fragments_are_not_excluded(self):
-        """Excluding two-letter fragments would suppress real subjects."""
-        from drymem_server.discover import _names_from
-
-        assert "de" not in _names_from(["Ana de Souza"])
-
-    def test_nothing_in_means_nothing_excluded(self):
-        from drymem_server.discover import _names_from
-
-        assert _names_from([]) == set()
-        assert _names_from([""]) == set()
