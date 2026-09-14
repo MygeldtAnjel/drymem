@@ -15,6 +15,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { descriptionOf } from "./frontmatter.js";
 import { publishVersion } from "./publish.js";
 
 /**
@@ -44,13 +45,6 @@ function readSkill(dir: string): { content: string; files: Record<string, string
     files[entry.name] = readFileSync(path, "utf8");
   }
   return { content: readFileSync(md, "utf8"), files };
-}
-
-/** The `description:` line, which is what the catalogue list shows. */
-function descriptionOf(content: string): string {
-  const close = content.indexOf("\n---", 4);
-  const head = content.startsWith("---") && close > 0 ? content.slice(4, close) : "";
-  return (/^description\s*:\s*(.+)$/m.exec(head)?.[1] ?? "").trim().slice(0, 2000);
 }
 
 export interface Seeded {

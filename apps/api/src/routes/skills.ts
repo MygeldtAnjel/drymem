@@ -23,7 +23,8 @@ import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 import { param } from "../lib/params.js";
 import { isAdmin, type Principal } from "../lib/principal.js";
 import { publishVersion, slug } from "../lib/publish.js";
-import { principalOf, requireUser } from "../middleware/auth.js";
+import { seedCatalogue } from "../lib/seed.js";
+import { principalOf, requireAdmin, requireUser } from "../middleware/auth.js";
 
 export const skillRouter = Router();
 skillRouter.use(requireUser);
@@ -369,6 +370,29 @@ skillRouter.post("/", async (req, res) => {
       result.state === "pending"
         ? "Stored for review. An organisation admin has to approve it before a project can use it."
         : undefined,
+  });
+});
+
+/**
+ * Put the bundled base skills in this organisation's catalogue.
+ *
+ * Signup does this already. This is for the organisations that existed before
+ * it did — every self-hosted install that upgrades has an empty catalogue and
+ * no way to fill it. Idempotent: identical bytes are the same version, so
+ * running it twice adds nothing.
+ */
+skillRouter.post("/seed", requireAdmin, async (req, res) => {
+  const principal = principalOf(req);
+  const seeded = await seedCatalogue(principal);
+  await record(principal, "skill.publish", `base set: ${seeded.published.length} published`);
+  res.json({
+    published: seeded.published,
+    pending: seeded.pending,
+    skipped: seeded.skipped,
+    detail:
+      seeded.published.length === 0 && seeded.pending.length === 0
+        ? "Nothing to add — the base skills are already here."
+        : `${seeded.published.length} published, ${seeded.pending.length} held for review.`,
   });
 });
 

@@ -84,6 +84,28 @@ describe("the catalogue a new organisation starts with", () => {
     expect(named.description).toBeTruthy();
   });
 
+  it("can be filled in afterwards, for an organisation older than the seeder", async () => {
+    // Every self-hosted install that upgrades has an empty catalogue and no
+    // other way to fill it.
+    const { status, body } = await h.client.post("/v1/skills/seed", {});
+    expect(status).toBe(200);
+    // Signup already seeded this org, so a second run adds nothing.
+    expect(body.published).toEqual([]);
+    expect(body.detail).toMatch(/already here/i);
+  });
+
+  it("is refused to a plain member", async () => {
+    const invited = await h.client.post("/auth/invites", {
+      email: "nobody@acme.test",
+      role: "member",
+    });
+    const member = new Client(h.base);
+    await member.post(`/auth/invites/${invited.body.invite_url.split("/").pop()}/accept`, {
+      password: "a perfectly long password",
+    });
+    expect((await member.post("/v1/skills/seed", {})).status).toBe(403);
+  });
+
   it("enabling one takes no extra publish step", async () => {
     const { status } = await h.client.post("/v1/skills/code-review/enable", {
       project_key: PROJECT,
@@ -110,6 +132,33 @@ describe("publishing", () => {
     expect(body.state).toBe("published");
     expect(body.findings).toEqual([]);
     expect(body.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("takes its description from its own frontmatter when none is sent", async () => {
+    // The CLI's `publish` and `import` send content and nothing else, and every
+    // card they produced read "No description".
+    const { body } = await h.client.post("/v1/skills", {
+      name: "self-describing",
+      content: SKILL,
+    });
+    expect(body.version).toBe(1);
+
+    const catalogue = await h.client.get("/v1/skills/catalogue");
+    const entry = catalogue.body.skills.find((s: { name: string }) => s.name === "self-describing");
+    expect(entry.description).toBe("When retrying a payment call.");
+  });
+
+  it("prefers an explicit description over the frontmatter", async () => {
+    const { body } = await h.client.post("/v1/skills", {
+      name: "overridden",
+      content: SKILL,
+      description: "What the publisher actually meant.",
+    });
+    expect(body.version).toBe(1);
+
+    const catalogue = await h.client.get("/v1/skills/catalogue");
+    const entry = catalogue.body.skills.find((s: { name: string }) => s.name === "overridden");
+    expect(entry.description).toBe("What the publisher actually meant.");
   });
 
   it("adds a version rather than overwriting", async () => {

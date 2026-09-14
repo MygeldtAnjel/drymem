@@ -14,6 +14,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db, schema } from "../db/client.js";
 import { record } from "./audit.js";
+import { descriptionOf } from "./frontmatter.js";
 import { rejects, scan } from "./scan.js";
 import type { Finding } from "../db/schema.js";
 
@@ -73,6 +74,13 @@ export async function publishVersion(
   input: PublishInput,
 ): Promise<PublishResult> {
   const name = slug(input.name);
+  /*
+   * A skill describes itself. Its frontmatter carries the sentence an agent
+   * reads to decide whether to load it, which is the same sentence a person
+   * reads in the catalogue — so a caller that sends no description gets that
+   * one rather than a card saying "No description".
+   */
+  const description = input.description || descriptionOf(input.content);
   const findings = scan(input.content, input.files);
   if (rejects(findings)) return { outcome: "rejected", findings };
 
@@ -92,7 +100,7 @@ export async function publishVersion(
         authorId: who.userId,
         name,
         topic: input.topic,
-        description: input.description || input.topic || null,
+        description: description || input.topic || null,
         scope: "org",
         source: input.source,
         origin: input.origin ?? null,
@@ -104,7 +112,7 @@ export async function publishVersion(
       .update(schema.skills)
       .set({
         topic: input.topic || skill.topic,
-        description: input.description || skill.description,
+        description: description || skill.description,
         // A skill that was deprecated and is published again is alive.
         state,
         updatedAt: new Date(),

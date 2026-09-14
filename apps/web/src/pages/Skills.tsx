@@ -24,6 +24,7 @@ import {
   FileText,
   History,
   Plus,
+  Search,
   ShieldAlert,
   Sparkles,
   Trash2,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { Blank } from "@/components/Bits";
+import { Input } from "@/components/ui/input";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -112,6 +114,82 @@ export function Findings({ findings }: { findings: Finding[] }) {
   );
 }
 
+/**
+ * One skill in the catalogue.
+ *
+ * A card rather than a row because a catalogue is browsed, not audited: a
+ * person arrives wanting to find out what is available, and a description that
+ * gets two lines instead of a truncated tail is the difference between reading
+ * and squinting. The list shape stays on "On this project", where the job is
+ * checking what is installed rather than shopping.
+ */
+function SkillCard({
+  skill,
+  enabledHere,
+  isAdmin,
+  busy,
+  onEnable,
+  onDeprecate,
+}: {
+  skill: CatalogueSkill;
+  enabledHere: boolean;
+  isAdmin: boolean;
+  busy: boolean;
+  onEnable: (name: string) => void;
+  onDeprecate: (name: string) => void;
+}) {
+  return (
+    <li className="border-border bg-card hover:border-input flex min-w-0 flex-col gap-3 rounded-lg border p-4 transition-colors">
+      <button className="min-w-0 text-left" onClick={() => go("skills", skill.name)}>
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="truncate font-mono text-sm font-medium">{skill.name}</span>
+          {enabledHere && (
+            <Badge className="bg-success/15 text-success">
+              <CheckCircle2 data-icon="inline-start" /> On here
+            </Badge>
+          )}
+          <StateChip state={skill.state} />
+        </span>
+        <span className="text-muted-foreground mt-1.5 line-clamp-2 text-xs">
+          {skill.description || skill.topic || "No description"}
+        </span>
+      </button>
+
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <SourceChip source={skill.source} />
+        <Badge variant="outline">v{skill.latest_version}</Badge>
+        {skill.uses > 0 && (
+          <Badge variant="outline" className="text-muted-foreground">
+            {count(skill.uses, "read")}
+          </Badge>
+        )}
+      </div>
+
+      <div className="border-border mt-auto flex min-w-0 flex-wrap items-center gap-2 border-t pt-3">
+        <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+          {skill.author?.split("@")[0] ?? "unknown"} · {relative(skill.updated_at)}
+        </span>
+        {!enabledHere && (
+          <Button size="sm" disabled={busy} onClick={() => onEnable(skill.name)}>
+            <Plus data-icon="inline-start" /> Add
+          </Button>
+        )}
+        {isAdmin && skill.state !== "deprecated" && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Deprecate ${skill.name}`}
+            disabled={busy}
+            onClick={() => onDeprecate(skill.name)}
+          >
+            <Ban />
+          </Button>
+        )}
+      </div>
+    </li>
+  );
+}
+
 export function SkillsPage({
   skills,
   catalogue,
@@ -145,12 +223,20 @@ export function SkillsPage({
 }) {
   const [readingDraft, setReadingDraft] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   const enabledNames = new Set(skills.map((s) => s.name));
   const published = catalogue.filter((s) => s.state !== "pending");
   const pending = catalogue.filter((s) => s.state === "pending");
   const publishedTopics = new Set(catalogue.map((s) => s.topic));
   const suggestions = clusters.filter((c) => !publishedTopics.has(c.topic));
+
+  const needle = filter.trim().toLowerCase();
+  const matching = needle
+    ? published.filter((s) =>
+        `${s.name} ${s.description ?? ""} ${s.topic}`.toLowerCase().includes(needle),
+      )
+    : published;
 
   const draft = readingDraft ? drafts[readingDraft] : null;
   const document = frontmatter(draft?.content ?? "");
@@ -294,56 +380,42 @@ export function SkillsPage({
                 <code className="font-mono">drymem skills publish ./my-skill</code>.
               </Blank>
             ) : (
-              <ul className="flex flex-col">
-                {published.map((skill) => (
-                  <li
-                    key={skill.id}
-                    className="flex flex-wrap items-center gap-2 border-t px-4 py-3 first:border-t-0"
-                  >
-                    <button
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => go("skills", skill.name)}
-                    >
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-mono text-sm font-medium">
-                          {skill.name}
-                        </span>
-                        <SourceChip source={skill.source} />
-                        <StateChip state={skill.state} />
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {skill.description || skill.topic || "No description"} · v
-                        {skill.latest_version} · {relative(skill.updated_at)}
-                        {skill.origin && ` · ${skill.origin}`}
-                      </span>
-                    </button>
-                    {enabledNames.has(skill.name) ? (
-                      <Badge variant="outline" className="text-success">
-                        <CheckCircle2 /> On here
-                      </Badge>
-                    ) : (
-                      <Button
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => onEnable(skill.name)}
-                      >
-                        <Plus data-icon="inline-start" /> Enable
-                      </Button>
-                    )}
-                    {isAdmin && skill.state !== "deprecated" && (
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Deprecate ${skill.name}`}
-                        disabled={busy}
-                        onClick={() => onDeprecate(skill.name)}
-                      >
-                        <Ban />
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-col gap-4 p-4">
+                {/* A seeded organisation starts with eighteen. Scrolling a grid
+                    looking for one by eye is the thing a filter exists for. */}
+                {published.length > 6 && (
+                  <div className="relative max-w-sm">
+                    <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                    <Input
+                      className="pl-8"
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      placeholder="Filter by name or description"
+                      aria-label="Filter the catalogue"
+                    />
+                  </div>
+                )}
+
+                {matching.length === 0 ? (
+                  <Blank icon={Search} title="Nothing matches">
+                    No skill here has “{filter}” in its name or description.
+                  </Blank>
+                ) : (
+                  <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {matching.map((skill) => (
+                      <SkillCard
+                        key={skill.id}
+                        skill={skill}
+                        enabledHere={enabledNames.has(skill.name)}
+                        isAdmin={isAdmin}
+                        busy={busy}
+                        onEnable={onEnable}
+                        onDeprecate={onDeprecate}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
           </Card>
         </TabsContent>
