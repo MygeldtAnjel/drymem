@@ -421,6 +421,7 @@ async def ask_question(body: AskRequest, service: ServiceDep) -> AskResponse:
         project_key=body.project_key,
         question=body.question,
         history=[t.model_dump() for t in body.history],
+        carry=body.carry,
     )
     return AskResponse(
         question=result.question,

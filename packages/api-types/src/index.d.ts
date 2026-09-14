@@ -378,6 +378,8 @@ export interface components {
             question: string;
             /** History */
             history?: components["schemas"]["AskTurn"][];
+            /** Carry */
+            carry?: string[];
         };
         /** AskResponse */
         AskResponse: {

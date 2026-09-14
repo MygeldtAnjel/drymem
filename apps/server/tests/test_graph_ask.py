@@ -493,3 +493,69 @@ class TestWhatTheModelSeesOfTheConversation:
 
         assert "conversation" in SYSTEM.lower()
         assert "restate" in SYSTEM.lower()
+
+
+async def test_a_carried_memory_survives_a_subjectless_follow_up(client, no_model):
+    """"And what files did he change?" has no subject of its own.
+
+    Retrieval on those words alone pulled four unrelated memories, and the
+    answer said — correctly, for what it was shown — that it could not tell. The
+    memories the last answer stood on are the subject.
+    """
+    subject = await save(
+        client,
+        summary="The canvas went. Files: apps/web/src/pages/Graph.tsx.",
+        topic="web/canvas",
+    )
+    for i in range(4):
+        await save(client, summary=f"Unrelated note about invoices {i}.", topic=f"billing/{i}")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={
+                "project_key": PROJECT,
+                "question": "and what files did he change?",
+                "history": [{"role": "user", "content": "was it complex?"}],
+                "carry": [subject["episode_uuid"]],
+            },
+            headers=auth(client),
+        )
+    ).json()
+
+    assert body["sources"][0]["uuid"] == subject["episode_uuid"], "the carried memory comes first"
+    assert "apps/web/src/pages/Graph.tsx" in body["answer"], "and its content reaches the model"
+
+
+async def test_carrying_nothing_is_the_first_question(client, no_model):
+    await save(client, summary="Retries cap at thirty seconds.", topic="pay/retry")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={"project_key": PROJECT, "question": "What is the retry cap?", "carry": []},
+            headers=auth(client),
+        )
+    ).json()
+
+    assert "retry cap" in body["answer"].lower()
+
+
+async def test_a_carried_uuid_that_no_longer_exists_is_ignored(client, no_model):
+    # A memory can be deleted between one turn and the next.
+    await save(client, summary="Retries cap at thirty seconds.", topic="pay/retry")
+
+    body = (
+        await client.post(
+            "/v1/ask",
+            json={
+                "project_key": PROJECT,
+                "question": "What is the retry cap?",
+                "carry": ["00000000-0000-0000-0000-000000000000"],
+            },
+            headers=auth(client),
+        )
+    ).json()
+
+    assert body["grounded"] is True
+    assert len(body["sources"]) >= 1

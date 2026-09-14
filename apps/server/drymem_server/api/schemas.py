@@ -343,6 +343,10 @@ class AskRequest(BaseModel):
     # Earlier turns, so "and why?" means something. Retrieval still runs on the
     # question alone — the history is context for the model, not a search term.
     history: list[AskTurn] = Field(default_factory=list, max_length=20)
+    # The memories the last answer stood on. A follow-up can carry no subject of
+    # its own — "and what files did he change?" — so the conversation's subject
+    # travels as uuids rather than being re-derived from words that lack it.
+    carry: list[str] = Field(default_factory=list, max_length=8)
 
 
 class AskSource(BaseModel):

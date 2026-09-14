@@ -141,6 +141,7 @@ async function askEngine(
   projectKey: string,
   question: string,
   history: { role: string; content: string }[],
+  carry: string[],
 ): Promise<EngineAnswer> {
   const response = await fetch(new URL("/v1/ask", env.MEMORY_URL), {
     method: "POST",
@@ -148,7 +149,7 @@ async function askEngine(
       "Content-Type": "application/json",
       "X-Drymem-Principal": await signPrincipal(principal),
     },
-    body: JSON.stringify({ project_key: projectKey, question, history }),
+    body: JSON.stringify({ project_key: projectKey, question, history, carry }),
     // A local model takes its time. Node's default would give up first and
     // report a network failure for an answer that was on its way.
     signal: AbortSignal.timeout(180_000),
@@ -175,16 +176,32 @@ chatRouter.post("/ask", async (req, res) => {
     ? await chatFor(principal.orgId, principal.userId, body.chat_id)
     : null;
 
-  const history = existing
-    ? (await messagesOf(existing.id)).slice(-HISTORY_TURNS).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }))
-    : [];
+  const earlier = existing ? await messagesOf(existing.id) : [];
+  const history = earlier.slice(-HISTORY_TURNS).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  /*
+   * What the conversation is about, as memory uuids.
+   *
+   * A follow-up often carries no subject — "was it complex?", then "and what
+   * files did he change?". Retrieving on those words alone lost the thread
+   * entirely. The memories the last answer stood on are the subject, so they
+   * travel with the question.
+   */
+  const carry = [
+    ...new Set(
+      earlier
+        .filter((m) => m.role === "assistant")
+        .slice(-1)
+        .flatMap((m) => m.sources.map((s) => s.uuid)),
+    ),
+  ];
 
   // The engine first. A chat row created before an answer that never arrives
   // is an empty conversation in somebody's list with nothing to explain it.
-  const result = await askEngine(principal, body.project_key, body.question, history);
+  const result = await askEngine(principal, body.project_key, body.question, history, carry);
 
   const chat =
     existing ??

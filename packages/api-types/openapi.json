@@ -1144,6 +1144,14 @@
             "type": "array",
             "maxItems": 20,
             "title": "History"
+          },
+          "carry": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Carry"
           }
         },
         "type": "object",

@@ -764,7 +764,13 @@ class MemoryService:
         return view
 
     async def ask(
-        self, *, project_key: str, question: str, limit: int = 6, history: list[dict] | None = None
+        self,
+        *,
+        project_key: str,
+        question: str,
+        limit: int = 6,
+        history: list[dict] | None = None,
+        carry: list[str] | None = None,
     ):
         """Answer from this project's memories, with citations.
 
@@ -815,9 +821,22 @@ class MemoryService:
             )
 
         ranked = sorted(entries, key=score, reverse=True)
-        picked = [e for e in ranked if any(score(e))][: ask_module.MAX_SOURCES]
-        if not picked:
-            picked = ranked[: ask_module.MAX_SOURCES]
+
+        # The memories the conversation is already about, kept in front.
+        #
+        # A follow-up can carry no subject at all — "was it complex?", then
+        # "and what files did he change?". Retrieval on those words alone
+        # pulled four unrelated memories, and the answer said, correctly for
+        # what it was shown, that it could not tell. The subject of a
+        # conversation is the memories the last answer stood on, so those are
+        # pinned and the query fills what is left.
+        wanted = list(carry or [])
+        pinned = [e for uuid in wanted for e in ranked if e.episode.uuid == uuid]
+        seen_uuids = {e.episode.uuid for e in pinned}
+
+        rest = [e for e in ranked if e.episode.uuid not in seen_uuids]
+        matched = [e for e in rest if any(score(e))]
+        picked = (pinned + (matched or rest))[: ask_module.MAX_SOURCES]
 
         sources = [
             ask_module.Source(

@@ -21,8 +21,12 @@ const PROJECT = "github.com/acme/payment-ui";
 const OWNER = { email: "owner@acme.test", password: "correct horse battery" };
 const DEV = { email: "dev@acme.test", password: "a developer's password" };
 
-/** What the engine was asked, newest last, so a test can inspect the history. */
-let asked: { question: string; history: { role: string; content: string }[] }[] = [];
+/** What the engine was asked, newest last, so a test can inspect it. */
+let asked: {
+  question: string;
+  history: { role: string; content: string }[];
+  carry: string[];
+}[] = [];
 
 function stubEngine(answer = "Thirty seconds [1].", grounded = true) {
   const real = globalThis.fetch;
@@ -31,7 +35,7 @@ function stubEngine(answer = "Thirty seconds [1].", grounded = true) {
     if (!url.includes("/v1/ask")) return real(input, init);
 
     const body = JSON.parse(String(init?.body ?? "{}"));
-    asked.push({ question: body.question, history: body.history ?? [] });
+    asked.push({ question: body.question, history: body.history ?? [], carry: body.carry ?? [] });
     return new Response(
       JSON.stringify({
         answer,
@@ -140,6 +144,41 @@ describe("asking", () => {
     expect(asked[0]!.history).toEqual([]);
     expect(asked[1]!.history.map((t) => t.role)).toEqual(["user", "assistant"]);
     expect(asked[1]!.history[0]!.content).toBe("What is the retry cap?");
+  });
+
+  it("carries the last answer's memories into the next question", async () => {
+    // A follow-up often has no subject of its own — "was it complex?", then
+    // "and what files did he change?". Without this the thread is lost.
+    stubEngine();
+    const first = await h.client.post("/v1/chats/ask", {
+      project_key: PROJECT,
+      question: "What was the last decision?",
+    });
+    await h.client.post("/v1/chats/ask", {
+      project_key: PROJECT,
+      question: "and what files did he change?",
+      chat_id: first.body.chat_id,
+    });
+
+    expect(asked[0]!.carry).toEqual([]);
+    expect(asked[1]!.carry).toEqual(["ep-1"]);
+  });
+
+  it("carries only the most recent answer's memories", async () => {
+    // Three turns deep, the subject is what the *last* answer stood on.
+    stubEngine();
+    const started = await h.client.post("/v1/chats/ask", {
+      project_key: PROJECT,
+      question: "First question here",
+    });
+    for (const q of ["Second question here", "Third question here"]) {
+      await h.client.post("/v1/chats/ask", {
+        project_key: PROJECT,
+        question: q,
+        chat_id: started.body.chat_id,
+      });
+    }
+    expect(asked.at(-1)!.carry).toEqual(["ep-1"]);
   });
 
   it("stores the memories that were cited", async () => {
