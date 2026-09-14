@@ -18,6 +18,7 @@ import { seedCatalogue } from "../lib/seed.js";
 import { hashPassword, hashToken, randomToken, verifyPassword, WeakPassword } from "../lib/crypto.js";
 import { badRequest, conflict, limiter, notFound, unauthorized } from "../lib/errors.js";
 import { link, sendReset } from "../lib/email.js";
+import { authorizeUrl, githubEnabled, GithubError, identify } from "../lib/github.js";
 import { endAllSessions, endSession, startSession } from "../lib/sessions.js";
 import { param } from "../lib/params.js";
 import { principalOf, requireUser, SESSION_COOKIE } from "../middleware/auth.js";
@@ -63,7 +64,104 @@ authRouter.get("/bootstrap", async (_req, res) => {
     needs_setup: empty,
     org_name: org?.name ?? null,
     smtp_enabled: emailEnabled,
+    github_enabled: githubEnabled(),
   });
+});
+
+// ---- signing in with GitHub --------------------------------------------------------
+
+/**
+ * The state cookie.
+ *
+ * A short-lived, httpOnly value echoed through GitHub and compared on the way
+ * back. Without it, anyone can feed a victim's browser a callback URL carrying
+ * *their* code and silently attach the attacker's GitHub identity to whatever
+ * session follows.
+ */
+const STATE_COOKIE = "drymem_oauth_state";
+const STATE_MINUTES = 10;
+
+/** Back to the app, with a message the sign-in page knows how to show. */
+function backToSignIn(res: import("express").Response, error?: string): void {
+  res.clearCookie(STATE_COOKIE, { path: "/auth" });
+  const base = env.PUBLIC_URL.replace(/\/$/, "");
+  res.redirect(error ? `${base}/#/signin?error=${encodeURIComponent(error)}` : `${base}/#/`);
+}
+
+authRouter.get("/github", (req, res) => {
+  if (!githubEnabled()) throw notFound("GitHub sign-in is not configured on this server.");
+  const state = randomToken(16);
+  res.cookie(STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: env.COOKIE_SECURE,
+    maxAge: STATE_MINUTES * 60_000,
+    // Scoped to /auth: it has no business being sent with every API call.
+    path: "/auth",
+  });
+  res.redirect(authorizeUrl(state));
+});
+
+/**
+ * GitHub sends the person back here.
+ *
+ * Every failure ends at the sign-in page with a sentence, never a JSON error:
+ * this is a browser redirect, and a person who clicked a button should not be
+ * looking at a stack trace.
+ */
+authRouter.get("/github/callback", async (req, res) => {
+  if (!githubEnabled()) return backToSignIn(res, "GitHub sign-in is not configured.");
+  loginLimit(req.ip ?? "unknown");
+
+  const query = z
+    .object({ code: z.string().max(500).optional(), state: z.string().max(200).optional() })
+    .safeParse(req.query);
+  const expected = (req.cookies as Record<string, string>)?.[STATE_COOKIE];
+
+  if (!query.success || !query.data.code || !query.data.state) {
+    return backToSignIn(res, "GitHub did not complete the sign-in.");
+  }
+  if (!expected || expected !== query.data.state) {
+    return backToSignIn(res, "That sign-in link expired. Try again.");
+  }
+
+  let identity;
+  try {
+    identity = await identify(query.data.code);
+  } catch (error) {
+    return backToSignIn(
+      res,
+      error instanceof GithubError ? error.message : "Could not reach GitHub.",
+    );
+  }
+
+  const [user] = await db
+    .select()
+    .from(schema.users)
+    .where(eq(raw`lower(${schema.users.email})`, identity.email))
+    .limit(1);
+
+  if (!user) {
+    // Invitation-only after the first account. A GitHub identity signs you in;
+    // it does not let you in.
+    return backToSignIn(
+      res,
+      `No drymem account for ${identity.email}. Ask an admin for an invitation.`,
+    );
+  }
+
+  // A name from GitHub is better than none, but never overwrites one the person
+  // set here.
+  if (!user.name && identity.name) {
+    await db
+      .update(schema.users)
+      .set({ name: identity.name.slice(0, 200) })
+      .where(eq(schema.users.id, user.id));
+  }
+
+  await startSession(user.id, req.get("user-agent"), res);
+  await record({ orgId: user.orgId, userId: user.id }, "user.login", `github:${identity.login}`);
+  backToSignIn(res);
 });
 
 const signupSchema = z.object({

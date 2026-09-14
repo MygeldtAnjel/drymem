@@ -87,6 +87,10 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-drymem <onboarding@resend.dev>}
+      # Both empty means no GitHub button, which is the right default for a
+      # laptop that cannot register an OAuth app.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy

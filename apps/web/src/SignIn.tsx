@@ -10,7 +10,8 @@
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
-import { CatMark } from "@/components/Logo";
+import { CatMark, GithubMark } from "@/components/Logo";
+import { flashError } from "@/flash";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -25,19 +26,36 @@ export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
   const [name, setName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /*
+   * A failed GitHub callback redirects here with the reason in the URL, read at
+   * import because the router clears the query before anything mounts.
+   *
+   * Kept apart from `error`, which belongs to the form: putting "no drymem
+   * account for you@example.com" under the password field turns a GitHub
+   * problem into what looks like a wrong password.
+   */
+  const [banner, setBanner] = useState<string | null>(flashError);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     auth
       .bootstrap()
       .then(setState)
-      .catch(() => setState({ needs_setup: false, org_name: null, smtp_enabled: false }));
+      .catch(() =>
+        setState({
+          needs_setup: false,
+          org_name: null,
+          smtp_enabled: false,
+          github_enabled: false,
+        }),
+      );
   }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setBanner(null);
     try {
       const session = state?.needs_setup
         ? await auth.signup({ org_name: orgName, email, password, name })
@@ -73,6 +91,14 @@ export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
           <Skeleton className="h-40" />
         ) : (
           <form className="flex flex-col gap-5" onSubmit={submit}>
+            {banner && (
+              <p
+                role="alert"
+                className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm"
+              >
+                {banner}
+              </p>
+            )}
             <FieldGroup>
               {creating && (
                 <Field>
@@ -136,11 +162,33 @@ export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
             {!creating && (
               <button
                 type="button"
-                className="self-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                className="text-muted-foreground hover:text-foreground self-center text-sm underline-offset-4 hover:underline"
                 onClick={() => go("forgot")}
               >
                 Forgotten your password?
               </button>
+            )}
+
+            {/* A second door, never the only one (D26). Absent entirely unless
+                the server has an OAuth app — a laptop install cannot register
+                one, and an inert button is worse than no button. */}
+            {!creating && state?.github_enabled && (
+              <>
+                <div className="flex items-center gap-3">
+                  <span className="bg-border h-px flex-1" />
+                  <span className="text-muted-foreground text-xs">or</span>
+                  <span className="bg-border h-px flex-1" />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    window.location.href = "/auth/github";
+                  }}
+                >
+                  <GithubMark /> Continue with GitHub
+                </Button>
+              </>
             )}
           </form>
         )}

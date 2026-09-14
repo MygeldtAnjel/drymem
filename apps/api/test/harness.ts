@@ -77,7 +77,7 @@ export class Client {
     path: string,
     body?: unknown,
     opts: { web?: boolean; bearer?: string } = {},
-  ): Promise<{ status: number; body: any }> {
+  ): Promise<{ status: number; body: any; headers: Headers }> {
     const web = opts.web ?? true;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (web) headers["X-Drymem-Client"] = "web";
@@ -108,7 +108,7 @@ export class Client {
     } catch {
       parsed = text;
     }
-    return { status: response.status, body: parsed as any };
+    return { status: response.status, body: parsed as any, headers: response.headers };
   }
 
   get = (p: string, o?: { web?: boolean; bearer?: string }) =>
@@ -129,7 +129,11 @@ export interface Harness {
   logged: string[];
 }
 
-export async function startServer(databaseUrl: string): Promise<Harness> {
+export async function startServer(
+  databaseUrl: string,
+  /** Extra configuration for this server only, cleared again afterwards. */
+  extra: Record<string, string> = {},
+): Promise<Harness> {
   // The app reads its configuration once, at import. Each scratch server needs
   // its own, so the module registry is reset between them.
   process.env.DATABASE_URL = databaseUrl;
@@ -140,6 +144,11 @@ export async function startServer(databaseUrl: string): Promise<Harness> {
   process.env.MEMORY_URL = "http://127.0.0.1:9";
   delete process.env.RESEND_API_KEY;
   delete process.env.WEB_DIR;
+  // Cleared every time, so a server configured for one test does not leak its
+  // settings into the next one through `process.env`.
+  delete process.env.GITHUB_CLIENT_ID;
+  delete process.env.GITHUB_CLIENT_SECRET;
+  Object.assign(process.env, extra);
 
   // The app reads env and opens its pool at import, so each scratch server
   // needs a fresh module graph.

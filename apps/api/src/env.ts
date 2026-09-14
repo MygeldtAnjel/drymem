@@ -40,6 +40,14 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("drymem <onboarding@resend.dev>"),
 
+  /**
+   * GitHub sign-in. Both absent means the feature is off and no button appears
+   * — a self-hosted install on a laptop cannot register an OAuth app, and
+   * password login has to keep working without one (D26).
+   */
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+
   /** Where the built web app lives. Empty disables serving it. */
   WEB_DIR: z.string().optional(),
 });

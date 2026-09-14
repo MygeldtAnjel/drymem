@@ -199,6 +199,7 @@ export interface Bootstrap {
   needs_setup: boolean;
   org_name: string | null;
   smtp_enabled: boolean;
+  github_enabled: boolean;
 }
 
 export interface Invite {
