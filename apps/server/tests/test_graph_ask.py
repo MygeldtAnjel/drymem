@@ -440,3 +440,56 @@ async def test_a_fact_carries_the_memories_it_came_from(client, store):
     ).json()
 
     assert body["results"][0]["name"] == "CAPS_AT"
+
+
+class TestWhatTheModelSeesOfTheConversation:
+    """`_as_turns` decides how much of a chat reaches the prompt."""
+
+    def test_only_the_last_few_turns(self):
+        from drymem_server.ask import HISTORY_TURNS, _as_turns
+
+        long = [{"role": "user", "content": f"turn {i}"} for i in range(HISTORY_TURNS * 3)]
+        seen = _as_turns(long)
+
+        assert len(seen) == HISTORY_TURNS
+        # The tail, not the head: the recent turns are the ones a follow-up is about.
+        assert seen[-1]["content"] == f"turn {HISTORY_TURNS * 3 - 1}"
+
+    def test_a_long_turn_is_trimmed(self):
+        from drymem_server.ask import HISTORY_CHARS, _as_turns
+
+        seen = _as_turns([{"role": "user", "content": "x" * (HISTORY_CHARS * 4)}])
+        assert len(seen[0]["content"]) == HISTORY_CHARS
+
+    def test_order_is_preserved(self):
+        from drymem_server.ask import _as_turns
+
+        seen = _as_turns(
+            [
+                {"role": "user", "content": "first"},
+                {"role": "assistant", "content": "second"},
+                {"role": "user", "content": "third"},
+            ]
+        )
+        assert [t["role"] for t in seen] == ["user", "assistant", "user"]
+        assert [t["content"] for t in seen] == ["first", "second", "third"]
+
+    def test_anything_that_is_not_a_turn_is_dropped(self):
+        from drymem_server.ask import _as_turns
+
+        seen = _as_turns(
+            [
+                {"role": "system", "content": "not yours to set"},
+                {"role": "user", "content": "   "},
+                {"role": "user", "content": "kept"},
+            ]
+        )
+        assert seen == [{"role": "user", "content": "kept"}]
+
+    def test_the_prompt_says_it_is_a_conversation(self):
+        # Without this the model re-answered the first question every turn:
+        # asked "was it a big change?" it restated what it had just said.
+        from drymem_server.ask import SYSTEM
+
+        assert "conversation" in SYSTEM.lower()
+        assert "restate" in SYSTEM.lower()
