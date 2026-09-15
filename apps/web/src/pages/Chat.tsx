@@ -127,6 +127,7 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
   const [more, setMore] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
 
   /*
    * Nothing until there is a project to ask about.
@@ -181,6 +182,29 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, asking]);
+
+  /*
+   * Fetch the next page when the end of the list is reached.
+   *
+   * The observer is rebuilt whenever the cursor changes, because the callback
+   * closes over it — a stale one would ask for the same page forever.
+   */
+  useEffect(() => {
+    const target = sentinel.current;
+    if (!target || !more) return;
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+      },
+      { rootMargin: "120px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+    // `loadMore` is recreated every render; `more` is what actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [more]);
 
   const open = async (id: string) => {
     setOpenId(id);
@@ -287,17 +311,16 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
               ))}
             </ul>
           )}
+          {/*
+            The sentinel. A chat list is scrolled, not navigated — nobody goes
+            to "page 3 of my conversations" — so the next page arrives when the
+            bottom comes into view rather than on a button. It still renders
+            when there is more, so a browser without IntersectionObserver shows
+            a plain line instead of silently stopping.
+          */}
           {more && (
-            <div className="border-t p-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                disabled={fetching}
-                onClick={loadMore}
-              >
-                {fetching ? <Spinner className="size-3.5" /> : null} Older chats
-              </Button>
+            <div ref={sentinel} className="text-muted-foreground p-3 text-center text-xs">
+              {fetching ? "Loading…" : "Older chats"}
             </div>
           )}
         </CardContent>
