@@ -14,7 +14,7 @@ skill is prose a person has to read and act on.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from drymem_server.settings import settings
 
@@ -56,6 +56,10 @@ class Draft:
     content: str
     model: str
     memory_count: int
+    # The topic keys of the memories it was written from. A person about to
+    # install this on everyone's machine should see what it was built out of,
+    # not just a count.
+    sources: list[str] = field(default_factory=list)
 
 
 def _slug(topic: str) -> str:
@@ -169,4 +173,11 @@ async def draft_skill(topic: str, memories: list[dict]) -> Draft:
     name = _slug(topic)
     content = _ensure_frontmatter(content, name, topic)
 
-    return Draft(topic=topic, name=name, content=content, model=model, memory_count=len(memories))
+    return Draft(
+        topic=topic,
+        name=name,
+        content=content,
+        model=model,
+        memory_count=len(memories),
+        sources=[str(m.get("name") or "") for m in memories if m.get("name")],
+    )

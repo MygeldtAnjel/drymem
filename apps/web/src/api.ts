@@ -755,6 +755,7 @@ export const api = {
       content: string;
       model: string;
       memory_count: number;
+      sources: string[];
     }>("/v1/skills/distill", {
       method: "POST",
       body: JSON.stringify({ project_key: projectKey, topic }),

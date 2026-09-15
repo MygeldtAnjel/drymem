@@ -291,6 +291,7 @@ async def distill_skill(body: DistillRequest, service: ServiceDep) -> DistillRes
         content=draft.content,
         model=draft.model,
         memory_count=draft.memory_count,
+        sources=draft.sources,
     )
 
 

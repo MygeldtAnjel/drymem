@@ -176,6 +176,9 @@ class DistillResponse(BaseModel):
     content: str
     model: str
     memory_count: int
+    # What it was written from, so the reader can judge the coverage rather
+    # than trust a number.
+    sources: list[str] = []
 
 
 class SessionOut(BaseModel):
