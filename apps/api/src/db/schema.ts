@@ -21,13 +21,14 @@
 
 import { randomUUID } from "node:crypto";
 
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
   index,
   integer,
   json,
+  bigint,
   jsonb,
   pgTable,
   text,
@@ -359,9 +360,23 @@ export const chatMessages = pgTable(
     /** False when the memory had nothing, so nobody has to ask if it was invented. */
     grounded: boolean("grounded").notNull().default(true),
     model: varchar("model", { length: 100 }).notNull().default(""),
+    /**
+     * Insertion order, and the only total order these rows have. Both messages
+     * of a turn are written in one statement, so `created_at` is identical for
+     * a question and its answer — ordering by it is a tie, which puts the
+     * answer above the question and makes a cursor ambiguous.
+     */
+    seq: bigint("seq", { mode: "number" })
+      .notNull()
+      // A plain sequence default, which is what the migration created — not an
+      // identity column. Declared so inserts can leave it out.
+      .default(sql`nextval('chat_messages_seq_seq')`),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("ix_chat_messages_chat").on(t.chatId, t.createdAt)],
+  (t) => [
+    index("ix_chat_messages_chat").on(t.chatId, t.createdAt),
+    index("ix_chat_messages_chat_seq").on(t.chatId, t.seq),
+  ],
 );
 
 export interface ChatSource {
