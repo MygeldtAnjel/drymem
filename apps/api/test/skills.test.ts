@@ -7,7 +7,7 @@
  * publish, scan, version, enable, lock — and the CLI suite is the other.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import postgres from "postgres";
 
 import { Client, scratchDatabase, startServer, type Harness, type Scratch } from "./harness.js";
@@ -17,6 +17,20 @@ let h: Harness;
 let sql: ReturnType<typeof postgres>;
 
 const PROJECT = "github.com/acme/payment-ui";
+
+/** The engine owns the model; these tests own the row it writes. */
+function stubEngineTopics(topics: string[], onCall?: () => void) {
+  const real = globalThis.fetch;
+  vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (!url.includes("/v1/skills/topics")) return real(input, init);
+    onCall?.();
+    return new Response(JSON.stringify({ topics }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+}
 const OWNER = { email: "owner@acme.test", password: "correct horse battery" };
 const DEV = { email: "dev@acme.test", password: "a developer's password" };
 
@@ -62,6 +76,8 @@ beforeAll(async () => {
   });
   await makeProject(OWNER.email);
 }, 120_000);
+
+afterEach(() => vi.unstubAllGlobals());
 
 afterAll(async () => {
   await sql?.end();
@@ -421,5 +437,55 @@ describe("telemetry", () => {
     expect(Object.keys(rows[0]!).sort()).toEqual(
       ["agent", "created_at", "id", "org_id", "project_id", "skill_id", "user_id"].sort(),
     );
+  });
+});
+
+describe("topics", () => {
+  it("tags a skill from its own text when it is published", async () => {
+    stubEngineTopics(["code-review", "quality"]);
+    const { body } = await h.client.post("/v1/skills", {
+      name: "tagged-on-publish",
+      content: "---\nname: tagged-on-publish\ndescription: Review a diff.\n---\n\nRead the diff.",
+    });
+    expect(body.topics).toEqual(["code-review", "quality"]);
+
+    const listed = await h.client.get(`/v1/skills/catalogue?project_key=${PROJECT}`);
+    const found = listed.body.skills.find((s: { name: string }) => s.name === "tagged-on-publish");
+    expect(found.topics).toEqual(["code-review", "quality"]);
+  });
+
+  it("publishes anyway when the tagger is down", async () => {
+    // The rule the whole thing hangs on: a skill with no tags is a worse card,
+    // a publish that fails because a model was down is somebody's blocked work.
+    const real = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/v1/skills/topics")) throw new TypeError("fetch failed");
+      return real(input, init);
+    });
+
+    const { status, body } = await h.client.post("/v1/skills", {
+      name: "untagged-but-published",
+      content: "---\nname: untagged-but-published\ndescription: Something.\n---\n\nDo it.",
+    });
+    expect(status).toBe(200);
+    expect(body.version).toBe(1);
+    expect(body.topics).toEqual([]);
+  });
+
+  it("does not re-tag a skill that already has tags", async () => {
+    // Re-deriving on every version spends a model call to produce the same five
+    // words, and would overwrite a tag somebody had corrected by hand.
+    let calls = 0;
+    stubEngineTopics(["first"], () => (calls += 1));
+    await h.client.post("/v1/skills", {
+      name: "tagged-once",
+      content: "---\nname: tagged-once\ndescription: One.\n---\n\nBody one.",
+    });
+    await h.client.post("/v1/skills", {
+      name: "tagged-once",
+      content: "---\nname: tagged-once\ndescription: Two.\n---\n\nBody two, different bytes.",
+    });
+    expect(calls).toBe(1);
   });
 });

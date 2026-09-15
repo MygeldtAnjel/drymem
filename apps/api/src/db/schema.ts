@@ -219,6 +219,12 @@ export const skills = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 200 }).notNull(),
     topic: varchar("topic", { length: 300 }).notNull().default(""),
+    /**
+     * What the skill is about, as tags: `code-review`, `testing`, `ci`.
+     * Derived from the skill's own text when it is published — the one moment
+     * the information is free, because somebody is handing us the document.
+     */
+    topics: jsonb("topics").$type<string[]>().notNull().default([]),
     description: text("description"),
     /** org | project */
     scope: varchar("scope", { length: 20 }).notNull().default("org"),

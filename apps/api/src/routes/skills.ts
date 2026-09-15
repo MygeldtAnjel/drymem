@@ -21,6 +21,7 @@ import { db, schema } from "../db/client.js";
 import { record } from "../lib/audit.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 import { param } from "../lib/params.js";
+import { tagSkill } from "../lib/topics.js";
 import { isAdmin, type Principal } from "../lib/principal.js";
 import { publishVersion, slug } from "../lib/publish.js";
 import { seedCatalogue } from "../lib/seed.js";
@@ -116,6 +117,7 @@ skillRouter.get("/", async (req, res) => {
       id: r.skill.id,
       name: r.skill.name,
       topic: r.skill.topic,
+      topics: r.skill.topics,
       description: r.skill.description,
       content: r.version.content,
       files: r.version.files,
@@ -174,6 +176,7 @@ skillRouter.get("/catalogue", async (req, res) => {
       id: r.skill.id,
       name: r.skill.name,
       topic: r.skill.topic,
+      topics: r.skill.topics,
       description: r.skill.description,
       author: r.author,
       author_name: r.authorName ?? "",
@@ -367,8 +370,14 @@ skillRouter.post("/", async (req, res) => {
     await record(principal, "skill.enable", `${result.name} in ${body.project_key}`);
   }
 
+  // After the publish, never before it: tagging is a model call, and a skill
+  // with no tags is a worse card while a publish that waits on a model is a
+  // person waiting. It writes its own row and cannot throw.
+  const topics = await tagSkill(principal, result.skillId, result.name, body.content);
+
   res.json({
     id: result.skillId,
+    topics,
     name: result.name,
     version: result.version,
     sha256: result.sha256,
@@ -390,6 +399,44 @@ skillRouter.post("/", async (req, res) => {
  * no way to fill it. Idempotent: identical bytes are the same version, so
  * running it twice adds nothing.
  */
+/**
+ * Tag every skill that has none.
+ *
+ * Seeding publishes twenty base skills at signup and does not tag them: a model
+ * call each would turn creating an account into a minute of waiting. So tags
+ * arrive here instead, on demand, and the endpoint is idempotent — a skill that
+ * already has tags is skipped, so running it twice costs nothing.
+ */
+skillRouter.post("/retag", requireAdmin, async (req, res) => {
+  const principal = principalOf(req);
+  const rows = await db
+    .select({
+      id: schema.skills.id,
+      name: schema.skills.name,
+      topics: schema.skills.topics,
+      content: schema.skillVersions.content,
+      version: schema.skillVersions.version,
+    })
+    .from(schema.skills)
+    .innerJoin(schema.skillVersions, eq(schema.skillVersions.skillId, schema.skills.id))
+    .where(eq(schema.skills.orgId, principal.orgId));
+
+  // One row per skill: its newest version is the one that describes it.
+  const newest = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    const seen = newest.get(row.id);
+    if (!seen || row.version > seen.version) newest.set(row.id, row);
+  }
+
+  let tagged = 0;
+  for (const row of newest.values()) {
+    if (row.topics.length > 0) continue;
+    const topics = await tagSkill(principal, row.id, row.name, row.content);
+    if (topics.length > 0) tagged += 1;
+  }
+  res.json({ tagged, skills: newest.size });
+});
+
 skillRouter.post("/seed", requireAdmin, async (req, res) => {
   const principal = principalOf(req);
   const seeded = await seedCatalogue(principal);
