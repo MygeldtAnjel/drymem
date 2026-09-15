@@ -242,6 +242,10 @@ async def memories_page(
     project_key: str = Query(...),
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    type: Annotated[
+        str | None, Query(description="One memory kind, or `all`")
+    ] = None,
+    scope: Annotated[str | None, Query(description="`team`, `private`, or `all`")] = None,
 ) -> PageResponse:
     """A numbered page of this project's memories, newest first.
 
@@ -250,7 +254,13 @@ async def memories_page(
     archive wants page 3 and a total, and neither of those exists without a
     count — so this pages the index instead of the graph.
     """
-    entries, total = await service.browse(project_key=project_key, limit=limit, offset=offset)
+    entries, total = await service.browse(
+        project_key=project_key,
+        limit=limit,
+        offset=offset,
+        memory_type=type,
+        scope=scope,
+    )
     names = await service.author_names(_authors_of(entries))
     return PageResponse(
         project_key=project_key,
@@ -258,6 +268,7 @@ async def memories_page(
         total=total,
         limit=limit,
         offset=offset,
+        by_type=await service.browse_counts(project_key=project_key),
     )
 
 

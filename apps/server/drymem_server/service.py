@@ -438,8 +438,39 @@ class MemoryService:
             )
         )
 
+    async def browse_counts(self, *, project_key: str) -> dict[str, int]:
+        """How many memories of each kind this caller can read, project-wide.
+
+        Counted over the project, not over the page. The filter tabs used to
+        count the rows in front of them, so "All 25" was the page size and two
+        kinds vanished from the strip entirely whenever page one happened to
+        contain none of them.
+        """
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return {}
+
+        rows = await self.session.execute(
+            select(Memory.memory_type, func.count())
+            .where(
+                Memory.project_id == project.id,
+                or_(
+                    Memory.author_id == self.principal.user_id,
+                    Memory.scope == SCOPE_TEAM,
+                ),
+            )
+            .group_by(Memory.memory_type)
+        )
+        return {kind: int(n) for kind, n in rows.all()}
+
     async def browse(
-        self, *, project_key: str, limit: int, offset: int
+        self,
+        *,
+        project_key: str,
+        limit: int,
+        offset: int,
+        memory_type: str | None = None,
+        scope: str | None = None,
     ) -> tuple[list[Entry], int]:
         """One numbered page of a project's memories, and how many there are.
 
@@ -460,15 +491,24 @@ class MemoryService:
             Memory.author_id == self.principal.user_id,
             Memory.scope == SCOPE_TEAM,
         )
+        # Filtering happens in SQL, not in the browser. A client-side filter
+        # over a server-paged list is incoherent: "Decision 9" counts the nine
+        # on the page in front of you, and turning to page two filters a
+        # different twenty-five, so the same filter means something new on
+        # every page.
+        narrow = [Memory.project_id == project.id, readable]
+        if memory_type and memory_type != "all":
+            narrow.append(Memory.memory_type == memory_type)
+        if scope and scope != "all":
+            narrow.append(Memory.scope == scope)
+
         total = await self.session.scalar(
-            select(func.count())
-            .select_from(Memory)
-            .where(Memory.project_id == project.id, readable)
+            select(func.count()).select_from(Memory).where(*narrow)
         )
 
         rows = await self.session.execute(
             select(Memory)
-            .where(Memory.project_id == project.id, readable)
+            .where(*narrow)
             .order_by(Memory.created_at.desc(), Memory.id.desc())
             .limit(limit)
             .offset(offset)

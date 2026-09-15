@@ -453,3 +453,60 @@ async def test_a_promoted_memory_is_counted_once(client):
     ).json()
     assert body["total"] == 1
     assert len(body["episodes"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_filtering_a_page_filters_in_the_database(client):
+    """The tabs used to filter the rows in front of them.
+
+    A client-side filter over a server-paged list means "Decision 9" counts the
+    nine on this page, and turning to page two filters a different twenty-five
+    — so the same filter means something new on every page.
+    """
+    for i in range(4):
+        await save(client, topic=f"kind/d{i}", memory_type="decision")
+    for i in range(2):
+        await save(client, topic=f"kind/b{i}", memory_type="bugfix")
+
+    body = (
+        await client.get(
+            "/v1/memories/page",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 2, "type": "decision"},
+        )
+    ).json()
+    # Four decisions, two to a page — the total is the filtered total.
+    assert body["total"] == 4
+    assert len(body["episodes"]) == 2
+    assert all(e["type"] == "decision" for e in body["episodes"])
+
+    second = (
+        await client.get(
+            "/v1/memories/page",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 2, "offset": 2, "type": "decision"},
+        )
+    ).json()
+    assert len(second["episodes"]) == 2
+    assert all(e["type"] == "decision" for e in second["episodes"])
+
+
+@pytest.mark.asyncio
+async def test_the_kind_counts_cover_the_project_not_the_page(client):
+    """A kind must not vanish from the tabs because page one had none of it."""
+    for i in range(3):
+        await save(client, topic=f"count/d{i}", memory_type="decision")
+    await save(client, topic="count/conv", memory_type="convention")
+
+    body = (
+        await client.get(
+            "/v1/memories/page",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 1},
+        )
+    ).json()
+
+    assert len(body["episodes"]) == 1
+    # One row on the page, but the whole project in the counts.
+    assert body["by_type"]["decision"] == 3
+    assert body["by_type"]["convention"] == 1

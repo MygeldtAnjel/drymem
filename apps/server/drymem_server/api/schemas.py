@@ -99,13 +99,18 @@ class ContextResponse(BaseModel):
 
 
 class PageResponse(BaseModel):
-    """One numbered page, and enough to draw the numbers."""
+    """One numbered page, and enough to draw the numbers and the filters."""
 
     project_key: str
     episodes: list[EpisodeOut] = []
+    # How many match the current filter — what the page numbers are drawn from.
     total: int = 0
     limit: int = 25
     offset: int = 0
+    # Every kind in the project and how many there are, regardless of the
+    # filter or the page. The tabs need the whole picture or they hide a kind
+    # the moment page one happens to contain none of it.
+    by_type: dict[str, int] = {}
 
 
 class TopicsResponse(BaseModel):
