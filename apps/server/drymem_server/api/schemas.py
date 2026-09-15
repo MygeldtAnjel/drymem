@@ -193,6 +193,15 @@ class SessionOut(BaseModel):
     )
 
 
+class SkillTopicsRequest(BaseModel):
+    name: str = ""
+    content: str
+
+
+class SkillTopicsResponse(BaseModel):
+    topics: list[str] = []
+
+
 class SessionMemoryOut(BaseModel):
     uuid: str
     title: str

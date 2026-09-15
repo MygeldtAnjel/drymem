@@ -48,6 +48,8 @@ from drymem_server.api.schemas import (
     SessionMemoryOut,
     SessionOut,
     SessionsResponse,
+    SkillTopicsRequest,
+    SkillTopicsResponse,
     TopicsResponse,
     TreeArea,
     TreeDecision,
@@ -304,6 +306,19 @@ async def memory_schema(_: PrincipalDep) -> MemorySchemaResponse:
         sections=list(SECTIONS),
         template=TEMPLATE,
     )
+
+
+@router.post("/v1/skills/topics", response_model=SkillTopicsResponse, tags=["skills"])
+async def skill_topics(body: SkillTopicsRequest, _: PrincipalDep) -> SkillTopicsResponse:
+    """The topics a skill is about, from its own text.
+
+    Called when a skill is published. Returns an empty list rather than an error
+    if the model is unreachable: a skill with no tags is a slightly worse card,
+    a publish that fails because the tagger was down is somebody's blocked work.
+    """
+    from drymem_server import topics as topics_module
+
+    return SkillTopicsResponse(topics=await topics_module.derive(name=body.name, content=body.content))
 
 
 @router.get("/v1/sessions", response_model=SessionsResponse, tags=["sessions"])
