@@ -615,12 +615,19 @@ export const api = {
   usage: () => request<Usage>("/v1/usage"),
 
   /** Conversations with this project's memory. Private to whoever asked. */
-  chats: async (projectKey: string): Promise<ChatSummary[]> =>
-    (
-      await request<{ chats: ChatSummary[] }>(
-        `/v1/chats?${new URLSearchParams({ project_key: projectKey })}`,
-      )
-    ).chats,
+  /** A page of conversations, newest activity first. */
+  chats: async (
+    projectKey: string,
+    limit = 30,
+    before?: string | null,
+  ): Promise<{ chats: ChatSummary[]; next_before: string | null }> => {
+    const q = new URLSearchParams({ project_key: projectKey, limit: String(limit) });
+    if (before) q.set("before", before);
+    const data = await request<{ chats: ChatSummary[]; next_before: string | null }>(
+      `/v1/chats?${q}`,
+    );
+    return { chats: data.chats ?? [], next_before: data.next_before ?? null };
+  },
 
   chat: (id: string) =>
     request<{ id: string; title: string; messages: ChatMessage[] }>(
@@ -714,11 +721,18 @@ export const api = {
     return (await request<{ skills: Skill[] }>(`/v1/skills?${q}`)).skills;
   },
 
-  catalogue: async (projectKey: string): Promise<CatalogueSkill[]> => {
-    const q = new URLSearchParams({ project_key: projectKey });
-    return (
-      await request<{ skills: CatalogueSkill[] }>(`/v1/skills/catalogue?${q}`)
-    ).skills;
+  /** A page of the catalogue, by name. `next_after` is null on the last one. */
+  catalogue: async (
+    projectKey: string,
+    limit = 100,
+    after?: string | null,
+  ): Promise<{ skills: CatalogueSkill[]; next_after: string | null }> => {
+    const q = new URLSearchParams({ project_key: projectKey, limit: String(limit) });
+    if (after) q.set("after", after);
+    const data = await request<{ skills: CatalogueSkill[]; next_after: string | null }>(
+      `/v1/skills/catalogue?${q}`,
+    );
+    return { skills: data.skills ?? [], next_after: data.next_after ?? null };
   },
 
   skillVersions: async (name: string): Promise<SkillVersion[]> => {

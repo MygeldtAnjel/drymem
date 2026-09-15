@@ -31,6 +31,9 @@ import type { ChatMessage, ChatSummary } from "@/api";
 import { person, relative } from "@/format";
 import { go } from "@/router";
 
+/** One page of conversations in the sidebar. This list grows with every question. */
+const PAGE = 30;
+
 /**
  * The memories an answer stood on.
  *
@@ -121,6 +124,8 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [more, setMore] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   /*
@@ -134,9 +139,33 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
     if (!projectKey) return;
     const { api } = await import("@/api");
     await api
-      .chats(projectKey)
-      .then(setChats)
-      .catch(() => setChats([]));
+      .chats(projectKey, PAGE)
+      .then((page) => {
+        setChats(page.chats);
+        setMore(page.next_before);
+      })
+      .catch(() => {
+        setChats([]);
+        setMore(null);
+      });
+  };
+
+  /** The next page of older conversations. This list grows with every question. */
+  const loadMore = async () => {
+    if (!more || fetching) return;
+    setFetching(true);
+    try {
+      const { api } = await import("@/api");
+      const page = await api.chats(projectKey, PAGE, more);
+      setChats((current) => {
+        const had = current ?? [];
+        const seen = new Set(had.map((c) => c.id));
+        return [...had, ...page.chats.filter((c) => !seen.has(c.id))];
+      });
+      setMore(page.next_before);
+    } finally {
+      setFetching(false);
+    }
   };
 
   useEffect(() => {
@@ -257,6 +286,19 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
                 </li>
               ))}
             </ul>
+          )}
+          {more && (
+            <div className="border-t p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                disabled={fetching}
+                onClick={loadMore}
+              >
+                {fetching ? <Spinner className="size-3.5" /> : null} Older chats
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

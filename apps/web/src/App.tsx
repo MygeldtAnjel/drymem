@@ -63,9 +63,14 @@ import { SignIn } from "./SignIn";
 import { go, useRoute } from "./router";
 import { SearchX } from "lucide-react";
 
-/** One page. Big enough that most people never press the button, small enough
- *  that the first screen arrives quickly. */
-const PAGE = 50;
+/**
+ * One page.
+ *
+ * Small enough that the first screen arrives quickly and that paging is a real
+ * path rather than a branch nobody reaches until a project is a year old — an
+ * untrodden path is an untested one.
+ */
+const PAGE = 25;
 
 const TITLES: Record<string, { title: string; description?: string }> = {
   overview: {
@@ -197,6 +202,7 @@ function Workspace({
    */
   const [moreMemories, setMoreMemories] = useState<Cursor | null>(null);
   const [moreSessions, setMoreSessions] = useState<string | null>(null);
+  const [moreSkills, setMoreSkills] = useState<string | null>(null);
   const [fetchingMore, setFetchingMore] = useState(false);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [catalogue, setCatalogue] = useState<CatalogueSkill[]>([]);
@@ -293,7 +299,7 @@ function Workspace({
           api.overview(projectKey).catch(() => null),
           api.sessions(projectKey, PAGE).catch(() => ({ sessions: [], next_before: null })),
           api.skills(projectKey).catch(() => []),
-          api.catalogue(projectKey).catch(() => []),
+          api.catalogue(projectKey, PAGE * 2).catch(() => ({ skills: [], next_after: null })),
           api.members(projectKey).catch(() => []),
           api.people().catch(() => []),
         ]);
@@ -303,7 +309,8 @@ function Workspace({
         setSessions(sessionList.sessions);
         setMoreSessions(sessionList.next_before);
         setSkills(enabled);
-        setCatalogue(wholeCatalogue);
+        setCatalogue(wholeCatalogue.skills);
+        setMoreSkills(wholeCatalogue.next_after);
         setMembers(memberList);
         setPeople(personList);
         api
@@ -357,6 +364,23 @@ function Workspace({
       setMoreSessions(next.next_before);
     } catch (e) {
       fail(e, "Loading more sessions");
+    } finally {
+      setFetchingMore(false);
+    }
+  };
+
+  const loadMoreSkills = async () => {
+    if (!moreSkills || fetchingMore) return;
+    setFetchingMore(true);
+    try {
+      const next = await api.catalogue(active, PAGE * 2, moreSkills);
+      setCatalogue((current) => {
+        const seen = new Set(current.map((s) => s.id));
+        return [...current, ...next.skills.filter((s) => !seen.has(s.id))];
+      });
+      setMoreSkills(next.next_after);
+    } catch (e) {
+      fail(e, "Loading more skills");
     } finally {
       setFetchingMore(false);
     }
@@ -493,10 +517,13 @@ function Workspace({
   const refreshSkills = async () => {
     const [enabled, all] = await Promise.all([
       api.skills(active).catch(() => []),
-      api.catalogue(active).catch(() => []),
+      api.catalogue(active, PAGE * 2).catch(() => ({ skills: [], next_after: null })),
     ]);
     setSkills(enabled);
-    setCatalogue(all);
+    // Back to the first page: after publishing, the top of the list is where
+    // the new thing is, and keeping stale later pages would show it twice.
+    setCatalogue(all.skills);
+    setMoreSkills(all.next_after);
   };
 
   const publishSkill = (topic: string) =>
@@ -685,6 +712,8 @@ function Workspace({
         fetchingMore={fetchingMore}
         onMoreMemories={loadMoreMemories}
         onMoreSessions={loadMoreSessions}
+        moreSkills={moreSkills}
+        onMoreSkills={loadMoreSkills}
         skills={skills}
         catalogue={catalogue}
         auditEvents={auditEvents}
@@ -753,9 +782,11 @@ function Screen(props: {
   sessions: AgentSession[];
   moreMemories: Cursor | null;
   moreSessions: string | null;
+  moreSkills: string | null;
   fetchingMore: boolean;
   onMoreMemories: () => void;
   onMoreSessions: () => void;
+  onMoreSkills: () => void;
   skills: Skill[];
   catalogue: CatalogueSkill[];
   auditEvents: AuditEvent[];
@@ -892,6 +923,9 @@ function Screen(props: {
           onApprove={props.onApprove}
           onDeprecate={props.onDeprecate}
           onVersions={props.onVersions}
+          moreSkills={props.moreSkills}
+          fetchingMore={props.fetchingMore}
+          onMoreSkills={props.onMoreSkills}
         />
       );
     case "projects":

@@ -266,6 +266,9 @@ export function SkillsPage({
   onApprove,
   onDeprecate,
   onVersions,
+  moreSkills,
+  fetchingMore,
+  onMoreSkills,
 }: {
   skills: Skill[];
   catalogue: CatalogueSkill[];
@@ -274,6 +277,9 @@ export function SkillsPage({
   drafting: string | null;
   busy: boolean;
   isAdmin: boolean;
+  moreSkills: string | null;
+  fetchingMore: boolean;
+  onMoreSkills: () => void;
   onDraft: (topic: string) => void;
   onPublish: (topic: string) => void;
   onEnable: (name: string, version?: number) => void;
@@ -459,6 +465,24 @@ export function SkillsPage({
                       />
                     ))}
                   </ul>
+                )}
+
+                {moreSkills && (
+                  <div className="flex items-center justify-center gap-3">
+                    {/* The filter runs over what is loaded, so say so rather
+                        than let "nothing matches" mean two different things. */}
+                    <p className="text-muted-foreground text-xs">
+                      {count(published.length, "skill")} loaded
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={fetchingMore}
+                      onClick={onMoreSkills}
+                    >
+                      {fetchingMore ? <Spinner className="size-3.5" /> : null} Load more
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
