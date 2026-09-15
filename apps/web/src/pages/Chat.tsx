@@ -25,6 +25,15 @@ import { CatMark } from "@/components/Logo";
 import { Markdown } from "@/Markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import type { ChatMessage, ChatSummary } from "@/api";
@@ -128,6 +137,7 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
   const [fetching, setFetching] = useState(false);
   const [older, setOlder] = useState<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [confirm, setConfirm] = useState<ChatSummary | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
@@ -310,14 +320,23 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
     }
   };
 
+  /*
+   * Deleting asks first.
+   *
+   * A chat is the only thing in drymem that is gone for good — a memory can be
+   * unshared, a skill deprecated and its versions kept, but the messages
+   * cascade. The bin icon sits a few pixels from the row you click to open one.
+   */
   const remove = async (id: string) => {
     const { api } = await import("@/api");
     await api.deleteChat(id).catch(() => {});
     if (id === openId) startNew();
+    setConfirm(null);
     void refresh();
   };
 
   return (
+    <>
     <div className="grid min-w-0 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
       {/* ---- the conversations so far ------------------------------------ */}
       <Card className="min-w-0 overflow-hidden p-0 lg:h-[42rem]">
@@ -355,7 +374,7 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
                     variant="ghost"
                     size="icon-xs"
                     aria-label={`Delete ${chat.title}`}
-                    onClick={() => remove(chat.id)}
+                    onClick={() => setConfirm(chat)}
                   >
                     <Trash2 />
                   </Button>
@@ -428,5 +447,26 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
         </div>
       </Card>
     </div>
+
+    <Dialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="min-w-0 truncate">Delete “{confirm?.title}”?</DialogTitle>
+          <DialogDescription>
+            The whole conversation goes with it, and this cannot be undone. The memories it
+            cited are untouched.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Keep it</Button>
+          </DialogClose>
+          <Button variant="destructive" onClick={() => confirm && remove(confirm.id)}>
+            <Trash2 data-icon="inline-start" /> Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
