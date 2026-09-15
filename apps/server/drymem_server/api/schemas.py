@@ -74,6 +74,8 @@ class EpisodeOut(BaseModel):
     content: str
     created_at: datetime | None = None
     author: str | None = None
+    # The person's name when the org knows one; pages showed a raw email.
+    author_name: str = ""
     scope: str = "private"
     # Everything below comes from the index, not the graph. `title` is what a
     # person wrote; `name` is the topic key a machine keys on.
@@ -327,6 +329,7 @@ class TreeDecision(BaseModel):
     title: str
     type: str = ""
     author: str = ""
+    author_name: str = ""
     created_at: datetime | None = None
     gist: str = ""
     paths: list[str] = []

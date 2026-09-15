@@ -36,7 +36,7 @@ import "@xyflow/react/dist/style.css";
 
 import { Blank } from "@/components/Bits";
 import type { TreeArea, TreeDecision } from "@/api";
-import { relative } from "@/format";
+import { person, relative } from "@/format";
 import { TYPE_FILL } from "@/memory";
 
 /* Measured, not guessed: dagre needs real sizes or the ranks collide. */
@@ -108,7 +108,7 @@ function DecisionNode({ data }: NodeProps) {
         <p className="text-muted-foreground line-clamp-1 text-xs">{decision.gist}</p>
       )}
       <p className="text-muted-foreground truncate text-[11px]">
-        {decision.author.split("@")[0]} · {relative(decision.created_at)}
+        {person(decision.author, decision.author_name)} · {relative(decision.created_at)}
         {dead && " · replaced"}
       </p>
       <Handle type="source" position={Position.Right} className="!opacity-0" />

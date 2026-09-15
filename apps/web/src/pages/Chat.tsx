@@ -28,7 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import type { ChatMessage, ChatSummary } from "@/api";
-import { relative } from "@/format";
+import { person, relative } from "@/format";
 import { go } from "@/router";
 
 /**
@@ -68,7 +68,7 @@ function Sources({ message }: { message: ChatMessage }) {
               </span>
               <span className="text-muted-foreground mt-auto flex min-w-0 items-center gap-1 text-[11px]">
                 <span className="min-w-0 truncate">
-                  {source.author_name || source.author?.split("@")[0] || "unknown"} ·{" "}
+                  {person(source.author, source.author_name)} ·{" "}
                   {relative(source.created_at)}
                 </span>
                 <ArrowUpRight className="ml-auto size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />

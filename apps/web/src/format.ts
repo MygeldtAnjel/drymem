@@ -96,3 +96,16 @@ export function stamp(value: string | null): string {
   if (Number.isNaN(d.getTime())) return value;
   return `${when(value)} · ${clock(value)}`;
 }
+
+/**
+ * A person, as a person reads them.
+ *
+ * Memories record an email because that is what git and the CLI know. Shown raw
+ * it put `a.long.address@example.com` in breadcrumbs, citation cards and author
+ * lines all over the product. The name when the org has one, the local part
+ * when it does not.
+ */
+export function person(author: string | null | undefined, name?: string | null): string {
+  if (name) return name;
+  return author?.split("@")[0] || "unknown";
+}

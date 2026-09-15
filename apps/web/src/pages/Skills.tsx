@@ -57,7 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CatalogueSkill, Cluster, Finding, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
-import { count, relative } from "@/format";
+import { count, person, relative } from "@/format";
 import { go } from "@/router";
 
 export type Draft = { name: string; content: string; model: string; memory_count: number };
@@ -167,7 +167,7 @@ function SkillCard({
 
       <div className="border-border mt-auto flex min-w-0 flex-wrap items-center gap-2 border-t pt-3">
         <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-          {skill.author?.split("@")[0] ?? "unknown"} · {relative(skill.updated_at)}
+          {person(skill.author, skill.author_name)} · {relative(skill.updated_at)}
         </span>
         {!enabledHere && (
           <Button size="sm" disabled={busy} onClick={() => onEnable(skill.name)}>

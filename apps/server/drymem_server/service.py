@@ -728,12 +728,27 @@ class MemoryService:
         from drymem_server import tree as tree_view
 
         groups = await self.readable_groups(project_key)
-        return await tree_view.build(
+        built = await tree_view.build(
             groups=groups,
             project_label=project_key.rsplit("/", 1)[-1] or project_key,
             limit=limit,
             kinds=kinds,
         )
+
+        # The graph records an email; the cards under a memory read better with
+        # a name. Filled here rather than in `tree.py`, which has no database.
+        decisions = []
+
+        def collect(area) -> None:
+            decisions.extend(area.decisions)
+            for child in area.children:
+                collect(child)
+
+        collect(built.root)
+        names = await self._names_for({d.author for d in decisions if d.author})
+        for decision in decisions:
+            decision.author_name = names.get(decision.author, "")
+        return built
 
     async def graph(
         self,
@@ -885,6 +900,10 @@ class MemoryService:
         return await ask_module.answer(
             question=question, sources=sources, bodies=bodies, history=history
         )
+
+    async def author_names(self, emails: set[str]) -> dict[str, str]:
+        """Display names by email, for anything that shows who wrote something."""
+        return await self._names_for(emails)
 
     async def _names_for(self, emails: set[str]) -> dict[str, str]:
         """Display names for the people who wrote these memories, by email.

@@ -43,6 +43,7 @@ export interface Episode {
   content: string;
   created_at: string | null;
   author: string | null;
+  author_name?: string;
   scope: string;
   title: string;
   type: string;
@@ -126,6 +127,7 @@ export interface TreeDecision {
   title: string;
   type: string;
   author: string;
+  author_name?: string;
   created_at: string | null;
   gist: string;
   paths: string[];
@@ -195,6 +197,7 @@ export interface CatalogueSkill {
   topic: string;
   description: string | null;
   author: string | null;
+  author_name?: string;
   scope: string;
   source: string;
   state: string;
@@ -219,6 +222,7 @@ export interface Skill extends CatalogueSkill {
 
 export interface SkillVersion {
   version: number;
+  author_name?: string;
   sha256: string;
   content: string;
   model: string | null;

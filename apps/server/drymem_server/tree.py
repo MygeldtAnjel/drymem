@@ -94,6 +94,8 @@ class Decision:
     paths: list[str] = field(default_factory=list)
     # Set when an edge records that a later decision replaced this one.
     superseded_by: str | None = None
+    # The person's name when the org knows one; the cards showed a raw email.
+    author_name: str = ""
 
 
 @dataclass

@@ -141,10 +141,11 @@ async def search_memories(
 ) -> SearchResponse:
     entries = await service.search_entries(project_key=project_key, query=q, limit=limit)
     facts = await service.search(project_key=project_key, query=q, limit=limit)
+    names = await service.author_names(_authors_of(entries))
     return SearchResponse(
         query=q,
         project_key=project_key,
-        memories=[_episode_out(e) for e in entries],
+        memories=[_episode_out(e, names) for e in entries],
         results=[
             FactOut(name=f.name, fact=f.fact, created_at=f.created_at, superseded=f.superseded)
             for f in facts
@@ -152,15 +153,30 @@ async def search_memories(
     )
 
 
-def _episode_out(entry) -> EpisodeOut:
-    """One memory, as the API shows it. Shared by context and search."""
+def _authors_of(entries) -> set[str]:
+    """The addresses on a page of memories, for one name lookup instead of N."""
+    return {
+        e.episode.metadata.author
+        for e in entries
+        if e.episode.metadata and e.episode.metadata.author
+    }
+
+
+def _episode_out(entry, names: dict[str, str] | None = None) -> EpisodeOut:
+    """One memory, as the API shows it. Shared by context and search.
+
+    `names` maps an author's email to their display name. Passed in rather than
+    looked up here: one query for the whole page, not one per memory.
+    """
     meta = entry.episode.metadata
+    author = meta.author if meta else None
     return EpisodeOut(
         uuid=entry.episode.uuid,
         name=entry.episode.name,
         content=entry.episode.content,
         created_at=entry.episode.created_at,
-        author=meta.author if meta else None,
+        author=author,
+        author_name=(names or {}).get(author or "", ""),
         scope=meta.scope if meta else "private",
         title=entry.title or entry.episode.name,
         type=entry.memory_type,
@@ -178,9 +194,10 @@ async def memory_context(
     limit: int = Query(10, ge=1, le=100),
 ) -> ContextResponse:
     entries = await service.entries(project_key=project_key, limit=limit)
+    names = await service.author_names(_authors_of(entries))
     return ContextResponse(
         project_key=project_key,
-        episodes=[_episode_out(entry) for entry in entries],
+        episodes=[_episode_out(entry, names) for entry in entries],
     )
 
 
@@ -440,6 +457,7 @@ async def project_tree(
                     title=d.title,
                     type=d.memory_type,
                     author=d.author,
+                    author_name=d.author_name,
                     created_at=d.created_at,
                     gist=d.gist,
                     paths=d.paths,

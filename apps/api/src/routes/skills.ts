@@ -94,6 +94,7 @@ skillRouter.get("/", async (req, res) => {
       skill: schema.skills,
       version: schema.skillVersions,
       author: schema.users.email,
+      authorName: schema.users.name,
       uses: raw<number>`(
         select count(*) from skill_uses u
         where u.skill_id = ${schema.skills.id} and u.project_id = ${found.id}
@@ -119,6 +120,7 @@ skillRouter.get("/", async (req, res) => {
       content: r.version.content,
       files: r.version.files,
       author: r.author,
+      author_name: r.authorName ?? "",
       model: r.version.model,
       memory_count: r.version.memoryCount,
       scope: r.skill.scope,
@@ -156,6 +158,7 @@ skillRouter.get("/catalogue", async (req, res) => {
     .select({
       skill: schema.skills,
       author: schema.users.email,
+      authorName: schema.users.name,
       newest: raw<number>`(
         select max(version) from skill_versions v where v.skill_id = ${schema.skills.id}
       )`,
@@ -173,6 +176,7 @@ skillRouter.get("/catalogue", async (req, res) => {
       topic: r.skill.topic,
       description: r.skill.description,
       author: r.author,
+      author_name: r.authorName ?? "",
       scope: r.skill.scope,
       source: r.skill.source,
       state: r.skill.state,
@@ -271,7 +275,11 @@ skillRouter.get("/:name/versions", async (req, res) => {
   if (!skill) throw notFound("No such skill.");
 
   const rows = await db
-    .select({ version: schema.skillVersions, author: schema.users.email })
+    .select({
+      version: schema.skillVersions,
+      author: schema.users.email,
+      authorName: schema.users.name,
+    })
     .from(schema.skillVersions)
     .leftJoin(schema.users, eq(schema.users.id, schema.skillVersions.createdBy))
     .where(eq(schema.skillVersions.skillId, skill.id))
@@ -288,6 +296,7 @@ skillRouter.get("/:name/versions", async (req, res) => {
       findings: r.version.findings,
       note: r.version.note,
       author: r.author,
+      author_name: r.authorName ?? "",
       created_at: r.version.createdAt,
     })),
   });
