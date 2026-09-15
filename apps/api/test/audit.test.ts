@@ -202,3 +202,35 @@ describe("who may read it", () => {
     expect((await anon.get("/v1/audit")).status).toBe(401);
   });
 });
+
+describe("narrowing by who and when", () => {
+  it("filters to one person", async () => {
+    const { body } = await h.client.get(`/v1/audit?actor=${encodeURIComponent(OWNER.email)}&limit=200`);
+    expect(body.events.length).toBeGreaterThan(0);
+    expect(body.events.every((e: { actor: string }) => e.actor === OWNER.email)).toBe(true);
+    expect(body.total).toBe(body.events.length);
+  });
+
+  it("finds nobody for a stranger rather than everybody", async () => {
+    const { body } = await h.client.get("/v1/audit?actor=nobody@nowhere.test");
+    expect(body.events).toEqual([]);
+    expect(body.total).toBe(0);
+  });
+
+  it("includes the whole of the day named as the upper bound", async () => {
+    // `until=today` parses to midnight, and an admin asking for today means
+    // events *on* today — so a bare date covers the day it names.
+    const today = new Date().toISOString().slice(0, 10);
+    const all = await h.client.get("/v1/audit?limit=200");
+    const ranged = await h.client.get(`/v1/audit?since=${today}&until=${today}&limit=200`);
+
+    expect(ranged.body.total).toBeGreaterThan(0);
+    expect(ranged.body.total).toBeLessThanOrEqual(all.body.total);
+  });
+
+  it("returns nothing for a window that ended before anything happened", async () => {
+    const { body } = await h.client.get("/v1/audit?until=2000-01-01&limit=200");
+    expect(body.events).toEqual([]);
+    expect(body.total).toBe(0);
+  });
+});

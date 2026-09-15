@@ -12,7 +12,7 @@
  */
 
 import { Router } from "express";
-import { and, desc, eq, gte, inArray, sql as raw } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql as raw } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "../db/client.js";
@@ -73,8 +73,10 @@ const querySchema = z.object({
   group: z.enum(["security", "people", "skills", "memories", "projects", "access"]).optional(),
   action: z.string().max(100).optional(),
   actor: z.string().max(320).optional(),
+  /** Inclusive lower bound, and an exclusive upper one — a day, or a week. */
   since: z.string().max(40).optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(25),
+  until: z.string().max(40).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(20),
   /**
    * Which page, from zero.
    *
@@ -97,6 +99,17 @@ auditRouter.get("/", async (req, res) => {
   if (query.since) {
     const at = new Date(query.since);
     if (!Number.isNaN(at.getTime())) where.push(gte(schema.auditLog.createdAt, at));
+  }
+  if (query.until) {
+    // A date means the whole of that day: `until=2026-09-15` parses to
+    // midnight, and an admin asking for the 15th means events *on* the 15th.
+    const at = new Date(query.until);
+    if (!Number.isNaN(at.getTime())) {
+      const end = /^\d{4}-\d{2}-\d{2}$/.test(query.until)
+        ? new Date(at.getTime() + 24 * 60 * 60 * 1000)
+        : at;
+      where.push(lt(schema.auditLog.createdAt, end));
+    }
   }
   if (query.actor) {
     where.push(eq(raw`lower(${schema.users.email})`, query.actor.trim().toLowerCase()));
