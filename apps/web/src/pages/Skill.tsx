@@ -12,9 +12,21 @@
  */
 
 import { useEffect, useState } from "react";
-import { Ban, CheckCircle2, Clock, Download, FileText, ShieldAlert, Trash2, User } from "lucide-react";
+import {
+  Ban,
+  CheckCircle2,
+  Clock,
+  Code2,
+  Copy,
+  Download,
+  Eye,
+  FileText,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react";
 
 import { Blank } from "@/components/Bits";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Crumbs } from "@/components/Crumbs";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +38,12 @@ import { Findings, SourceChip, StateChip } from "@/pages/Skills";
 import type { CatalogueSkill, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
 import { count, person, when } from "@/format";
+
+/** Initials for the byline. There are no uploaded avatars anywhere in drymem. */
+function initials(value: string): string {
+  const parts = value.split(/[@\s._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
 
 export function SkillPage({
   name,
@@ -39,6 +57,7 @@ export function SkillPage({
   onApprove,
   onDeprecate,
   onLoadVersions,
+  onCopy,
 }: {
   name: string;
   /** The enabled copy, which is the only one carrying content. */
@@ -53,8 +72,13 @@ export function SkillPage({
   onApprove: (name: string) => void;
   onDeprecate: (name: string) => void;
   onLoadVersions: (name: string) => void;
+  onCopy: (text: string, what: string) => void;
 }) {
   const [tab, setTab] = useState("skill");
+  // A skill is a file somebody installs. Reading it as prose is the default,
+  // but the raw SKILL.md is what actually lands on a machine, so it is one
+  // click away rather than something you have to go to GitHub for.
+  const [raw, setRaw] = useState(false);
 
   useEffect(() => {
     onLoadVersions(name);
@@ -107,6 +131,11 @@ export function SkillPage({
                 {skill && <Badge variant="outline">v{skill.version}</Badge>}
                 {meta && <SourceChip source={meta.source} />}
                 {meta && <StateChip state={meta.state} />}
+                {meta?.topic && (
+                  <Badge variant="outline" className="text-muted-foreground font-normal">
+                    {meta.topic}
+                  </Badge>
+                )}
                 {enabledHere && (
                   <Badge className="bg-success/15 text-success">
                     <CheckCircle2 data-icon="inline-start" /> On this project
@@ -125,8 +154,13 @@ export function SkillPage({
               )}
               {/* Provenance, not identity, so it reads small and last. */}
               <div className="text-muted-foreground mt-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                <span className="inline-flex items-center gap-1" title={author ?? undefined}>
-                  <User className="size-3" /> {who}
+                <span className="inline-flex items-center gap-1.5" title={author ?? undefined}>
+                  <Avatar className="size-4">
+                    <AvatarFallback className="text-[8px]">
+                      {initials(author ?? who)}
+                    </AvatarFallback>
+                  </Avatar>
+                  By {who}
                 </span>
                 {meta && <span aria-hidden>·</span>}
                 {meta && <span>{count(meta.uses, "read")}</span>}
@@ -179,8 +213,47 @@ export function SkillPage({
             <TabsContent value="skill" className="min-w-0 pt-4">
               {skill?.findings?.length ? <Findings findings={skill.findings} /> : null}
               {content ? (
-                <div className="border-border bg-muted/20 min-w-0 rounded-lg border p-4">
-                  <Markdown source={document.body} />
+                <div className="min-w-0">
+                  <div className="mb-2 flex min-w-0 flex-wrap items-center justify-end gap-2">
+                    <div className="border-border bg-muted/40 inline-flex items-center rounded-md border p-0.5">
+                      <Button
+                        size="xs"
+                        variant={raw ? "ghost" : "secondary"}
+                        aria-pressed={!raw}
+                        onClick={() => setRaw(false)}
+                      >
+                        <Eye data-icon="inline-start" /> Rich text
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant={raw ? "secondary" : "ghost"}
+                        aria-pressed={raw}
+                        onClick={() => setRaw(true)}
+                      >
+                        <Code2 data-icon="inline-start" /> Markdown
+                      </Button>
+                    </div>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => onCopy(content, `${name} source`)}
+                    >
+                      <Copy data-icon="inline-start" /> Copy
+                    </Button>
+                  </div>
+                  <div className="border-border bg-muted/20 min-w-0 rounded-lg border p-4">
+                    {raw ? (
+                      // The whole file, frontmatter included: that header is
+                      // what tells an agent when to load the skill, so hiding
+                      // it from the raw view would show something that is not
+                      // the file.
+                      <pre className="min-w-0 overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre">
+                        {content}
+                      </pre>
+                    ) : (
+                      <Markdown source={document.body} />
+                    )}
+                  </div>
                 </div>
               ) : (
                 <Spinner />

@@ -798,6 +798,7 @@ function Screen(props: {
             onApprove={props.onApprove}
             onDeprecate={props.onDeprecate}
             onLoadVersions={props.onLoadVersions}
+            onCopy={props.onCopy}
           />
         );
       }
