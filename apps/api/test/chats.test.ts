@@ -228,6 +228,24 @@ describe("asking", () => {
     const after = await h.client.get(`/v1/chats?project_key=${PROJECT}`);
     expect(after.body.chats.length).toBe(before.body.chats.length);
   });
+
+  it("says so plainly when the engine is not reachable at all", async () => {
+    // Not the same as a 503: the connection never opens. Unhandled, this came
+    // back as a 500 with an "unhandled" trace and no hint of which route threw.
+    const real = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/v1/ask")) throw new TypeError("fetch failed");
+      return real(input, init);
+    });
+
+    const { status, body } = await h.client.post("/v1/chats/ask", {
+      project_key: PROJECT,
+      question: "Is anyone home?",
+    });
+    expect(status).toBe(400);
+    expect(body.detail).toMatch(/did not answer/i);
+  });
 });
 
 describe("the list", () => {

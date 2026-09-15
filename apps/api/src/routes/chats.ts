@@ -143,17 +143,25 @@ async function askEngine(
   history: { role: string; content: string }[],
   carry: string[],
 ): Promise<EngineAnswer> {
-  const response = await fetch(new URL("/v1/ask", env.MEMORY_URL), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Drymem-Principal": await signPrincipal(principal),
-    },
-    body: JSON.stringify({ project_key: projectKey, question, history, carry }),
-    // A local model takes its time. Node's default would give up first and
-    // report a network failure for an answer that was on its way.
-    signal: AbortSignal.timeout(180_000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(new URL("/v1/ask", env.MEMORY_URL), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Drymem-Principal": await signPrincipal(principal),
+      },
+      body: JSON.stringify({ project_key: projectKey, question, history, carry }),
+      // A local model takes its time. Node's default would give up first and
+      // report a network failure for an answer that was on its way.
+      signal: AbortSignal.timeout(180_000),
+    });
+  } catch {
+    // The engine being down or slow is not this request's fault. Unhandled, it
+    // surfaced as a 500 and an "unhandled" trace in the log with no sign of
+    // which route threw it.
+    throw badRequest("The memory engine did not answer. It may be starting up.");
+  }
   if (!response.ok) {
     throw badRequest(`The memory engine replied ${response.status}.`);
   }
