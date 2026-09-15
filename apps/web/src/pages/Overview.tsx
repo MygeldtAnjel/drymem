@@ -9,6 +9,7 @@
 import { Activity, Boxes, NotebookPen, Sparkles, Users } from "lucide-react";
 
 import { Blank, TypeChip } from "@/components/Bits";
+import { ByKindChart, PerDayChart } from "@/components/Charts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -162,6 +163,21 @@ export function OverviewPage({
         />
       </div>
 
+      {/* Is anything still being written down? The first question anybody has
+          about a memory product, and until now the dashboard answered it with a
+          single cumulative number that can only go up. */}
+      {stats.per_day?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Memories written</CardTitle>
+            <CardDescription>The last 30 days. Quiet days are shown, not skipped.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PerDayChart data={stats.per_day} label="Memories" className="h-[180px] w-full" />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -170,8 +186,11 @@ export function OverviewPage({
               Every memory has a kind. The mix tells you what the team keeps writing down.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
+            {/* The bar keeps the proportions at a glance; the chart under it
+                gives each kind a number you can read off. */}
             <TypeMix byType={stats.by_type} total={stats.memories} />
+            <ByKindChart byType={stats.by_type} className="h-[190px] w-full" />
             {stats.memories === 0 && (
               <p className="text-sm text-muted-foreground">Nothing saved yet.</p>
             )}

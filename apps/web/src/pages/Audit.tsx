@@ -14,12 +14,13 @@
 import { AlertTriangle, ScrollText, ShieldCheck } from "lucide-react";
 
 import { Blank, RowsSkeleton } from "@/components/Bits";
+import { PerDayChart } from "@/components/Charts";
+import { DateRange } from "@/components/DateRange";
 import { Pager } from "@/components/Pager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -181,6 +182,22 @@ export function AuditPage({
     <div className="space-y-6">
       <Headline summary={summary} />
 
+      {/* Quiet is the signal here. A month of flat bars with one spike is how
+          an admin finds the day something happened. */}
+      {summary && summary.per_day?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Events per day</CardTitle>
+            <CardDescription>
+              The last {summary.days} days, quiet days included.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PerDayChart data={summary.per_day} label="Events" className="h-[160px] w-full" />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         {/* `min-w-0` on both: these are grid and flex children, whose default
             `min-width: auto` makes them refuse to shrink below their content —
@@ -239,32 +256,20 @@ export function AuditPage({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-muted-foreground text-xs">From</span>
-              <Input
-                type="date"
-                className="h-8 w-40"
-                value={where.since ?? ""}
-                max={where.until || undefined}
+              <span className="text-muted-foreground text-xs">When</span>
+              <DateRange
+                from={where.since}
+                to={where.until}
                 disabled={busy}
-                onChange={(e) => onWhere({ ...where, since: e.target.value || undefined })}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-muted-foreground text-xs">To</span>
-              <Input
-                type="date"
-                className="h-8 w-40"
-                value={where.until ?? ""}
-                min={where.since || undefined}
-                disabled={busy}
-                onChange={(e) => onWhere({ ...where, until: e.target.value || undefined })}
+                onChange={(range) =>
+                  onWhere({ ...where, since: range.from, until: range.to })
+                }
               />
             </label>
 
             {(where.actor || where.since || where.until) && (
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => onWhere({})}>
-                Clear
+                Clear all
               </Button>
             )}
           </div>

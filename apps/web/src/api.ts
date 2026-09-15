@@ -187,9 +187,16 @@ export interface AuditEvent {
   created_at: string;
 }
 
+/** One day of a series, with quiet days present as zero. */
+export interface Day {
+  day: string;
+  n: number;
+}
+
 export interface AuditSummary {
   days: number;
   total: number;
+  per_day: Day[];
   actions: { action: string; count: number; last_at: string }[];
   credentials: { rejected: number; redacted: number };
 }
@@ -316,6 +323,7 @@ export interface Overview {
   positive: number;
   negative: number;
   by_type: Record<string, number>;
+  per_day: Day[];
 }
 
 export interface Health {
