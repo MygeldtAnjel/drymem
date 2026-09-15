@@ -109,6 +109,20 @@ export const TYPE_FILL: Record<string, string> = {
 
 
 /**
+ * A YAML scalar with its quotes taken off.
+ *
+ * YAML quotes any value containing a colon, and a skill description almost
+ * always has one — so without this the page printed a stray quote at each end
+ * and an escaped `\"review since X\"` in the middle of the sentence.
+ */
+function unquote(raw: string): string {
+  const quote = raw[0];
+  if ((quote !== '"' && quote !== "'") || !raw.endsWith(quote) || raw.length < 2) return raw;
+  const inner = raw.slice(1, -1);
+  return quote === '"' ? inner.replace(/\\(["\\])/g, "$1") : inner.replace(/''/g, "'");
+}
+
+/**
  * Split a SKILL.md's YAML frontmatter off its body.
  *
  * A skill file carries `name` and `description` at the top for the agent that
@@ -129,7 +143,7 @@ export function frontmatter(source: string): {
   const meta: Record<string, string> = {};
   for (const line of lines.slice(1, close)) {
     const at = line.indexOf(":");
-    if (at > 0) meta[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+    if (at > 0) meta[line.slice(0, at).trim()] = unquote(line.slice(at + 1).trim());
   }
   // A second `---` immediately after is a rule the model added, not a divider
   // anyone wants at the top of the page.

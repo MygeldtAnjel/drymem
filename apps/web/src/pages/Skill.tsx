@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Ban, CheckCircle2, Clock, Download, FileText, ShieldAlert, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, Clock, Download, FileText, ShieldAlert, Trash2, User } from "lucide-react";
 
 import { Blank } from "@/components/Bits";
 import { Crumbs } from "@/components/Crumbs";
@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Findings, SourceChip, StateChip } from "@/pages/Skills";
 import type { CatalogueSkill, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
-import { count, when } from "@/format";
+import { count, person, when } from "@/format";
 
 export function SkillPage({
   name,
@@ -68,6 +68,8 @@ export function SkillPage({
   const content = skill?.content ?? versions?.[0]?.content ?? "";
   const document = frontmatter(content);
   const author = meta?.author ?? versions?.[0]?.author ?? null;
+  // An email is not a person's name. The header showed the raw address.
+  const who = person(author, meta?.author_name || versions?.[0]?.author_name);
   const enabledHere = Boolean(skill);
 
   if (!meta && versions === null) return <Spinner />;
@@ -87,21 +89,52 @@ export function SkillPage({
       <Crumbs
         trail={[
           { label: "Skills", page: "skills" },
-          ...(author ? [{ label: author.split("@")[0]!, page: "skills" }] : []),
+          ...(author ? [{ label: who, page: "skills" }] : []),
           { label: name, mono: true },
         ]}
       />
 
       <Card className="min-w-0">
         <CardHeader className="min-w-0 gap-3">
-          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="font-mono text-lg">{name}</CardTitle>
+          {/* Name and badges on one line, then what it does, then who and
+              where from. The badges used to sit under the description, three
+              lines below the name they describe, with the author's email run
+              into the same row as plain text. */}
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+                <CardTitle className="font-mono text-lg break-all">{name}</CardTitle>
+                {skill && <Badge variant="outline">v{skill.version}</Badge>}
+                {meta && <SourceChip source={meta.source} />}
+                {meta && <StateChip state={meta.state} />}
+                {enabledHere && (
+                  <Badge className="bg-success/15 text-success">
+                    <CheckCircle2 data-icon="inline-start" /> On this project
+                  </Badge>
+                )}
+                {skill?.outdated && (
+                  <Badge variant="outline" className="text-muted-foreground">
+                    <Clock data-icon="inline-start" /> v{skill.latest_version} available
+                  </Badge>
+                )}
+              </div>
               {document.meta.description && (
-                <CardDescription className="mt-1 max-w-2xl">
+                <CardDescription className="mt-2 max-w-3xl text-sm leading-relaxed">
                   {document.meta.description}
                 </CardDescription>
               )}
+              {/* Provenance, not identity, so it reads small and last. */}
+              <div className="text-muted-foreground mt-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <span className="inline-flex items-center gap-1" title={author ?? undefined}>
+                  <User className="size-3" /> {who}
+                </span>
+                {meta && <span aria-hidden>·</span>}
+                {meta && <span>{count(meta.uses, "read")}</span>}
+                {meta?.origin && <span aria-hidden>·</span>}
+                {meta?.origin && <span className="truncate font-mono">{meta.origin}</span>}
+                {meta?.updated_at && <span aria-hidden>·</span>}
+                {meta?.updated_at && <span>updated {when(meta.updated_at)}</span>}
+              </div>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {enabledHere ? (
@@ -119,31 +152,6 @@ export function SkillPage({
                 </Button>
               )}
             </div>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {skill && <Badge variant="outline">v{skill.version}</Badge>}
-            {meta && <SourceChip source={meta.source} />}
-            {meta && <StateChip state={meta.state} />}
-            {enabledHere && (
-              <Badge className="bg-success/15 text-success">
-                <CheckCircle2 data-icon="inline-start" /> On this project
-              </Badge>
-            )}
-            {skill?.outdated && (
-              <Badge variant="outline" className="text-muted-foreground">
-                <Clock data-icon="inline-start" /> v{skill.latest_version} available
-              </Badge>
-            )}
-            {meta?.origin && (
-              <Badge variant="outline" className="font-mono text-xs">
-                {meta.origin}
-              </Badge>
-            )}
-            <span className="text-muted-foreground text-xs">
-              {author ?? "unknown"}
-              {meta ? ` · ${count(meta.uses, "read")}` : ""}
-            </span>
           </div>
 
           {isAdmin && meta?.state === "pending" && (
