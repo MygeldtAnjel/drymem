@@ -179,6 +179,8 @@ class DistillResponse(BaseModel):
 class SessionOut(BaseModel):
     session_id: str
     author: str
+    # The person's name when the org knows one; the table showed a raw email.
+    author_name: str = ""
     memory_count: int
     shared: int = 0
     started_at: datetime
@@ -187,6 +189,21 @@ class SessionOut(BaseModel):
     synthetic: bool = Field(
         False, description="Grouped by author and day because no session id was recorded"
     )
+
+
+class SessionMemoryOut(BaseModel):
+    uuid: str
+    title: str
+    type: str = "note"
+    scope: str = "private"
+    created_at: datetime
+    topic_key: str = ""
+
+
+class SessionDetailResponse(BaseModel):
+    project_key: str
+    session: SessionOut
+    memories: list[SessionMemoryOut] = []
 
 
 class SessionsResponse(BaseModel):

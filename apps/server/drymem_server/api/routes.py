@@ -44,6 +44,8 @@ from drymem_server.api.schemas import (
     SaveMemoryRequest,
     SaveMemoryResponse,
     SearchResponse,
+    SessionDetailResponse,
+    SessionMemoryOut,
     SessionOut,
     SessionsResponse,
     TopicsResponse,
@@ -301,6 +303,7 @@ async def list_sessions(
             SessionOut(
                 session_id=s.session_id,
                 author=s.author,
+                author_name=s.author_name,
                 memory_count=s.memory_count,
                 shared=s.shared,
                 started_at=s.started_at,
@@ -309,6 +312,52 @@ async def list_sessions(
                 synthetic=s.synthetic,
             )
             for s in sessions
+        ],
+    )
+
+
+@router.get(
+    "/v1/sessions/{session_id:path}",
+    response_model=SessionDetailResponse,
+    tags=["sessions"],
+)
+async def session_detail(
+    session_id: str,
+    service: ServiceDep,
+    project_key: str = Query(...),
+) -> SessionDetailResponse:
+    """One sitting and the memories it produced.
+
+    A synthetic id is `email@day`, so the path is matched greedily — an address
+    with no slash still contains characters a stricter converter rejects.
+    """
+    found = await service.session_detail(project_key=project_key, session_id=session_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="No such session in this project.")
+    summary, memories = found
+    return SessionDetailResponse(
+        project_key=project_key,
+        session=SessionOut(
+            session_id=summary.session_id,
+            author=summary.author,
+            author_name=summary.author_name,
+            memory_count=summary.memory_count,
+            shared=summary.shared,
+            started_at=summary.started_at,
+            ended_at=summary.ended_at,
+            titles=summary.titles,
+            synthetic=summary.synthetic,
+        ),
+        memories=[
+            SessionMemoryOut(
+                uuid=m.uuid,
+                title=m.title,
+                type=m.memory_type,
+                scope=m.scope,
+                created_at=m.created_at,
+                topic_key=m.topic_key,
+            )
+            for m in memories
         ],
     )
 

@@ -175,6 +175,95 @@ async def test_a_memory_with_no_session_is_grouped_by_day_and_says_so(client):
 
 
 @pytest.mark.asyncio
+async def test_a_teammates_private_memory_is_not_in_the_sessions_list(client, sessionmaker):
+    """The list showed every memory in the project, titles and all.
+
+    Everywhere else in drymem a teammate's private memory is invisible; this
+    table was reading straight from `project_id` with no scope clause, so Jose
+    could read the titles of everything Miguel had kept to himself.
+    """
+    from tests.conftest import add_member
+
+    await save(client, "miguel", summary="## Summary\nThe admin password is hunter2")
+    await add_member(sessionmaker, PROJECT, client.world["people"]["jose"][0])
+
+    body = (
+        await client.get(
+            "/v1/sessions", headers=auth(client, "jose"), params={"project_key": PROJECT}
+        )
+    ).json()
+    assert [t for s in body["sessions"] for t in s["titles"]] == []
+
+
+@pytest.mark.asyncio
+async def test_a_session_opens_the_memories_it_produced(client):
+    """The table was a dead end: five columns and nowhere to click."""
+    await save(client, topic="a", session_id="s-open")
+    await save(client, topic="b", session_id="s-open")
+    await save(client, topic="elsewhere", session_id="s-other")
+
+    body = (
+        await client.get(
+            "/v1/sessions/s-open", headers=auth(client), params={"project_key": PROJECT}
+        )
+    ).json()
+    assert body["session"]["memory_count"] == 2
+    assert len(body["memories"]) == 2
+    assert {m["topic_key"] for m in body["memories"]} == {"a", "b"}
+    # Every row links to the memory's own page, so the uuid has to be real.
+    assert all(m["uuid"] for m in body["memories"])
+
+
+@pytest.mark.asyncio
+async def test_a_sessions_count_and_its_list_cannot_disagree(client):
+    """Both read the same rows: a row saying 2 that opens 1 is a bug report."""
+    await save(client, topic="a", session_id="s-count")
+    await save(client, topic="b", session_id="s-count")
+
+    listed = (
+        await client.get("/v1/sessions", headers=auth(client), params={"project_key": PROJECT})
+    ).json()
+    summary = next(s for s in listed["sessions"] if s["session_id"] == "s-count")
+    opened = (
+        await client.get(
+            "/v1/sessions/s-count", headers=auth(client), params={"project_key": PROJECT}
+        )
+    ).json()
+    assert summary["memory_count"] == len(opened["memories"])
+
+
+@pytest.mark.asyncio
+async def test_a_grouped_by_day_session_opens_too(client):
+    """Its id is `email@day`, which has to survive being a path segment."""
+    await save(client, topic="old", session_id="")
+    listed = (
+        await client.get("/v1/sessions", headers=auth(client), params={"project_key": PROJECT})
+    ).json()
+    [session] = listed["sessions"]
+
+    opened = await client.get(
+        f"/v1/sessions/{session['session_id']}",
+        headers=auth(client),
+        params={"project_key": PROJECT},
+    )
+    assert opened.status_code == 200, opened.text
+    assert len(opened.json()["memories"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_opening_a_teammates_private_session_is_a_404(client, sessionmaker):
+    from tests.conftest import add_member
+
+    await save(client, "miguel", session_id="s-mine")
+    await add_member(sessionmaker, PROJECT, client.world["people"]["jose"][0])
+
+    response = await client.get(
+        "/v1/sessions/s-mine", headers=auth(client, "jose"), params={"project_key": PROJECT}
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_sessions_of_a_project_you_are_not_in_are_invisible(client):
     await save(client, "miguel")
     body = (

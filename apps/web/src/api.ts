@@ -55,12 +55,28 @@ export interface Episode {
 export interface AgentSession {
   session_id: string;
   author: string;
+  author_name?: string;
   memory_count: number;
   shared: number;
   started_at: string;
   ended_at: string;
   titles: string[];
   synthetic: boolean;
+}
+
+/** One memory in a session. The body lives on the memory's own page. */
+export interface SessionMemory {
+  uuid: string;
+  title: string;
+  type: string;
+  scope: string;
+  created_at: string;
+  topic_key: string;
+}
+
+export interface SessionDetail {
+  session: AgentSession;
+  memories: SessionMemory[];
 }
 
 export interface Person {
@@ -338,7 +354,6 @@ export class ApiError extends Error {
   }
 }
 
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -370,10 +385,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const auth = {
   bootstrap: () => request<Bootstrap>("/auth/bootstrap"),
   session: () => request<Session>("/auth/session"),
-  signup: (body: { org_name: string; email: string; password: string; name: string }) =>
-    request<Session>("/auth/signup", { method: "POST", body: JSON.stringify(body) }),
+  signup: (body: {
+    org_name: string;
+    email: string;
+    password: string;
+    name: string;
+  }) =>
+    request<Session>("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   login: (email: string, password: string) =>
-    request<Session>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    request<Session>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
   forgot: (email: string) =>
@@ -381,7 +407,8 @@ export const auth = {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
-  resetInfo: (token: string) => request<{ email: string }>(`/auth/reset/${token}`),
+  resetInfo: (token: string) =>
+    request<{ email: string }>(`/auth/reset/${token}`),
   reset: (token: string, password: string) =>
     request<Session>(`/auth/reset/${token}`, {
       method: "POST",
@@ -393,11 +420,20 @@ export const auth = {
       body: JSON.stringify({ current, new: next }),
     }),
 
-  invite: (body: { email: string; role: string; project_key?: string | null }) =>
-    request<Invite>("/auth/invites", { method: "POST", body: JSON.stringify(body) }),
+  invite: (body: {
+    email: string;
+    role: string;
+    project_key?: string | null;
+  }) =>
+    request<Invite>("/auth/invites", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   invites: () => request<Invite[]>("/auth/invites"),
-  revokeInvite: (id: string) => request<void>(`/auth/invites/${id}`, { method: "DELETE" }),
-  invitePublic: (token: string) => request<InvitePublic>(`/auth/invites/${token}/public`),
+  revokeInvite: (id: string) =>
+    request<void>(`/auth/invites/${id}`, { method: "DELETE" }),
+  invitePublic: (token: string) =>
+    request<InvitePublic>(`/auth/invites/${token}/public`),
   accept: (token: string, password: string, name: string) =>
     request<Session>(`/auth/invites/${token}/accept`, {
       method: "POST",
@@ -405,11 +441,16 @@ export const auth = {
     }),
 
   sessions: () => request<WebSession[]>("/auth/sessions"),
-  revokeSession: (id: string) => request<void>(`/auth/sessions/${id}`, { method: "DELETE" }),
+  revokeSession: (id: string) =>
+    request<void>(`/auth/sessions/${id}`, { method: "DELETE" }),
   tokens: () => request<ApiToken[]>("/auth/tokens"),
   createToken: (label: string) =>
-    request<ApiToken>("/auth/tokens", { method: "POST", body: JSON.stringify({ label }) }),
-  revokeToken: (id: string) => request<void>(`/auth/tokens/${id}`, { method: "DELETE" }),
+    request<ApiToken>("/auth/tokens", {
+      method: "POST",
+      body: JSON.stringify({ label }),
+    }),
+  revokeToken: (id: string) =>
+    request<void>(`/auth/tokens/${id}`, { method: "DELETE" }),
 
   approveDevice: (userCode: string) =>
     request<void>("/auth/device/approve", {
@@ -434,7 +475,9 @@ export const api = {
   },
 
   projects: async (): Promise<Project[]> => {
-    const data = await request<{ projects: Partial<Project>[] }>("/v1/projects");
+    const data = await request<{ projects: Partial<Project>[] }>(
+      "/v1/projects",
+    );
     return data.projects.map((p) => ({
       id: p.id ?? "",
       project_key: p.project_key ?? "",
@@ -448,8 +491,12 @@ export const api = {
   },
 
   context: async (projectKey: string, limit = 100): Promise<Episode[]> => {
-    const q = new URLSearchParams({ project_key: projectKey, limit: String(limit) });
-    return (await request<{ episodes: Episode[] }>(`/v1/memories/context?${q}`)).episodes;
+    const q = new URLSearchParams({
+      project_key: projectKey,
+      limit: String(limit),
+    });
+    return (await request<{ episodes: Episode[] }>(`/v1/memories/context?${q}`))
+      .episodes;
   },
 
   /**
@@ -464,7 +511,11 @@ export const api = {
     query: string,
     limit = 25,
   ): Promise<{ memories: Episode[]; facts: Fact[] }> => {
-    const q = new URLSearchParams({ project_key: projectKey, q: query, limit: String(limit) });
+    const q = new URLSearchParams({
+      project_key: projectKey,
+      q: query,
+      limit: String(limit),
+    });
     const data = await request<{ memories: Episode[]; results: Fact[] }>(
       `/v1/memories/search?${q}`,
     );
@@ -478,22 +529,36 @@ export const api = {
     }),
 
   promote: (uuid: string) =>
-    request<{ scope: string }>(`/v1/memories/${uuid}/promote`, { method: "POST" }),
+    request<{ scope: string }>(`/v1/memories/${uuid}/promote`, {
+      method: "POST",
+    }),
 
-  remove: (uuid: string) => request(`/v1/memories/${uuid}`, { method: "DELETE" }),
+  remove: (uuid: string) =>
+    request(`/v1/memories/${uuid}`, { method: "DELETE" }),
 
   sessions: async (projectKey: string): Promise<AgentSession[]> => {
     const q = new URLSearchParams({ project_key: projectKey });
-    return (await request<{ sessions: AgentSession[] }>(`/v1/sessions?${q}`)).sessions;
+    return (await request<{ sessions: AgentSession[] }>(`/v1/sessions?${q}`))
+      .sessions;
+  },
+  session: (projectKey: string, id: string): Promise<SessionDetail> => {
+    const q = new URLSearchParams({ project_key: projectKey });
+    return request<SessionDetail>(
+      `/v1/sessions/${encodeURIComponent(id)}?${q}`,
+    );
   },
 
   /** Admins only; a member gets a 403 and the screen is not offered to them. */
-  audit: (options: { group?: string; before?: number; limit?: number } = {}) => {
+  audit: (
+    options: { group?: string; before?: number; limit?: number } = {},
+  ) => {
     const query = new URLSearchParams();
     if (options.group) query.set("group", options.group);
     if (options.before) query.set("before", String(options.before));
     query.set("limit", String(options.limit ?? 50));
-    return request<{ events: AuditEvent[]; next_before: number | null }>(`/v1/audit?${query}`);
+    return request<{ events: AuditEvent[]; next_before: number | null }>(
+      `/v1/audit?${query}`,
+    );
   },
 
   usage: () => request<Usage>("/v1/usage"),
@@ -507,15 +572,25 @@ export const api = {
     ).chats,
 
   chat: (id: string) =>
-    request<{ id: string; title: string; messages: ChatMessage[] }>(`/v1/chats/${id}`),
+    request<{ id: string; title: string; messages: ChatMessage[] }>(
+      `/v1/chats/${id}`,
+    ),
 
-  deleteChat: (id: string) => request<void>(`/v1/chats/${id}`, { method: "DELETE" }),
+  deleteChat: (id: string) =>
+    request<void>(`/v1/chats/${id}`, { method: "DELETE" }),
 
   askInChat: (projectKey: string, question: string, chatId?: string) =>
-    request<{ chat_id: string; title: string; message: ChatMessage }>("/v1/chats/ask", {
-      method: "POST",
-      body: JSON.stringify({ project_key: projectKey, question, chat_id: chatId }),
-    }),
+    request<{ chat_id: string; title: string; message: ChatMessage }>(
+      "/v1/chats/ask",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          project_key: projectKey,
+          question,
+          chat_id: chatId,
+        }),
+      },
+    ),
 
   /** The decision tree: areas of the codebase and what was decided about them. */
   tree: (projectKey: string, kinds: string[] = []) => {
@@ -524,9 +599,11 @@ export const api = {
     return request<Tree>(`/v1/graph/tree?${query}`);
   },
 
-  auditSummary: (days = 30) => request<AuditSummary>(`/v1/audit/summary?days=${days}`),
+  auditSummary: (days = 30) =>
+    request<AuditSummary>(`/v1/audit/summary?days=${days}`),
 
-  people: async (): Promise<Person[]> => (await request<{ users: Person[] }>("/v1/users")).users,
+  people: async (): Promise<Person[]> =>
+    (await request<{ users: Person[] }>("/v1/users")).users,
 
   members: async (projectKey: string): Promise<Member[]> => {
     const data = await request<{ members: Member[] }>(
@@ -536,10 +613,13 @@ export const api = {
   },
 
   addMember: async (projectKey: string, email: string): Promise<Member[]> => {
-    const data = await request<{ members: Member[] }>(`/v1/projects/${projectKey}/members`, {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
+    const data = await request<{ members: Member[] }>(
+      `/v1/projects/${projectKey}/members`,
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+    );
     return data.members;
   },
 
@@ -555,7 +635,11 @@ export const api = {
       body: JSON.stringify({ capture_mode: mode }),
     }),
 
-  setMemberRole: async (projectKey: string, email: string, role: string): Promise<Member[]> => {
+  setMemberRole: async (
+    projectKey: string,
+    email: string,
+    role: string,
+  ): Promise<Member[]> => {
     const data = await request<{ members: Member[] }>(
       `/v1/projects/${projectKey}/members/${encodeURIComponent(email)}`,
       { method: "PATCH", body: JSON.stringify({ role }) },
@@ -563,7 +647,10 @@ export const api = {
     return data.members;
   },
 
-  removeMember: async (projectKey: string, email: string): Promise<Member[]> => {
+  removeMember: async (
+    projectKey: string,
+    email: string,
+  ): Promise<Member[]> => {
     const data = await request<{ members: Member[] }>(
       `/v1/projects/${projectKey}/members/${encodeURIComponent(email)}`,
       { method: "DELETE" },
@@ -578,7 +665,9 @@ export const api = {
 
   catalogue: async (projectKey: string): Promise<CatalogueSkill[]> => {
     const q = new URLSearchParams({ project_key: projectKey });
-    return (await request<{ skills: CatalogueSkill[] }>(`/v1/skills/catalogue?${q}`)).skills;
+    return (
+      await request<{ skills: CatalogueSkill[] }>(`/v1/skills/catalogue?${q}`)
+    ).skills;
   },
 
   skillVersions: async (name: string): Promise<SkillVersion[]> => {
@@ -610,12 +699,17 @@ export const api = {
   enableSkill: (name: string, projectKey: string, version?: number) =>
     request<{ name: string; version: number }>(
       `/v1/skills/${encodeURIComponent(name)}/enable`,
-      { method: "POST", body: JSON.stringify({ project_key: projectKey, version }) },
+      {
+        method: "POST",
+        body: JSON.stringify({ project_key: projectKey, version }),
+      },
     ),
 
   disableSkill: (name: string, projectKey: string) => {
     const q = new URLSearchParams({ project_key: projectKey });
-    return request(`/v1/skills/${encodeURIComponent(name)}/enable?${q}`, { method: "DELETE" });
+    return request(`/v1/skills/${encodeURIComponent(name)}/enable?${q}`, {
+      method: "DELETE",
+    });
   },
 
   approveSkill: (name: string) =>
@@ -630,7 +724,6 @@ export const api = {
       { method: "POST", body: "{}" },
     ),
 
-
   /** A grounded answer, or an honest "nothing here mentions that". */
   ask: (projectKey: string, question: string) =>
     request<AskResult>("/v1/ask", {
@@ -644,13 +737,20 @@ export const api = {
       project_key: projectKey,
       min_memories: String(minMemories),
     });
-    return (await request<{ clusters: Cluster[] }>(`/v1/skills/discover?${q}`)).clusters;
+    return (await request<{ clusters: Cluster[] }>(`/v1/skills/discover?${q}`))
+      .clusters;
   },
 
   /** Draft a SKILL.md from the memories about a subject. Always a draft. */
   distill: (projectKey: string, topic: string) =>
-    request<{ topic: string; name: string; content: string; model: string; memory_count: number }>(
-      "/v1/skills/distill",
-      { method: "POST", body: JSON.stringify({ project_key: projectKey, topic }) },
-    ),
+    request<{
+      topic: string;
+      name: string;
+      content: string;
+      model: string;
+      memory_count: number;
+    }>("/v1/skills/distill", {
+      method: "POST",
+      body: JSON.stringify({ project_key: projectKey, topic }),
+    }),
 };

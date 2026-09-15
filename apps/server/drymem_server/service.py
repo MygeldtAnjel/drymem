@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from drymem_server.auth import Principal, ensure_project, project_for, role_in
@@ -109,6 +109,18 @@ class Overview:
 
 
 @dataclass(frozen=True)
+class SessionMemory:
+    """One memory in a session's list. The body lives in the graph, not here."""
+
+    uuid: str
+    title: str
+    memory_type: str
+    scope: str
+    created_at: datetime
+    topic_key: str = ""
+
+
+@dataclass(frozen=True)
 class SessionSummary:
     """One sitting: the memories that came out of a single agent run."""
 
@@ -121,6 +133,8 @@ class SessionSummary:
     shared: int = 0
     # True when the id was derived from author and day rather than recorded.
     synthetic: bool = False
+    # The person's name when the org knows one; the table showed a raw email.
+    author_name: str = ""
 
 
 @dataclass
@@ -888,6 +902,54 @@ class MemoryService:
         )
         return {email: name for email, name in rows.all() if name}
 
+    async def session_detail(
+        self, *, project_key: str, session_id: str
+    ) -> tuple[SessionSummary, list[SessionMemory]] | None:
+        """One sitting and the memories that came out of it.
+
+        Reads the same rows `sessions` counts, so the detail can never show a
+        different number from the row that was clicked. Synthetic ids are
+        `email@date`, which is how a pre-sessions memory is addressed.
+        """
+        summaries = await self.sessions(project_key=project_key, limit=500)
+        summary = next((s for s in summaries if s.session_id == session_id), None)
+        if summary is None:
+            return None
+
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return None
+
+        rows = await self.session.execute(
+            select(Memory, User.email)
+            .join(User, User.id == Memory.author_id)
+            .where(
+                Memory.project_id == project.id,
+                or_(
+                    Memory.author_id == self.principal.user_id,
+                    Memory.scope == SCOPE_TEAM,
+                ),
+            )
+            .order_by(Memory.created_at)
+        )
+
+        memories = []
+        for memory, email in rows.all():
+            key = memory.session_id or f"{email}@{memory.created_at.date().isoformat()}"
+            if key != session_id:
+                continue
+            memories.append(
+                SessionMemory(
+                    uuid=memory.team_episode_uuid or memory.episode_uuid,
+                    title=memory.title,
+                    memory_type=memory.memory_type,
+                    scope=memory.scope,
+                    created_at=memory.created_at,
+                    topic_key=memory.topic_key or "",
+                )
+            )
+        return summary, memories
+
     async def capture_mode(self, *, project_key: str) -> str:
         """How this project wants sessions captured. See PLAN.md D38."""
         from drymem_server.db.models import CAPTURE_AUTOMATIC
@@ -909,32 +971,42 @@ class MemoryService:
         if project is None:
             return []
 
+        # Yours, plus what the team shared. Without this clause the table
+        # listed every memory in the project including a teammate's private
+        # ones — titles and all — which is the one thing scope is for.
         rows = await self.session.execute(
-            select(Memory, User.email)
+            select(Memory, User.email, User.name)
             .join(User, User.id == Memory.author_id)
-            .where(Memory.project_id == project.id)
+            .where(
+                Memory.project_id == project.id,
+                or_(
+                    Memory.author_id == self.principal.user_id,
+                    Memory.scope == SCOPE_TEAM,
+                ),
+            )
             .order_by(Memory.created_at.desc())
         )
 
-        groups: dict[str, list[tuple[Memory, str]]] = {}
+        groups: dict[str, list[tuple[Memory, str, str]]] = {}
         synthetic: set[str] = set()
-        for memory, email in rows.all():
+        for memory, email, name in rows.all():
             if memory.session_id:
                 key = memory.session_id
             else:
                 key = f"{email}@{memory.created_at.date().isoformat()}"
                 synthetic.add(key)
-            groups.setdefault(key, []).append((memory, email))
+            groups.setdefault(key, []).append((memory, email, name or ""))
 
         summaries = [
             SessionSummary(
                 session_id=key,
                 author=items[0][1],
+                author_name=items[0][2],
                 memory_count=len(items),
-                started_at=min(m.created_at for m, _ in items),
-                ended_at=max(m.created_at for m, _ in items),
-                titles=[m.title for m, _ in items][:6],
-                shared=sum(1 for m, _ in items if m.scope == SCOPE_TEAM),
+                started_at=min(m.created_at for m, _, _ in items),
+                ended_at=max(m.created_at for m, _, _ in items),
+                titles=[m.title for m, _, _ in items][:6],
+                shared=sum(1 for m, _, _ in items if m.scope == SCOPE_TEAM),
                 synthetic=key in synthetic,
             )
             for key, items in groups.items()

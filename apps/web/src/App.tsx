@@ -38,14 +38,19 @@ import {
   type Skill,
   type SkillVersion,
 } from "./api";
-import { AcceptInvite, ApproveDevice, ForgotPassword, ResetPassword } from "@/pages/Gate";
+import {
+  AcceptInvite,
+  ApproveDevice,
+  ForgotPassword,
+  ResetPassword,
+} from "@/pages/Gate";
 import { Shell } from "@/components/Shell";
 import { Blank } from "@/components/Bits";
 import { MemoriesPage, MemoryDetail } from "@/pages/Memories";
 import { MembersPage } from "@/pages/Members";
 import { OverviewPage } from "@/pages/Overview";
 import { ProjectsPage } from "@/pages/Projects";
-import { SessionsPage } from "@/pages/Sessions";
+import { SessionPage, SessionsPage } from "@/pages/Sessions";
 import { ChatPage } from "@/pages/Chat";
 import { GraphPage } from "@/pages/Graph";
 import { SkillsPage, type Draft } from "@/pages/Skills";
@@ -60,7 +65,8 @@ import { SearchX } from "lucide-react";
 const TITLES: Record<string, { title: string; description?: string }> = {
   overview: {
     title: "Overview",
-    description: "What this project has learned, and whether everything is running.",
+    description:
+      "What this project has learned, and whether everything is running.",
   },
   memories: {
     title: "Memories",
@@ -68,7 +74,8 @@ const TITLES: Record<string, { title: string; description?: string }> = {
   },
   chat: {
     title: "Chat",
-    description: "Ask this project anything. Every claim points at a memory you can open.",
+    description:
+      "Ask this project anything. Every claim points at a memory you can open.",
   },
   graph: {
     title: "Decisions",
@@ -76,7 +83,8 @@ const TITLES: Record<string, { title: string; description?: string }> = {
   },
   audit: {
     title: "Audit",
-    description: "Who did what, and whether a credential has gone anywhere it should not.",
+    description:
+      "Who did what, and whether a credential has gone anywhere it should not.",
   },
   sessions: {
     title: "Sessions",
@@ -84,7 +92,8 @@ const TITLES: Record<string, { title: string; description?: string }> = {
   },
   skills: {
     title: "Skills",
-    description: "Turn what the team keeps re-learning into a skill every agent installs.",
+    description:
+      "Turn what the team keeps re-learning into a skill every agent installs.",
   },
   projects: {
     title: "Projects",
@@ -156,7 +165,13 @@ export function App() {
   );
 }
 
-function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => void }) {
+function Workspace({
+  session,
+  onSignOut,
+}: {
+  session: Session;
+  onSignOut: () => void;
+}) {
   const route = useRoute();
 
   const [me, setMe] = useState<Me | null>(null);
@@ -210,7 +225,11 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   );
 
   useEffect(() => {
-    Promise.all([api.me(), api.health().catch(() => null), api.schema().catch(() => null)])
+    Promise.all([
+      api.me(),
+      api.health().catch(() => null),
+      api.schema().catch(() => null),
+    ])
       .then(([who, status, shape]) => {
         setMe(who);
         setHealth(status);
@@ -246,16 +265,23 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
       if (!projectKey) return;
       setLoading(true);
       try {
-        const [context, overview, sessionList, enabled, wholeCatalogue, memberList, personList] =
-          await Promise.all([
-            api.context(projectKey, 100),
-            api.overview(projectKey).catch(() => null),
-            api.sessions(projectKey).catch(() => []),
-            api.skills(projectKey).catch(() => []),
-            api.catalogue(projectKey).catch(() => []),
-            api.members(projectKey).catch(() => []),
-            api.people().catch(() => []),
-          ]);
+        const [
+          context,
+          overview,
+          sessionList,
+          enabled,
+          wholeCatalogue,
+          memberList,
+          personList,
+        ] = await Promise.all([
+          api.context(projectKey, 100),
+          api.overview(projectKey).catch(() => null),
+          api.sessions(projectKey).catch(() => []),
+          api.skills(projectKey).catch(() => []),
+          api.catalogue(projectKey).catch(() => []),
+          api.members(projectKey).catch(() => []),
+          api.people().catch(() => []),
+        ]);
         setEpisodes(context);
         setStats(overview);
         setSessions(sessionList);
@@ -263,7 +289,10 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
         setCatalogue(wholeCatalogue);
         setMembers(memberList);
         setPeople(personList);
-        api.discover(projectKey).then(setClusters).catch(() => setClusters([]));
+        api
+          .discover(projectKey)
+          .then(setClusters)
+          .catch(() => setClusters([]));
       } catch (e) {
         fail(e, "Loading this project");
       } finally {
@@ -315,7 +344,9 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   };
 
   const patchEpisode = (uuid: string, patch: Partial<Episode>) =>
-    setEpisodes((list) => list.map((e) => (e.uuid === uuid ? { ...e, ...patch } : e)));
+    setEpisodes((list) =>
+      list.map((e) => (e.uuid === uuid ? { ...e, ...patch } : e)),
+    );
 
   const rate = (episode: Episode, rating: 1 | -1) =>
     act("Rating", async () => {
@@ -327,8 +358,14 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
   const promote = (episode: Episode) =>
     act("Sharing", async () => {
       await api.promote(episode.uuid);
-      patchEpisode(episode.uuid, { scope: "team", promoted_at: new Date().toISOString() });
-      void api.overview(active).then(setStats).catch(() => {});
+      patchEpisode(episode.uuid, {
+        scope: "team",
+        promoted_at: new Date().toISOString(),
+      });
+      void api
+        .overview(active)
+        .then(setStats)
+        .catch(() => {});
       return "Shared with the project";
     });
 
@@ -337,7 +374,10 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
       await api.remove(episode.uuid);
       setEpisodes((list) => list.filter((e) => e.uuid !== episode.uuid));
       go("memories");
-      void api.overview(active).then(setStats).catch(() => {});
+      void api
+        .overview(active)
+        .then(setStats)
+        .catch(() => {});
       return "Memory deleted";
     });
 
@@ -366,9 +406,13 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     try {
       const [page, summary] = await Promise.all([
         api.audit({ group: group || undefined, before: before ?? undefined }),
-        before ? Promise.resolve(auditSummary) : api.auditSummary(30).catch(() => null),
+        before
+          ? Promise.resolve(auditSummary)
+          : api.auditSummary(30).catch(() => null),
       ]);
-      setAuditEvents((current) => (before ? [...current, ...page.events] : page.events));
+      setAuditEvents((current) =>
+        before ? [...current, ...page.events] : page.events,
+      );
       setAuditBefore(page.next_before);
       if (!before) setAuditSummary(summary);
     } catch (e) {
@@ -458,11 +502,15 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
 
   // The skill page asks for its own versions on mount. Held here so a second
   // visit to the same skill paints from what is already loaded.
-  const [versionsFor, setVersionsFor] = useState<Record<string, SkillVersion[]>>({});
+  const [versionsFor, setVersionsFor] = useState<
+    Record<string, SkillVersion[]>
+  >({});
   const loadVersions = useCallback((name: string) => {
     api
       .skillVersions(name)
-      .then((list) => setVersionsFor((current) => ({ ...current, [name]: list })))
+      .then((list) =>
+        setVersionsFor((current) => ({ ...current, [name]: list })),
+      )
       .catch(() => setVersionsFor((current) => ({ ...current, [name]: [] })));
   }, []);
 
@@ -494,7 +542,11 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     act("Changing what gets saved", async () => {
       const updated = await api.setCaptureMode(key, mode);
       setProjects((list) =>
-        list.map((p) => (p.project_key === key ? { ...p, capture_mode: updated.capture_mode } : p)),
+        list.map((p) =>
+          p.project_key === key
+            ? { ...p, capture_mode: updated.capture_mode }
+            : p,
+        ),
       );
       return mode === "automatic"
         ? "Agents will save a private summary automatically"
@@ -507,7 +559,11 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     act("Renaming", async () => {
       const updated = await api.renameProject(key, name);
       setProjects((list) =>
-        list.map((p) => (p.project_key === key ? { ...p, display_name: updated.display_name } : p)),
+        list.map((p) =>
+          p.project_key === key
+            ? { ...p, display_name: updated.display_name }
+            : p,
+        ),
       );
       return name ? `Renamed to ${name}` : "Name cleared";
     });
@@ -519,7 +575,8 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
       toast.success(`Copied the ${what}`);
     } catch {
       toast.error(`Could not copy the ${what}`, {
-        description: "Your browser refused clipboard access. Select the text and copy it.",
+        description:
+          "Your browser refused clipboard access. Select the text and copy it.",
       });
     }
   };
@@ -529,16 +586,19 @@ function Workspace({ session, onSignOut }: { session: Session; onSignOut: () => 
     [projects, active],
   );
 
-  const openMemory = route.page === "memories" && route.id
-    ? episodes.find((e) => e.uuid === route.id)
-    : undefined;
+  const openMemory =
+    route.page === "memories" && route.id
+      ? episodes.find((e) => e.uuid === route.id)
+      : undefined;
 
   const meta = TITLES[route.page] ?? TITLES.overview!;
   // On a memory's own page the card already carries the title; repeating it in
   // the page heading printed the same sentence twice, one line apart.
   // Detail pages print their own trail, so the shell heading steps aside.
   const onDetail =
-    openMemory !== undefined || (route.page === "skills" && Boolean(route.id));
+    openMemory !== undefined ||
+    (route.page === "skills" && Boolean(route.id)) ||
+    (route.page === "sessions" && Boolean(route.id));
   const heading = onDetail ? { title: "", description: undefined } : meta;
 
   return (
@@ -718,10 +778,10 @@ function Screen(props: {
     case "chat":
       return <ChatPage projectKey={props.active} />;
     case "graph":
-      return (
-        <GraphPage projectKey={props.active} />
-      );
+      return <GraphPage projectKey={props.active} />;
     case "sessions":
+      if (route.id)
+        return <SessionPage projectKey={props.active} id={route.id} />;
       return <SessionsPage sessions={props.sessions} loading={props.loading} />;
     case "skills":
       if (route.id) {
