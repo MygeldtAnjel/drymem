@@ -36,7 +36,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Episode, Fact, TreeArea, TreeDecision } from "@/api";
 import { MEMORY_TYPES, TYPE_FILL, split } from "@/memory";
-import { firstLine, relative, stamp } from "@/format";
+import { firstLine, person, relative, stamp } from "@/format";
 import { go } from "@/router";
 
 export function MemoriesPage({
@@ -176,7 +176,7 @@ function MemoryRow({ episode }: { episode: Episode }) {
           {firstLine(episode.content, 180)}
         </span>
         <span className="text-muted-foreground truncate text-xs">
-          {episode.author ?? "unknown"} · {relative(episode.created_at)}
+          {person(episode.author, episode.author_name)} · {relative(episode.created_at)}
           {episode.topic_key && <span className="font-mono"> · {episode.topic_key}</span>}
         </span>
       </button>
@@ -284,7 +284,11 @@ export function MemoryDetail({
 
   const facts: Array<[string, React.ReactNode]> = [
     ["Kind", <TypeChip type={episode.type} />],
-    ["Author", episode.author ?? "unknown"],
+    [
+      "Author",
+      // The name reads; the address is still the identifier, so it stays on hover.
+      <span title={episode.author ?? undefined}>{person(episode.author, episode.author_name)}</span>,
+    ],
     ["Saved", stamp(episode.created_at)],
     ["Project", <span className="font-mono text-xs">{projectKey}</span>],
   ];
@@ -426,8 +430,18 @@ export function MemoryDetail({
  * Absent entirely when this memory names no file: there is no relationship to
  * claim, and a card saying "none" is a card that earns nothing.
  */
+/**
+ * How many related memories are worth showing at all.
+ *
+ * It used to be five *per area*, and a memory touching both `apps/server` and
+ * `apps/api` is in two areas — so a sidebar card quietly became eleven links
+ * and outgrew the memory it was meant to support.
+ */
+const RELATED_MAX = 5;
+
 function Related({ episode, projectKey }: { episode: Episode; projectKey: string }) {
   const [areas, setAreas] = useState<{ area: string; decisions: TreeDecision[] }[] | null>(null);
+  const [more, setMore] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -440,12 +454,26 @@ function Related({ episode, projectKey }: { episode: Episode; projectKey: string
           // A leaf area holds the decisions; the branches above only group.
           if (node.decisions.some((d) => d.id === episode.uuid)) {
             const others = node.decisions.filter((d) => d.id !== episode.uuid);
-            if (others.length > 0) found.push({ area: node.id, decisions: others.slice(0, 5) });
+            if (others.length > 0) found.push({ area: node.id, decisions: others });
           }
           node.children.forEach(walk);
         };
         walk(tree.root);
-        setAreas(found);
+
+        // Smallest area first: sharing `apps/server` with forty memories says
+        // almost nothing, sharing one file with two says a lot.
+        found.sort((a, b) => a.decisions.length - b.decisions.length);
+
+        const total = found.reduce((n, a) => n + a.decisions.length, 0);
+        const kept: { area: string; decisions: TreeDecision[] }[] = [];
+        let room = RELATED_MAX;
+        for (const area of found) {
+          if (room <= 0) break;
+          kept.push({ area: area.area, decisions: area.decisions.slice(0, room) });
+          room -= Math.min(room, area.decisions.length);
+        }
+        setAreas(kept);
+        setMore(total - Math.min(total, RELATED_MAX));
       })
       .catch(() => live && setAreas([]));
     return () => {
@@ -483,7 +511,7 @@ function Related({ episode, projectKey }: { episode: Episode; projectKey: string
                       </span>
                     </span>
                     <span className="text-muted-foreground block truncate pl-3 text-[11px]">
-                      {d.author?.split("@")[0] ?? "unknown"} · {relative(d.created_at)}
+                      {person(d.author, d.author_name)} · {relative(d.created_at)}
                     </span>
                   </button>
                 </li>
@@ -491,6 +519,14 @@ function Related({ episode, projectKey }: { episode: Episode; projectKey: string
             </ul>
           </div>
         ))}
+        {more > 0 && (
+          <button
+            className="text-muted-foreground hover:text-foreground text-left text-xs"
+            onClick={() => go("graph")}
+          >
+            {more} more in the decision tree →
+          </button>
+        )}
       </CardContent>
     </Card>
   );
