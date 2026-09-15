@@ -162,9 +162,28 @@ auditRouter.get("/summary", async (req, res) => {
     .groupBy(schema.auditLog.action)
     .orderBy(desc(raw`count(*)`));
 
+  // Events per day, quiet days included as zero: a chart drawn only from the
+  // days that had activity flattens a silent week into a straight line.
+  const daily = await db
+    .select({
+      day: raw<string>`to_char(${schema.auditLog.createdAt}, 'YYYY-MM-DD')`,
+      n: raw<number>`count(*)::int`,
+    })
+    .from(schema.auditLog)
+    .where(and(eq(schema.auditLog.orgId, principal.orgId), gte(schema.auditLog.createdAt, since)))
+    .groupBy(raw`to_char(${schema.auditLog.createdAt}, 'YYYY-MM-DD')`);
+
+  const counted = new Map(daily.map((r) => [r.day, Number(r.n)]));
+  const window = Array.from({ length: days }, (_, i) => {
+    const at = new Date(since);
+    at.setUTCDate(at.getUTCDate() + i);
+    return at.toISOString().slice(0, 10);
+  });
+
   const of = (action: string) => rows.find((r) => r.action === action)?.count ?? 0;
   res.json({
     days,
+    per_day: window.map((day) => ({ day, n: counted.get(day) ?? 0 })),
     actions: rows,
     total: rows.reduce((sum, r) => sum + r.count, 0),
     // Answering the question in the plan directly, rather than making an admin
