@@ -220,7 +220,8 @@ function Workspace({
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [auditSummary, setAuditSummary] = useState<AuditSummary | null>(null);
   const [auditGroup, setAuditGroup] = useState("");
-  const [auditBefore, setAuditBefore] = useState<number | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
   const [auditLoading, setAuditLoading] = useState(false);
 
   const [facts, setFacts] = useState<Fact[] | null>(null);
@@ -509,20 +510,19 @@ function Workspace({
    * It is admin-only and most sessions never open it, so fetching it eagerly
    * would be one 403 per sign-in for every member of the team.
    */
-  const loadAudit = async (group: string, before: number | null = null) => {
+  const loadAudit = async (group: string, page = 1) => {
     setAuditLoading(true);
     try {
-      const [page, summary] = await Promise.all([
-        api.audit({ group: group || undefined, before: before ?? undefined }),
-        before
-          ? Promise.resolve(auditSummary)
-          : api.auditSummary(30).catch(() => null),
+      const [body, summary] = await Promise.all([
+        api.audit({ group: group || undefined, limit: PAGE, offset: (page - 1) * PAGE }),
+        // The summary describes the whole trail, so it is fetched once rather
+        // than on every page turn.
+        page === 1 ? api.auditSummary(30).catch(() => null) : Promise.resolve(auditSummary),
       ]);
-      setAuditEvents((current) =>
-        before ? [...current, ...page.events] : page.events,
-      );
-      setAuditBefore(page.next_before);
-      if (!before) setAuditSummary(summary);
+      setAuditEvents(body.events);
+      setAuditTotal(body.total);
+      setAuditPage(page);
+      if (page === 1) setAuditSummary(summary);
     } catch (e) {
       fail(e, "Loading the audit trail");
     } finally {
@@ -530,10 +530,10 @@ function Workspace({
     }
   };
 
+  /** A filter change is a new first page: page 6 of a different set is nobody's. */
   const chooseAuditGroup = (group: string) => {
     setAuditGroup(group);
-    setAuditEvents([]);
-    void loadAudit(group);
+    void loadAudit(group, 1);
   };
 
   useEffect(() => {
@@ -757,9 +757,10 @@ function Workspace({
         auditSummary={auditSummary}
         auditGroup={auditGroup}
         auditLoading={auditLoading}
-        auditHasMore={auditBefore !== null}
+        auditPage={auditPage}
+        auditTotal={auditTotal}
         onAuditGroup={chooseAuditGroup}
-        onAuditMore={() => void loadAudit(auditGroup, auditBefore)}
+        onAuditPage={(p: number) => void loadAudit(auditGroup, p)}
         clusters={clusters}
         people={people}
         members={members}
@@ -836,9 +837,10 @@ function Screen(props: {
   auditSummary: AuditSummary | null;
   auditGroup: string;
   auditLoading: boolean;
-  auditHasMore: boolean;
+  auditPage: number;
+  auditTotal: number;
   onAuditGroup: (group: string) => void;
-  onAuditMore: () => void;
+  onAuditPage: (page: number) => void;
   clusters: Cluster[];
   people: Person[];
   members: Member[];
@@ -1010,9 +1012,11 @@ function Screen(props: {
           loading={props.auditLoading}
           busy={props.auditLoading}
           group={props.auditGroup}
-          hasMore={props.auditHasMore}
+          page={props.auditPage}
+          total={props.auditTotal}
+          perPage={PAGE}
           onGroup={props.onAuditGroup}
-          onMore={props.onAuditMore}
+          onPage={props.onAuditPage}
         />
       );
     case "settings":

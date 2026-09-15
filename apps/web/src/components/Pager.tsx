@@ -108,7 +108,15 @@ export function Pager({
               {n === "gap" ? (
                 <PaginationEllipsis />
               ) : (
-                <PaginationLink href="#" isActive={n === page} onClick={jump(n)}>
+                // A bare "2" is a poor accessible name; the label says what
+                // pressing it does. It was on the hand-rolled version and I
+                // lost it moving to the shadcn one.
+                <PaginationLink
+                  href="#"
+                  aria-label={`Page ${n}`}
+                  isActive={n === page}
+                  onClick={jump(n)}
+                >
                   <span className="tabular-nums">{n}</span>
                 </PaginationLink>
               )}

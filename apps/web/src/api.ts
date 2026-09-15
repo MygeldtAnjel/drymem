@@ -631,16 +631,13 @@ export const api = {
   },
 
   /** Admins only; a member gets a 403 and the screen is not offered to them. */
-  audit: (
-    options: { group?: string; before?: number; limit?: number } = {},
-  ) => {
+  /** One numbered page of the trail, with a total counted under the same filter. */
+  audit: (options: { group?: string; offset?: number; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (options.group) query.set("group", options.group);
-    if (options.before) query.set("before", String(options.before));
-    query.set("limit", String(options.limit ?? 50));
-    return request<{ events: AuditEvent[]; next_before: number | null }>(
-      `/v1/audit?${query}`,
-    );
+    query.set("limit", String(options.limit ?? 25));
+    query.set("offset", String(options.offset ?? 0));
+    return request<{ events: AuditEvent[]; total: number }>(`/v1/audit?${query}`);
   },
 
   usage: () => request<Usage>("/v1/usage"),

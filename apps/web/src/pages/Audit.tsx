@@ -14,7 +14,7 @@
 import { AlertTriangle, ScrollText, ShieldCheck } from "lucide-react";
 
 import { Blank, RowsSkeleton } from "@/components/Bits";
-import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/Pager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -138,18 +138,22 @@ export function AuditPage({
   loading,
   busy,
   group,
-  hasMore,
   onGroup,
-  onMore,
+  onPage,
+  page,
+  total,
+  perPage,
 }: {
   events: AuditEvent[];
   summary: AuditSummary | null;
   loading: boolean;
   busy: boolean;
   group: string;
-  hasMore: boolean;
   onGroup: (group: string) => void;
-  onMore: () => void;
+  onPage: (page: number) => void;
+  page: number;
+  total: number;
+  perPage: number;
 }) {
   return (
     <div className="space-y-6">
@@ -241,13 +245,9 @@ export function AuditPage({
               </Table>
               </div>
 
-              {hasMore && (
-                <div className="mt-4 flex justify-center">
-                  <Button variant="outline" size="sm" disabled={busy} onClick={onMore}>
-                    {busy ? "Loading…" : "Older"}
-                  </Button>
-                </div>
-              )}
+              {/* Numbered, like the memories archive: an admin looking into
+                  something comes back to it and should land on the same page. */}
+              <Pager page={page} total={total} perPage={perPage} busy={busy} onPage={onPage} />
             </>
           )}
         </CardContent>
