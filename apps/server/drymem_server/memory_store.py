@@ -122,7 +122,14 @@ class MemoryStore(Protocol):
         self, *, query: str, group_ids: list[str], limit: int
     ) -> list[Episode]: ...
 
-    async def recent(self, *, group_ids: list[str], limit: int) -> list[Episode]: ...
+    async def recent(
+        self,
+        *,
+        group_ids: list[str],
+        limit: int,
+        before: datetime | None = None,
+        before_uuid: str | None = None,
+    ) -> list[Episode]: ...
 
     async def delete(self, episode_id: str) -> None: ...
 
@@ -300,13 +307,32 @@ class GraphitiMemoryStore:
             for r in records
         ]
 
-    async def recent(self, *, group_ids: list[str], limit: int) -> list[Episode]:
+    async def recent(
+        self,
+        *,
+        group_ids: list[str],
+        limit: int,
+        before: datetime | None = None,
+        before_uuid: str | None = None,
+    ) -> list[Episode]:
+        """The newest episodes, or the newest older than the cursor.
+
+        The cursor is a time **and** a uuid, and the uuid is not decoration:
+        Graphiti's `reference_time` is inclusive, so asking for "older than the
+        last item I saw" hands that item back a second time. Measured against
+        real data it was one duplicate on every page boundary — eight across
+        nine pages. Naming the item lets it be dropped.
+
+        One extra row is fetched to replace it, so a page stays a full page.
+        """
         graphiti = await self._graphiti()
         episodes = await graphiti.retrieve_episodes(
-            reference_time=datetime.now(UTC),
-            last_n=limit,
+            reference_time=before or datetime.now(UTC),
+            last_n=limit + (1 if before_uuid else 0),
             group_ids=group_ids,
         )
+        if before_uuid:
+            episodes = [ep for ep in episodes if ep.uuid != before_uuid]
         return [
             Episode(
                 uuid=ep.uuid,

@@ -90,6 +90,12 @@ class EpisodeOut(BaseModel):
 class ContextResponse(BaseModel):
     project_key: str
     episodes: list[EpisodeOut]
+    # The cursor for the next page: the oldest item on this one. Null when the
+    # page came back short, which is how a caller knows it has reached the end.
+    next_before: datetime | None = None
+    # Its uuid, which the next page needs to exclude — the store's time filter
+    # is inclusive, so a time alone repeats the boundary item.
+    next_uuid: str | None = None
 
 
 class TopicsResponse(BaseModel):
@@ -222,6 +228,9 @@ class SessionDetailResponse(BaseModel):
 
 class SessionsResponse(BaseModel):
     project_key: str
+    # The cursor for the next page. Null when this one was short, which is how
+    # a caller knows there is nothing more to ask for.
+    next_before: datetime | None = None
     sessions: list[SessionOut]
 
 

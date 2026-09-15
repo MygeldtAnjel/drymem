@@ -42,6 +42,7 @@ class InMemoryStore:
         self.deleted: list[str] = []
         self.saved_bodies: list[str] = []
         self.superseded: list[tuple[str, list[str]]] = []
+        self._tick = 0
 
     async def search_episodes(self, *, query, group_ids, limit) -> list[Episode]:
         """Substring over content, which is what the full-text index approximates."""
@@ -62,18 +63,39 @@ class InMemoryStore:
     async def save(self, *, name, body, group_id, metadata) -> SaveResult:
         episode_uuid = str(uuid.uuid4())
         self.saved_bodies.append(body)
+        # A real episode is stamped when it is written, and the double left it
+        # None — so every cursor derived from it was None and paging could not
+        # be tested at all. Each save is a tick apart because a test writes five
+        # memories faster than a clock moves, and identical timestamps make a
+        # time cursor ambiguous.
+        self._tick += 1
         self.episodes.setdefault(group_id, []).insert(
-            0, Episode(uuid=episode_uuid, name=name, content=body, metadata=metadata)
+            0,
+            Episode(
+                uuid=episode_uuid,
+                name=name,
+                content=body,
+                created_at=datetime.now(UTC) + timedelta(milliseconds=self._tick),
+                metadata=metadata,
+            ),
         )
         return SaveResult(uuid=episode_uuid, entity_count=2, edge_count=1)
 
     async def search(self, *, query, group_ids, limit):
         return self.facts[:limit]
 
-    async def recent(self, *, group_ids, limit):
+    async def recent(self, *, group_ids, limit, before=None, before_uuid=None):
+        # The cursor is honoured, and inclusively — like Graphiti's
+        # `reference_time`. A double that filtered exclusively would hide the
+        # duplicate-on-every-boundary bug that only real data exposed.
         out: list[Episode] = []
         for gid in group_ids:
             out.extend(self.episodes.get(gid, []))
+        if before is not None:
+            out = [e for e in out if e.created_at and e.created_at <= before]
+        if before_uuid is not None:
+            out = [e for e in out if e.uuid != before_uuid]
+        out.sort(key=lambda e: e.created_at or datetime.min.replace(tzinfo=UTC), reverse=True)
         return out[:limit]
 
     async def delete(self, episode_id: str) -> None:

@@ -344,8 +344,22 @@ class MemoryService:
         )
         return self._dedupe(found)[:limit]
 
-    async def context(self, *, project_key: str, limit: int) -> list[Episode]:
+    async def context(
+        self,
+        *,
+        project_key: str,
+        limit: int,
+        before: datetime | None = None,
+        before_uuid: str | None = None,
+        newest_first: bool = False,
+    ) -> list[Episode]:
         """Recent memories, team first, each appearing once.
+
+        `newest_first` drops the team-first bias for strict time order, and is
+        what a browsable list wants: the bias below is for a session-start hook
+        spending a few hundred tokens, but it makes a *page* of results
+        unpageable — a cursor is a point in time, and this order is not time.
+        The screen that says "newest first" now gets newest first.
 
         The session-start hook has a budget of a few hundred tokens. Spending it
         on your own half-finished note when a teammate has already vouched for
@@ -355,7 +369,10 @@ class MemoryService:
         memory back two times.
         """
         episodes = await self.store.recent(
-            group_ids=await self.readable_groups(project_key), limit=limit * 2
+            group_ids=await self.readable_groups(project_key),
+            limit=limit * 2,
+            before=before,
+            before_uuid=before_uuid,
         )
 
         unique = sorted(
@@ -363,6 +380,8 @@ class MemoryService:
             key=lambda e: e.created_at or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
+        if newest_first:
+            return unique[:limit]
         shared = [e for e in unique if self._is_shared(e)]
         own = [e for e in unique if not self._is_shared(e)]
         return (shared + own)[:limit]
@@ -394,14 +413,30 @@ class MemoryService:
     def _is_shared(episode: Episode) -> bool:
         return episode.metadata is not None and episode.metadata.scope == SCOPE_TEAM
 
-    async def entries(self, *, project_key: str, limit: int) -> list[Entry]:
+    async def entries(
+        self,
+        *,
+        project_key: str,
+        limit: int,
+        before: datetime | None = None,
+        before_uuid: str | None = None,
+        newest_first: bool = False,
+    ) -> list[Entry]:
         """Recent memories with their index rows attached.
 
         One query for every uuid in the page rather than one per memory: the
         list view is the most-hit read in the product and N+1 on it is the
         difference between instant and noticeable.
         """
-        return await self._entries_for(await self.context(project_key=project_key, limit=limit))
+        return await self._entries_for(
+            await self.context(
+                project_key=project_key,
+                limit=limit,
+                before=before,
+                before_uuid=before_uuid,
+                newest_first=newest_first,
+            )
+        )
 
     async def search_entries(self, *, project_key: str, query: str, limit: int) -> list[Entry]:
         """Memories matching a query, best match first, with their index rows."""
@@ -978,7 +1013,9 @@ class MemoryService:
 
     # ---- the management surface: sessions, people, skills -------------------
 
-    async def sessions(self, *, project_key: str, limit: int = 50) -> list[SessionSummary]:
+    async def sessions(
+        self, *, project_key: str, limit: int = 50, before: datetime | None = None
+    ) -> list[SessionSummary]:
         """A project's memories grouped into the sittings that produced them.
 
         Memories saved before sessions existed have no id, so they are grouped
@@ -1031,6 +1068,11 @@ class MemoryService:
             for key, items in groups.items()
         ]
         summaries.sort(key=lambda x: x.ended_at, reverse=True)
+        # Grouping happens over every memory, so the cursor is applied to the
+        # result: a session cannot be filtered out by a SQL WHERE without
+        # splitting the sitting it belongs to.
+        if before is not None:
+            summaries = [s for s in summaries if s.ended_at < before]
         return summaries[:limit]
 
     async def me(self) -> User | None:

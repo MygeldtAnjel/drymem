@@ -272,3 +272,112 @@ async def test_sessions_of_a_project_you_are_not_in_are_invisible(client):
         )
     ).json()
     assert body["sessions"] == []
+
+
+# ---- paging ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_sessions_page_with_a_cursor_and_say_when_they_end(client):
+    """A project accumulates sittings forever; the cap used to be the whole story."""
+    for i in range(5):
+        await save(client, topic=f"page/{i}", session_id=f"s-page-{i}")
+
+    first = (
+        await client.get(
+            "/v1/sessions", headers=auth(client), params={"project_key": PROJECT, "limit": 2}
+        )
+    ).json()
+    assert len(first["sessions"]) == 2
+    assert first["next_before"] is not None
+
+    second = (
+        await client.get(
+            "/v1/sessions",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 2, "before": first["next_before"]},
+        )
+    ).json()
+    assert len(second["sessions"]) == 2
+    # No overlap: a cursor that returned the same rows would loop forever.
+    assert {s["session_id"] for s in first["sessions"]}.isdisjoint(
+        {s["session_id"] for s in second["sessions"]}
+    )
+
+    # Walking to the end terminates, and the last page says so.
+    seen, cursor = set(), None
+    for _ in range(10):
+        params = {"project_key": PROJECT, "limit": 2}
+        if cursor:
+            params["before"] = cursor
+        body = (await client.get("/v1/sessions", headers=auth(client), params=params)).json()
+        seen.update(s["session_id"] for s in body["sessions"])
+        cursor = body["next_before"]
+        if cursor is None:
+            break
+    assert cursor is None
+    assert len(seen) == 5
+
+
+@pytest.mark.asyncio
+async def test_memories_page_newest_first_without_repeating_one(client):
+    for i in range(5):
+        await save(client, topic=f"mem/{i}", session_id="s-mem")
+
+    seen: list[str] = []
+    cursor: tuple[str, str] | None = None
+    for _ in range(10):
+        params = {"project_key": PROJECT, "limit": 2, "order": "recent"}
+        if cursor:
+            # Both halves, as a real client sends them. The store's time filter
+            # is inclusive, so a timestamp on its own returns the boundary item
+            # twice — which is exactly what it did against real data.
+            params["before"], params["before_uuid"] = cursor
+        body = (
+            await client.get("/v1/memories/context", headers=auth(client), params=params)
+        ).json()
+        seen.extend(e["uuid"] for e in body["episodes"])
+        cursor = (
+            (body["next_before"], body["next_uuid"]) if body["next_before"] else None
+        )
+        if cursor is None:
+            break
+
+    assert cursor is None
+    assert len(seen) == len(set(seen)) == 5
+
+
+@pytest.mark.asyncio
+async def test_the_memory_on_a_page_boundary_is_not_served_twice(client):
+    """The bug real data found and the in-memory double had hidden.
+
+    Graphiti's `reference_time` is inclusive, so "older than the last one I
+    saw" hands that one back. One duplicate per boundary, every time.
+    """
+    for i in range(4):
+        await save(client, topic=f"edge/{i}", session_id="s-edge")
+
+    first = (
+        await client.get(
+            "/v1/memories/context",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 2, "order": "recent"},
+        )
+    ).json()
+    second = (
+        await client.get(
+            "/v1/memories/context",
+            headers=auth(client),
+            params={
+                "project_key": PROJECT,
+                "limit": 2,
+                "order": "recent",
+                "before": first["next_before"],
+                "before_uuid": first["next_uuid"],
+            },
+        )
+    ).json()
+
+    last_of_first = first["episodes"][-1]["uuid"]
+    assert last_of_first not in {e["uuid"] for e in second["episodes"]}
+    assert len(second["episodes"]) == 2

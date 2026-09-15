@@ -14,6 +14,7 @@ Nothing here authenticates. `X-Drymem-Principal` says who the caller is; see
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -194,12 +195,43 @@ async def memory_context(
     service: ServiceDep,
     project_key: str = Query(...),
     limit: int = Query(10, ge=1, le=100),
+    before: Annotated[
+        datetime | None, Query(description="Cursor: the `next_before` from the previous page")
+    ] = None,
+    before_uuid: Annotated[
+        str | None, Query(description="Cursor: the `next_uuid` from the previous page")
+    ] = None,
+    order: Annotated[
+        str,
+        Query(
+            description="`context` puts shared memories first for a token budget; "
+            "`recent` is strict newest-first, which is what a browsable list needs"
+        ),
+    ] = "context",
 ) -> ContextResponse:
-    entries = await service.entries(project_key=project_key, limit=limit)
+    """A page of memories.
+
+    Paged because this list grows forever. Before, the cap was the whole story:
+    the hundredth memory was the last one the product would ever show you, and
+    nothing said so.
+    """
+    entries = await service.entries(
+        project_key=project_key,
+        limit=limit,
+        before=before,
+        before_uuid=before_uuid,
+        newest_first=order == "recent",
+    )
     names = await service.author_names(_authors_of(entries))
+    last = entries[-1].episode if entries else None
+    more = len(entries) == limit
     return ContextResponse(
         project_key=project_key,
         episodes=[_episode_out(entry, names) for entry in entries],
+        # A short page is the last page. Saying so costs nothing and saves the
+        # caller a round trip that returns nothing.
+        next_before=last.created_at if more and last else None,
+        next_uuid=last.uuid if more and last else None,
     )
 
 
@@ -327,11 +359,15 @@ async def list_sessions(
     service: ServiceDep,
     project_key: str = Query(...),
     limit: int = Query(50, ge=1, le=200),
+    before: Annotated[
+        datetime | None, Query(description="Cursor: the `next_before` from the previous page")
+    ] = None,
 ) -> SessionsResponse:
-    """The sittings this project's memories came out of."""
-    sessions = await service.sessions(project_key=project_key, limit=limit)
+    """The sittings this project's memories came out of, newest first."""
+    sessions = await service.sessions(project_key=project_key, limit=limit, before=before)
     return SessionsResponse(
         project_key=project_key,
+        next_before=sessions[-1].ended_at if len(sessions) == limit else None,
         sessions=[
             SessionOut(
                 session_id=s.session_id,
