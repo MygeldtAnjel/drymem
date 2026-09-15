@@ -15,7 +15,7 @@
  * server; the buttons are hidden here as a courtesy, never as the control.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Ban,
@@ -23,7 +23,6 @@ import {
   Clock,
   FileText,
   Flame,
-  History,
   Plus,
   Search,
   ShieldAlert,
@@ -55,13 +54,19 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CatalogueSkill, Cluster, Finding, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
 import { count, relative } from "@/format";
 import { go } from "@/router";
 
-export type Draft = { name: string; content: string; model: string; memory_count: number };
+export type Draft = {
+  name: string;
+  content: string;
+  model: string;
+  memory_count: number;
+  /** The topic keys it was written from, so a reader can judge the coverage. */
+  sources?: string[];
+};
 
 /** Where a skill came from. Worth showing: imported and distilled earn different trust. */
 export function SourceChip({ source }: { source: string }) {
@@ -129,17 +134,27 @@ function SkillCard({
   enabledHere,
   isAdmin,
   busy,
+  pinned,
+  outdated,
+  latestVersion,
   onEnable,
   onDeprecate,
   onFilter,
+  onRemove,
 }: {
   skill: CatalogueSkill;
   enabledHere: boolean;
   isAdmin: boolean;
   busy: boolean;
+  /** The version this project is on, when it is installed here. */
+  pinned?: number;
+  outdated?: boolean;
+  latestVersion?: number;
   onEnable: (name: string) => void;
   onDeprecate: (name: string) => void;
   onFilter: (topic: string) => void;
+  /** Present only on the installed list, where removing is the action. */
+  onRemove?: (name: string) => void;
 }) {
   return (
     <li className="border-border bg-card hover:border-input flex min-w-0 flex-col gap-3 rounded-lg border p-4 transition-colors">
@@ -179,7 +194,12 @@ function SkillCard({
 
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <SourceChip source={skill.source} />
-        <Badge variant="outline">v{skill.latest_version}</Badge>
+        <Badge variant="outline">v{pinned ?? skill.latest_version}</Badge>
+        {outdated && (
+          <Badge variant="outline" className="text-primary">
+            <Clock data-icon="inline-start" /> v{latestVersion} available
+          </Badge>
+        )}
         {skill.uses > 0 && (
           <Badge variant="outline" className="text-primary">
             <Flame data-icon="inline-start" /> {count(skill.uses, "read")}
@@ -192,21 +212,39 @@ function SkillCard({
           <PersonChip author={skill.author} name={skill.author_name} />
           <span className="ml-1.5">· {relative(skill.updated_at)}</span>
         </span>
+        {outdated && (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => onEnable(skill.name)}>
+            Update to v{latestVersion}
+          </Button>
+        )}
         {!enabledHere && (
           <Button size="sm" disabled={busy} onClick={() => onEnable(skill.name)}>
             <Plus data-icon="inline-start" /> Add
           </Button>
         )}
-        {isAdmin && skill.state !== "deprecated" && (
+        {onRemove ? (
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Deprecate ${skill.name}`}
+            aria-label={`Remove ${skill.name} from this project`}
             disabled={busy}
-            onClick={() => onDeprecate(skill.name)}
+            onClick={() => onRemove(skill.name)}
           >
-            <Ban />
+            <Trash2 />
           </Button>
+        ) : (
+          isAdmin &&
+          skill.state !== "deprecated" && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Deprecate ${skill.name}`}
+              disabled={busy}
+              onClick={() => onDeprecate(skill.name)}
+            >
+              <Ban />
+            </Button>
+          )
         )}
       </div>
     </li>
@@ -244,6 +282,9 @@ export function SkillsPage({
   onDeprecate: (name: string) => void;
   onVersions: (name: string) => Promise<SkillVersion[]>;
 }) {
+  // Controlled, so clicking a tag on an installed skill can take you to the
+  // catalogue with that tag already filtering it.
+  const [tab, setTab] = useState("project");
   const [readingDraft, setReadingDraft] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -264,6 +305,25 @@ export function SkillsPage({
     : published;
 
   const draft = readingDraft ? drafts[readingDraft] : null;
+
+  /*
+   * Open the draft the moment it lands.
+   *
+   * Drafting takes a local model a minute or two. Coming back to a toast and
+   * having to find a "Read" button is the wrong end of that wait — the whole
+   * point of the pause is the document at the end of it.
+   */
+  const waitingFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (drafting) waitingFor.current = drafting;
+  }, [drafting]);
+  useEffect(() => {
+    const topic = waitingFor.current;
+    if (!drafting && topic && drafts[topic]) {
+      waitingFor.current = null;
+      setReadingDraft(topic);
+    }
+  }, [drafting, drafts]);
   const document = frontmatter(draft?.content ?? "");
 
   return (
@@ -300,7 +360,7 @@ export function SkillsPage({
         </Card>
       )}
 
-      <Tabs defaultValue="project" className="gap-4">
+      <Tabs value={tab} onValueChange={setTab} className="gap-4">
         <TabsList>
           <TabsTrigger value="project">On this project {skills.length}</TabsTrigger>
           <TabsTrigger value="catalogue">Catalogue {published.length}</TabsTrigger>
@@ -324,66 +384,25 @@ export function SkillsPage({
                 re-learning.
               </Blank>
             ) : (
-              <ul className="flex flex-col">
+              <ul className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 {skills.map((skill) => (
-                  <li
+                  <SkillCard
                     key={skill.id}
-                    className="flex flex-wrap items-center gap-2 border-t px-4 py-3 first:border-t-0"
-                  >
-                    <button
-                      className="min-w-0 flex-1 text-left"
-                      onClick={() => go("skills", skill.name)}
-                    >
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-mono text-sm font-medium">
-                          {skill.name}
-                        </span>
-                        <Badge variant="outline">v{skill.version}</Badge>
-                        <StateChip state={skill.state} />
-                        {skill.outdated && (
-                          <Badge variant="outline" className="text-primary">
-                            v{skill.latest_version} available
-                          </Badge>
-                        )}
-                      </span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {skill.description || skill.topic || "No description"} ·{" "}
-                        {skill.uses > 0 ? count(skill.uses, "read") : "never read by an agent"}
-                      </span>
-                    </button>
-                    {skill.outdated && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => onEnable(skill.name)}
-                      >
-                        Update to v{skill.latest_version}
-                      </Button>
-                    )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`History of ${skill.name}`}
-                          onClick={() => go("skills", skill.name)}
-                        >
-                          <History />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Every version</TooltipContent>
-                    </Tooltip>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Remove ${skill.name} from this project`}
-                      disabled={busy}
-                      onClick={() => setConfirm(skill.name)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </li>
+                    skill={skill}
+                    enabledHere
+                    isAdmin={isAdmin}
+                    busy={busy}
+                    pinned={skill.version}
+                    outdated={skill.outdated}
+                    latestVersion={skill.latest_version}
+                    onEnable={onEnable}
+                    onDeprecate={onDeprecate}
+                    onFilter={(topic) => {
+                      setFilter(topic);
+                      setTab("catalogue");
+                    }}
+                    onRemove={setConfirm}
+                  />
                 ))}
               </ul>
             )}
@@ -537,6 +556,24 @@ export function SkillsPage({
               <p className="text-foreground text-sm">{document.meta.description}</p>
             )}
           </DialogHeader>
+
+          {draft?.sources && draft.sources.length > 0 && (
+            <div className="min-w-0">
+              <p className="text-muted-foreground mb-1.5 text-xs font-medium">
+                What it covers
+              </p>
+              <div className="flex min-w-0 flex-wrap gap-1">
+                {draft.sources.map((source) => (
+                  <span
+                    key={source}
+                    className="border-border text-muted-foreground truncate rounded-full border px-2 py-0.5 font-mono text-[11px]"
+                  >
+                    {source}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="min-w-0 rounded-lg border bg-muted/20 p-4">
             <Markdown source={document.body} />
