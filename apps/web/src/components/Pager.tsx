@@ -1,16 +1,35 @@
 /**
- * Numbered pages.
+ * Numbered pages, and how many to a page.
  *
  * "Load more" is right for a catalogue you skim once. An archive is different:
- * you come back to it, you remember roughly where a thing was, and you want to
- * go to page 4 rather than press a button four times and lose the place on the
- * next visit. Numbers also tell you how much there is, which a button cannot.
+ * you come back to it, you half-remember where a thing was, and you want page 4
+ * rather than a button pressed four times. Numbers also say how much there is,
+ * which a button cannot.
+ *
+ * Built on shadcn's `pagination`, so it matches every other control here rather
+ * than being a second set of buttons that look nearly the same.
  */
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { pageNumbers } from "@/format";
+
+/** The sizes worth offering. Past a hundred rows nobody is reading, they are scrolling. */
+export const PER_PAGE = [25, 50, 100];
 
 export function Pager({
   page,
@@ -18,6 +37,7 @@ export function Pager({
   perPage,
   busy,
   onPage,
+  onPerPage,
 }: {
   /** One-based, because that is what the buttons say. */
   page: number;
@@ -25,6 +45,7 @@ export function Pager({
   perPage: number;
   busy?: boolean;
   onPage: (page: number) => void;
+  onPerPage?: (perPage: number) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / perPage));
   if (total === 0) return null;
@@ -32,53 +53,78 @@ export function Pager({
   const from = (page - 1) * perPage + 1;
   const to = Math.min(page * perPage, total);
 
+  /*
+   * The anchors are for the keyboard and the screen reader, not for navigating:
+   * this app is hash-routed, so letting the browser follow `#` would drop the
+   * reader on the overview.
+   */
+  const jump = (to: number) => (event: React.MouseEvent) => {
+    event.preventDefault();
+    if (!busy && to >= 1 && to <= pages) onPage(to);
+  };
+
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
-      <p className="text-muted-foreground text-xs">
-        {from}–{to} of {total}
-      </p>
-
-      <div className="flex min-w-0 flex-wrap items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Previous page"
-          disabled={busy || page <= 1}
-          onClick={() => onPage(page - 1)}
-        >
-          <ChevronLeft />
-        </Button>
-
-        {pageNumbers(page, pages).map((n, i) =>
-          n === "gap" ? (
-            <span key={`gap-${i}`} className="text-muted-foreground px-1 text-xs">
-              …
-            </span>
-          ) : (
-            <Button
-              key={n}
-              size="icon-sm"
-              variant={n === page ? "secondary" : "ghost"}
-              aria-label={`Page ${n}`}
-              aria-current={n === page ? "page" : undefined}
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t px-4 py-3">
+      <div className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-2 text-xs">
+        <span className="tabular-nums">
+          {from}–{to} of {total}
+        </span>
+        {onPerPage && (
+          <>
+            <span aria-hidden>·</span>
+            <Select
+              value={String(perPage)}
+              onValueChange={(value) => onPerPage(Number(value))}
               disabled={busy}
-              onClick={() => onPage(n)}
             >
-              <span className="text-xs tabular-nums">{n}</span>
-            </Button>
-          ),
+              <SelectTrigger size="sm" className="h-7 w-auto gap-1" aria-label="Rows per page">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PER_PAGE.map((n) => (
+                  <SelectItem key={n} value={String(n)}>
+                    {n} per page
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
         )}
-
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Next page"
-          disabled={busy || page >= pages}
-          onClick={() => onPage(page + 1)}
-        >
-          <ChevronRight />
-        </Button>
       </div>
+
+      <Pagination className="mx-0 w-auto justify-end">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              href="#"
+              onClick={jump(page - 1)}
+              aria-disabled={page <= 1}
+              className={page <= 1 ? "pointer-events-none opacity-40" : undefined}
+            />
+          </PaginationItem>
+
+          {pageNumbers(page, pages).map((n, i) => (
+            <PaginationItem key={n === "gap" ? `gap-${i}` : n}>
+              {n === "gap" ? (
+                <PaginationEllipsis />
+              ) : (
+                <PaginationLink href="#" isActive={n === page} onClick={jump(n)}>
+                  <span className="tabular-nums">{n}</span>
+                </PaginationLink>
+              )}
+            </PaginationItem>
+          ))}
+
+          <PaginationItem>
+            <PaginationNext
+              href="#"
+              onClick={jump(page + 1)}
+              aria-disabled={page >= pages}
+              className={page >= pages ? "pointer-events-none opacity-40" : undefined}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
     </div>
   );
 }

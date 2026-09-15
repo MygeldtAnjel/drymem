@@ -202,6 +202,8 @@ function Workspace({
   const [page, setPage] = useState(1);
   const [totalMemories, setTotalMemories] = useState(0);
   const [byType, setByType] = useState<Record<string, number>>({});
+  /** Rows to a page, the reader's choice. Changing it starts again at page one. */
+  const [perPage, setPerPage] = useState(PAGE);
   // Held here, not in the page, because the server does the filtering now and
   // a filter change is a new first page rather than a re-render.
   const [kind, setKind] = useState("all");
@@ -314,6 +316,7 @@ function Workspace({
         setPage(1);
         setKind("all");
         setVisibility("all");
+        setPerPage(PAGE);
         setStats(overview);
         setSessions(sessionList.sessions);
         setMoreSessions(sessionList.next_before);
@@ -349,19 +352,24 @@ function Workspace({
    * between a pager and a "load more", and why an archive gets one: you can
    * come back to page 4 tomorrow instead of pressing a button four times.
    */
-  const goToPage = async (next: number, filter?: { type?: string; scope?: string }) => {
+  const goToPage = async (
+    next: number,
+    filter?: { type?: string; scope?: string; perPage?: number },
+  ) => {
     if (fetchingMore) return;
     const type = filter?.type ?? kind;
     const scope = filter?.scope ?? visibility;
+    const size = filter?.perPage ?? perPage;
     setFetchingMore(true);
     try {
-      const body = await api.memoriesPage(active, PAGE, (next - 1) * PAGE, { type, scope });
+      const body = await api.memoriesPage(active, size, (next - 1) * size, { type, scope });
       setEpisodes(body.episodes);
       setTotalMemories(body.total);
       setByType(body.by_type);
       setPage(next);
       setKind(type);
       setVisibility(scope);
+      setPerPage(size);
     } catch (e) {
       fail(e, "Loading that page");
     } finally {
@@ -371,7 +379,8 @@ function Workspace({
 
   /** Any filter change starts again at page one: page 4 of a different set is
    *  a page nobody asked for. */
-  const filterMemories = (filter: { type?: string; scope?: string }) => void goToPage(1, filter);
+  const filterMemories = (filter: { type?: string; scope?: string; perPage?: number }) =>
+    void goToPage(1, filter);
 
   const loadMoreSessions = async () => {
     if (!moreSessions || fetchingMore) return;
@@ -733,6 +742,7 @@ function Workspace({
         byType={byType}
         kind={kind}
         visibility={visibility}
+        perPage={perPage}
         moreSessions={moreSessions}
         fetchingMore={fetchingMore}
         onPage={goToPage}
@@ -811,11 +821,12 @@ function Screen(props: {
   byType: Record<string, number>;
   kind: string;
   visibility: string;
+  perPage: number;
   moreSessions: string | null;
   moreSkills: string | null;
   fetchingMore: boolean;
   onPage: (page: number) => void;
-  onFilter: (filter: { type?: string; scope?: string }) => void;
+  onFilter: (filter: { type?: string; scope?: string; perPage?: number }) => void;
   onMoreSessions: () => void;
   onMoreSkills: () => void;
   skills: Skill[];
@@ -900,7 +911,7 @@ function Screen(props: {
           onClearSearch={props.onClearSearch}
           page={props.page}
           total={props.totalMemories}
-          perPage={PAGE}
+          perPage={props.perPage}
           busy={props.fetchingMore}
           onPage={props.onPage}
           byType={props.byType}

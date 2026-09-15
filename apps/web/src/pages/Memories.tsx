@@ -78,7 +78,7 @@ export function MemoriesPage({
   byType: Record<string, number>;
   kind: string;
   visibility: string;
-  onFilter: (filter: { type?: string; scope?: string }) => void;
+  onFilter: (filter: { type?: string; scope?: string; perPage?: number }) => void;
 }) {
   // The page arrives already filtered, so this is the page.
   const shown = episodes;
@@ -178,6 +178,7 @@ export function MemoriesPage({
                   perPage={perPage}
                   busy={busy}
                   onPage={onPage}
+                  onPerPage={(n) => onFilter({ perPage: n })}
                 />
               </>
             )}
