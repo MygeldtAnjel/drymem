@@ -22,7 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Episode, Health, Overview as Stats } from "@/api";
 import { MEMORY_TYPES, TYPE_FILL } from "@/memory";
-import { relative } from "@/format";
+import { person, relative } from "@/format";
 import { go } from "@/router";
 
 function Tile({
@@ -240,7 +240,8 @@ export function OverviewPage({
                         {episode.title || episode.name}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {episode.author ?? "unknown"} · {relative(episode.created_at)}
+                        {person(episode.author, episode.author_name)} ·{" "}
+                        {relative(episode.created_at)}
                       </span>
                     </span>
                   </button>

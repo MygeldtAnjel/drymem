@@ -276,7 +276,8 @@ export function SkillPage({
                           {version.sha256.slice(0, 12)}
                         </span>
                         <span className="text-muted-foreground text-xs">
-                          {version.author ?? "unknown"} · {when(version.created_at)}
+                          {person(version.author, version.author_name)} ·{" "}
+                          {when(version.created_at)}
                           {version.model && ` · ${version.model}`}
                         </span>
                         {skill?.version !== version.version && (
