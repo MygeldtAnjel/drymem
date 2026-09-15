@@ -21,7 +21,7 @@
  */
 
 import { Router } from "express";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, lt } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "../db/client.js";
@@ -77,9 +77,17 @@ const messagesOf = (chatId: string) =>
     .where(eq(schema.chatMessages.chatId, chatId))
     .orderBy(schema.chatMessages.createdAt);
 
+/** A page of conversations. This list grows for as long as somebody uses it. */
+const listSchema = z.object({
+  project_key: z.string().max(500),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(30),
+  /** Cursor: the `next_before` from the previous page. */
+  before: z.coerce.date().optional(),
+});
+
 chatRouter.get("/", async (req, res) => {
   const principal = principalOf(req);
-  const query = z.object({ project_key: z.string().max(500) }).parse(req.query);
+  const query = listSchema.parse(req.query);
   const project = await projectFor(principal.orgId, principal.userId, query.project_key);
 
   const rows = await db
@@ -91,12 +99,22 @@ chatRouter.get("/", async (req, res) => {
     })
     .from(schema.chats)
     .leftJoin(schema.chatMessages, eq(schema.chatMessages.chatId, schema.chats.id))
-    .where(and(eq(schema.chats.projectId, project.id), eq(schema.chats.userId, principal.userId)))
+    .where(
+      and(
+        eq(schema.chats.projectId, project.id),
+        eq(schema.chats.userId, principal.userId),
+        ...(query.before ? [lt(schema.chats.updatedAt, query.before)] : []),
+      ),
+    )
     .groupBy(schema.chats.id)
     .orderBy(desc(schema.chats.updatedAt))
-    .limit(50);
+    .limit(query.limit);
 
-  res.json({ chats: rows });
+  res.json({
+    chats: rows,
+    // A short page is the last page, so the caller never asks for nothing.
+    next_before: rows.length === query.limit ? rows[rows.length - 1]!.updated_at : null,
+  });
 });
 
 chatRouter.get("/:id", async (req, res) => {
