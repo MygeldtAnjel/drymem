@@ -131,6 +131,8 @@ class MemoryStore(Protocol):
         before_uuid: str | None = None,
     ) -> list[Episode]: ...
 
+    async def by_uuids(self, *, uuids: list[str]) -> dict[str, Episode]: ...
+
     async def delete(self, episode_id: str) -> None: ...
 
 
@@ -343,6 +345,38 @@ class GraphitiMemoryStore:
             )
             for ep in episodes
         ]
+
+    async def by_uuids(self, *, uuids: list[str]) -> dict[str, Episode]:
+        """The episodes with these uuids, by uuid.
+
+        For a browsable list, where the *page* is decided in Postgres — one row
+        per memory, with a count and an offset — and only the bodies come from
+        the graph. Paging the graph directly would mean paging promoted
+        memories twice, because promotion copies the episode into the team
+        group and both copies are readable by its author.
+        """
+        if not uuids:
+            return {}
+        graphiti = await self._graphiti()
+        records, _, _ = await graphiti.driver.execute_query(
+            """
+            MATCH (e:Episodic)
+            WHERE e.uuid IN $uuids
+            RETURN e.uuid AS uuid, e.name AS name, e.content AS content,
+                   e.created_at AS created_at, e.source_description AS source_description
+            """,
+            uuids=uuids,
+        )
+        return {
+            record["uuid"]: Episode(
+                uuid=record["uuid"],
+                name=record["name"] or "",
+                content=record["content"] or "",
+                created_at=_as_datetime(record["created_at"]),
+                metadata=Metadata.decode(record["source_description"]),
+            )
+            for record in records
+        }
 
     async def delete(self, episode_id: str) -> None:
         graphiti = await self._graphiti()

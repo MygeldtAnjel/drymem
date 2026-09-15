@@ -381,3 +381,75 @@ async def test_the_memory_on_a_page_boundary_is_not_served_twice(client):
     last_of_first = first["episodes"][-1]["uuid"]
     assert last_of_first not in {e["uuid"] for e in second["episodes"]}
     assert len(second["episodes"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_memories_come_back_as_numbered_pages_with_a_total(client):
+    """A person browsing an archive wants page 3 and a total, not a cursor."""
+    for i in range(7):
+        await save(client, topic=f"num/{i}", session_id="s-num")
+
+    first = (
+        await client.get(
+            "/v1/memories/page",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 3, "offset": 0},
+        )
+    ).json()
+    assert first["total"] == 7
+    assert len(first["episodes"]) == 3
+
+    last = (
+        await client.get(
+            "/v1/memories/page",
+            headers=auth(client),
+            params={"project_key": PROJECT, "limit": 3, "offset": 6},
+        )
+    ).json()
+    assert len(last["episodes"]) == 1
+    assert last["total"] == 7
+
+    # Every page, end to end, with nothing seen twice and nothing missed.
+    seen = []
+    for offset in (0, 3, 6):
+        body = (
+            await client.get(
+                "/v1/memories/page",
+                headers=auth(client),
+                params={"project_key": PROJECT, "limit": 3, "offset": offset},
+            )
+        ).json()
+        seen.extend(e["uuid"] for e in body["episodes"])
+    assert len(seen) == len(set(seen)) == 7
+
+
+@pytest.mark.asyncio
+async def test_a_teammates_private_memory_is_not_on_any_page(client, sessionmaker):
+    from tests.conftest import add_member
+
+    await save(client, "miguel", summary="## Summary\nhunter2", topic="secret/one")
+    await add_member(sessionmaker, PROJECT, client.world["people"]["jose"][0])
+
+    body = (
+        await client.get(
+            "/v1/memories/page", headers=auth(client, "jose"), params={"project_key": PROJECT}
+        )
+    ).json()
+    assert body["total"] == 0
+    assert body["episodes"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_promoted_memory_is_counted_once(client):
+    """The graph has two episodes for it; the index has one row, which is why
+    a total is possible at all."""
+    saved = await save(client, topic="promote/once")
+    await client.post(f"/v1/memories/{saved['episode_uuid']}/promote", headers=auth(client))
+
+    body = (
+        await client.get(
+            "/v1/memories/page", headers=auth(client), params={"project_key": PROJECT}
+        )
+    ).json()
+    assert body["total"] == 1
+    assert len(body["episodes"]) == 1

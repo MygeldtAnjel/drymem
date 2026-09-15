@@ -41,6 +41,7 @@ from drymem_server.api.schemas import (
     HealthResponse,
     MemorySchemaResponse,
     MemoryTypeOut,
+    PageResponse,
     PromoteResponse,
     SaveMemoryRequest,
     SaveMemoryResponse,
@@ -232,6 +233,31 @@ async def memory_context(
         # caller a round trip that returns nothing.
         next_before=last.created_at if more and last else None,
         next_uuid=last.uuid if more and last else None,
+    )
+
+
+@router.get("/v1/memories/page", response_model=PageResponse, tags=["memories"])
+async def memories_page(
+    service: ServiceDep,
+    project_key: str = Query(...),
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> PageResponse:
+    """A numbered page of this project's memories, newest first.
+
+    Separate from `/context`, which is the agent's read: that one is cursor-fed
+    and biased towards shared memories for a token budget. A person browsing an
+    archive wants page 3 and a total, and neither of those exists without a
+    count — so this pages the index instead of the graph.
+    """
+    entries, total = await service.browse(project_key=project_key, limit=limit, offset=offset)
+    names = await service.author_names(_authors_of(entries))
+    return PageResponse(
+        project_key=project_key,
+        episodes=[_episode_out(entry, names) for entry in entries],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 

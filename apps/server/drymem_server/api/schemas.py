@@ -98,6 +98,16 @@ class ContextResponse(BaseModel):
     next_uuid: str | None = None
 
 
+class PageResponse(BaseModel):
+    """One numbered page, and enough to draw the numbers."""
+
+    project_key: str
+    episodes: list[EpisodeOut] = []
+    total: int = 0
+    limit: int = 25
+    offset: int = 0
+
+
 class TopicsResponse(BaseModel):
     project_key: str
     topic_keys: list[str]

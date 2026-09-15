@@ -438,6 +438,77 @@ class MemoryService:
             )
         )
 
+    async def browse(
+        self, *, project_key: str, limit: int, offset: int
+    ) -> tuple[list[Entry], int]:
+        """One numbered page of a project's memories, and how many there are.
+
+        The page is decided in Postgres, not in the graph. The index has one row
+        per memory — promotion adds a `team_episode_uuid` to the same row rather
+        than a second row — so `LIMIT`/`OFFSET`/`COUNT` mean what they say. The
+        graph has two episodes for a promoted memory and no notion of an offset,
+        which is why the cursor lists could not give a total or a page number.
+
+        Scope is the same rule as everywhere: your own, plus what the team
+        shared.
+        """
+        project = await project_for(self.session, self.principal, project_key)
+        if project is None:
+            return [], 0
+
+        readable = or_(
+            Memory.author_id == self.principal.user_id,
+            Memory.scope == SCOPE_TEAM,
+        )
+        total = await self.session.scalar(
+            select(func.count())
+            .select_from(Memory)
+            .where(Memory.project_id == project.id, readable)
+        )
+
+        rows = await self.session.execute(
+            select(Memory)
+            .where(Memory.project_id == project.id, readable)
+            .order_by(Memory.created_at.desc(), Memory.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        memories = list(rows.scalars())
+        if not memories:
+            return [], int(total or 0)
+
+        # The team copy when there is one: it is the version marked shared, and
+        # "shared" is the more useful of the two things to be told.
+        wanted = [m.team_episode_uuid or m.episode_uuid for m in memories]
+        bodies = await self.store.by_uuids(uuids=wanted)
+
+        scores = await self._ratings_for([m.id for m in memories])
+        entries = [
+            Entry(
+                episode=bodies[uuid],
+                title=memory.title,
+                memory_type=memory.memory_type,
+                session_id=memory.session_id or "",
+                topic_key=memory.topic_key or "",
+                promoted_at=memory.promoted_at,
+                rating=scores.get(memory.id, 0),
+            )
+            for memory, uuid in zip(memories, wanted, strict=True)
+            if uuid in bodies
+        ]
+        return entries, int(total or 0)
+
+    async def _ratings_for(self, memory_ids: list) -> dict:
+        """Net rating per memory, in one query rather than one per row."""
+        if not memory_ids:
+            return {}
+        rows = await self.session.execute(
+            select(MemoryFeedback.memory_id, func.coalesce(func.sum(MemoryFeedback.rating), 0))
+            .where(MemoryFeedback.memory_id.in_(memory_ids))
+            .group_by(MemoryFeedback.memory_id)
+        )
+        return {mid: int(score) for mid, score in rows.all()}
+
     async def search_entries(self, *, project_key: str, query: str, limit: int) -> list[Entry]:
         """Memories matching a query, best match first, with their index rows."""
         return await self._entries_for(

@@ -98,6 +98,14 @@ class InMemoryStore:
         out.sort(key=lambda e: e.created_at or datetime.min.replace(tzinfo=UTC), reverse=True)
         return out[:limit]
 
+    async def by_uuids(self, *, uuids):
+        found = {}
+        for episodes in self.episodes.values():
+            for episode in episodes:
+                if episode.uuid in uuids:
+                    found[episode.uuid] = episode
+        return found
+
     async def delete(self, episode_id: str) -> None:
         self.deleted.append(episode_id)
         for episodes in self.episodes.values():
