@@ -109,3 +109,28 @@ export function person(author: string | null | undefined, name?: string | null):
   if (name) return name;
   return author?.split("@")[0] || "unknown";
 }
+
+/**
+ * A window of page numbers around the current one, ends always reachable.
+ *
+ * Lives here rather than beside the component because it is pure arithmetic
+ * with an off-by-one in every direction, and it is the part worth testing.
+ */
+export function pageNumbers(page: number, pages: number, span = 2): (number | "gap")[] {
+  if (pages <= 1) return [1];
+  const wanted = new Set<number>([1, pages]);
+  for (let n = page - span; n <= page + span; n += 1) {
+    if (n >= 1 && n <= pages) wanted.add(n);
+  }
+  const sorted = [...wanted].sort((a, b) => a - b);
+
+  const out: (number | "gap")[] = [];
+  let previous = 0;
+  for (const n of sorted) {
+    // A single missing page is printed, not elided: "… 7 …" is longer than "7".
+    if (previous && n - previous > 1) out.push("gap");
+    out.push(n);
+    previous = n;
+  }
+  return out;
+}

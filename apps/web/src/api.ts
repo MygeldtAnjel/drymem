@@ -508,6 +508,28 @@ export const api = {
   },
 
   /**
+   * One numbered page of memories, with a total so the numbers can be drawn.
+   *
+   * Separate from `context`, which is the agent's cursor-fed read. A person
+   * browsing an archive wants page 3 and "of 340"; a cursor can give neither.
+   */
+  memoriesPage: async (
+    projectKey: string,
+    limit: number,
+    offset: number,
+  ): Promise<{ episodes: Episode[]; total: number }> => {
+    const q = new URLSearchParams({
+      project_key: projectKey,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const data = await request<{ episodes: Episode[]; total: number }>(
+      `/v1/memories/page?${q}`,
+    );
+    return { episodes: data.episodes ?? [], total: data.total ?? 0 };
+  },
+
+  /**
    * A page of memories, newest first.
    *
    * `before` is the cursor from the previous page; `next_before` is null on the

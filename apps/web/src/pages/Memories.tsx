@@ -24,7 +24,7 @@ import { Crumbs } from "@/components/Crumbs";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { Pager } from "@/components/Pager";
 import {
   Card,
   CardContent,
@@ -37,7 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Episode, Fact, TreeArea, TreeDecision } from "@/api";
 import { MEMORY_TYPES, TYPE_FILL, split } from "@/memory";
-import { count, firstLine, person, relative, stamp } from "@/format";
+import { firstLine, person, relative, stamp } from "@/format";
 import { go } from "@/router";
 
 export function MemoriesPage({
@@ -50,9 +50,11 @@ export function MemoriesPage({
   onQuery,
   onSearch,
   onClearSearch,
-  hasMore,
-  fetchingMore,
-  onMore,
+  page,
+  total,
+  perPage,
+  busy,
+  onPage,
 }: {
   episodes: Episode[];
   loading: boolean;
@@ -63,9 +65,11 @@ export function MemoriesPage({
   onQuery: (value: string) => void;
   onSearch: () => void;
   onClearSearch: () => void;
-  hasMore: boolean;
-  fetchingMore: boolean;
-  onMore: () => void;
+  page: number;
+  total: number;
+  perPage: number;
+  busy: boolean;
+  onPage: (page: number) => void;
 }) {
   const [type, setType] = useState("all");
   const [scope, setScope] = useState("all");
@@ -156,19 +160,17 @@ export function MemoriesPage({
                     <MemoryRow key={episode.uuid} episode={episode} />
                   ))}
                 </ul>
-                {/* The list used to stop at a hundred and say nothing, so the
-                    hundred-and-first memory was one the product had quietly
-                    decided you would never see again. */}
-                {hasMore && (
-                  <div className="flex items-center justify-center gap-3 border-t p-3">
-                    <p className="text-muted-foreground text-xs">
-                      {count(episodes.length, "memory", "memories")} so far
-                    </p>
-                    <Button variant="outline" size="sm" disabled={fetchingMore} onClick={onMore}>
-                      {fetchingMore ? <Spinner className="size-3.5" /> : null} Load more
-                    </Button>
-                  </div>
-                )}
+                {/* Numbered, not "load more": this is an archive somebody
+                    comes back to, and page 4 should still be page 4 tomorrow.
+                    The filters above are client-side and so apply to the page
+                    on screen, which is why the count here is the true total. */}
+                <Pager
+                  page={page}
+                  total={total}
+                  perPage={perPage}
+                  busy={busy}
+                  onPage={onPage}
+                />
               </>
             )}
           </Card>

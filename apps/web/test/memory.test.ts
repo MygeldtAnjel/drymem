@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import fixtures from "../../../packages/api-types/fixtures/sections.json";
 import { canonical, frontmatter, split } from "../src/memory";
+import { pageNumbers } from "../src/format";
 
 describe("the shared section fixture", () => {
   for (const test of fixtures.cases) {
@@ -71,5 +72,25 @@ describe("frontmatter", () => {
   it("leaves an unquoted value exactly as written", () => {
     const { meta } = frontmatter("---\nname: plain\n---\n\nbody");
     expect(meta.name).toBe("plain");
+  });
+});
+
+describe("pageNumbers", () => {
+  it("shows every page when there are few", () => {
+    expect(pageNumbers(1, 3)).toEqual([1, 2, 3]);
+  });
+
+  it("keeps the first and last reachable from the middle", () => {
+    // Otherwise "go back to the start" is four clicks on a long archive.
+    expect(pageNumbers(10, 20)).toEqual([1, "gap", 8, 9, 10, 11, 12, "gap", 20]);
+  });
+
+  it("does not print a gap for a single missing page", () => {
+    expect(pageNumbers(4, 8)).toEqual([1, 2, 3, 4, 5, 6, "gap", 8]);
+  });
+
+  it("never returns nothing", () => {
+    expect(pageNumbers(1, 0)).toEqual([1]);
+    expect(pageNumbers(1, 1)).toEqual([1]);
   });
 });

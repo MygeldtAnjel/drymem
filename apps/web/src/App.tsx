@@ -21,7 +21,6 @@ import {
   rememberProject,
   rememberedProject,
   type AgentSession,
-  type Cursor,
   type Cluster,
   type Episode,
   type Fact,
@@ -200,7 +199,8 @@ function Workspace({
    * worked on, and a fixed cap meant the product silently stopped showing you
    * your own history at the hundredth memory.
    */
-  const [moreMemories, setMoreMemories] = useState<Cursor | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalMemories, setTotalMemories] = useState(0);
   const [moreSessions, setMoreSessions] = useState<string | null>(null);
   const [moreSkills, setMoreSkills] = useState<string | null>(null);
   const [fetchingMore, setFetchingMore] = useState(false);
@@ -295,7 +295,7 @@ function Workspace({
           memberList,
           personList,
         ] = await Promise.all([
-          api.context(projectKey, PAGE),
+          api.memoriesPage(projectKey, PAGE, 0),
           api.overview(projectKey).catch(() => null),
           api.sessions(projectKey, PAGE).catch(() => ({ sessions: [], next_before: null })),
           api.skills(projectKey).catch(() => []),
@@ -304,7 +304,8 @@ function Workspace({
           api.people().catch(() => []),
         ]);
         setEpisodes(context.episodes);
-        setMoreMemories(context.next);
+        setTotalMemories(context.total);
+        setPage(1);
         setStats(overview);
         setSessions(sessionList.sessions);
         setMoreSessions(sessionList.next_before);
@@ -333,20 +334,23 @@ function Workspace({
     void load(active);
   }, [active, load]);
 
-  const loadMoreMemories = async () => {
-    if (!moreMemories || fetchingMore) return;
+  /**
+   * Go to a page.
+   *
+   * Replaces the list rather than growing it — that is the whole difference
+   * between a pager and a "load more", and why an archive gets one: you can
+   * come back to page 4 tomorrow instead of pressing a button four times.
+   */
+  const goToPage = async (next: number) => {
+    if (fetchingMore) return;
     setFetchingMore(true);
     try {
-      const next = await api.context(active, PAGE, moreMemories);
-      // Guard against a duplicate: two pages sharing a boundary timestamp
-      // would otherwise render the same memory twice with the same key.
-      setEpisodes((current) => {
-        const seen = new Set(current.map((e) => e.uuid));
-        return [...current, ...next.episodes.filter((e) => !seen.has(e.uuid))];
-      });
-      setMoreMemories(next.next);
+      const body = await api.memoriesPage(active, PAGE, (next - 1) * PAGE);
+      setEpisodes(body.episodes);
+      setTotalMemories(body.total);
+      setPage(next);
     } catch (e) {
-      fail(e, "Loading more memories");
+      fail(e, "Loading that page");
     } finally {
       setFetchingMore(false);
     }
@@ -707,10 +711,11 @@ function Workspace({
         stats={stats}
         episodes={episodes}
         sessions={sessions}
-        moreMemories={moreMemories}
+        page={page}
+        totalMemories={totalMemories}
         moreSessions={moreSessions}
         fetchingMore={fetchingMore}
-        onMoreMemories={loadMoreMemories}
+        onPage={goToPage}
         onMoreSessions={loadMoreSessions}
         moreSkills={moreSkills}
         onMoreSkills={loadMoreSkills}
@@ -780,11 +785,12 @@ function Screen(props: {
   stats: Overview | null;
   episodes: Episode[];
   sessions: AgentSession[];
-  moreMemories: Cursor | null;
+  page: number;
+  totalMemories: number;
   moreSessions: string | null;
   moreSkills: string | null;
   fetchingMore: boolean;
-  onMoreMemories: () => void;
+  onPage: (page: number) => void;
   onMoreSessions: () => void;
   onMoreSkills: () => void;
   skills: Skill[];
@@ -867,9 +873,11 @@ function Screen(props: {
           onQuery={props.setQuery}
           onSearch={props.onSearch}
           onClearSearch={props.onClearSearch}
-          hasMore={Boolean(props.moreMemories)}
-          fetchingMore={props.fetchingMore}
-          onMore={props.onMoreMemories}
+          page={props.page}
+          total={props.totalMemories}
+          perPage={PAGE}
+          busy={props.fetchingMore}
+          onPage={props.onPage}
         />
       );
     case "chat":
