@@ -6,17 +6,20 @@ codebase keep coming up → the ones with no skill covering them are the gaps �
 skill drafted from those memories is grounded in what the team actually hit, not
 in someone else's idea of best practice.
 
-**Subjects come from file paths, not from extracted entities.** The first
-version counted `(:Episodic)-[:MENTIONS]->(:Entity)` and suggested drafting
-skills about `npm`, `Docker`, `TypeScript` and `Haiku 4.5` — which is what you
-get when extraction produces five hundred undifferentiated nouns and you rank
-them by frequency. Every filter tried on top of that (only near the top of a
-memory, only decisions, a stoplist) removed some noise and some signal, because
-the store cannot tell `npm` from `payments`.
+**Subjects come from the topic key the author wrote.** This has been wrong
+twice, each time for the same reason: guessing a subject from the text.
 
-An area can. Memories name the files they touched, a path is a hierarchy, and
-"seven decisions about `apps/api` and no skill covering it" is a suggestion a
-person can act on. Same signal as the decision tree, for the same reason.
+The first version counted `(:Episodic)-[:MENTIONS]->(:Entity)` and suggested
+skills about `npm`, `Docker` and `Haiku 4.5` — five hundred undifferentiated
+nouns ranked by frequency. The second grouped by file path, which was better
+but produced `apps/web`, fifteen memories spanning routing, CSS, Alembic
+defaults and OAuth. A draft from those is a list of unrelated rules with a
+directory for a title; Miguel's word for it was "nonsense", and he was right.
+
+A memory already carries its subject. `ask/cards-numbered-from-one` says the
+person writing it thought it was about *ask* — assigned, not inferred, and the
+only signal here nobody had to guess. Memories with no topic key still fall
+back to their file area, which is where the path work earns its keep.
 """
 
 from __future__ import annotations
@@ -30,8 +33,27 @@ from drymem_server.tree import ROOT_AREA, area_of, paths_in
 DEFAULT_MIN_MEMORIES = 2
 
 # Not somewhere a team skill lives. `repo root` is READMEs and lockfiles;
-# `.claude` and `.drymem` are this tool's own configuration.
-NOT_A_SUBJECT = frozenset({ROOT_AREA, ".claude", ".drymem", ".github", "node_modules"})
+# `.claude` and `.drymem` are this tool's own configuration. `misc` and its
+# friends are what somebody types when they have not decided on a subject.
+NOT_A_SUBJECT = frozenset(
+    {ROOT_AREA, ".claude", ".drymem", ".github", "node_modules", "misc", "other", "general", "tmp"}
+)
+
+
+def subjects_of(name: str, content: str) -> set[str]:
+    """What one memory is about, best evidence first.
+
+    The topic key when there is one: the author named the subject, so there is
+    nothing to infer. Otherwise the areas of the files it touched.
+    """
+    head = (name or "").strip().split("/", 1)[0].strip().lower()
+    if "/" in (name or "") and head and head not in NOT_A_SUBJECT:
+        return {head}
+    return {
+        area
+        for area in (area_of(path) for path in paths_in(content))
+        if area and area not in NOT_A_SUBJECT
+    }
 
 
 @dataclass
@@ -72,7 +94,7 @@ async def clusters_for(
         """
         MATCH (e:Episodic)
         WHERE e.group_id IN $group_ids
-        RETURN e.uuid AS uuid, e.content AS content
+        RETURN e.uuid AS uuid, e.name AS name, e.content AS content
         ORDER BY e.created_at DESC
         LIMIT 500
         """,
@@ -81,17 +103,14 @@ async def clusters_for(
 
     episodes: dict[str, list[str]] = {}
     for record in records:
-        content = record["content"] or ""
-        # One memory touching three services counts for all three: the people
-        # who own the other two would go looking for it too.
-        for area in {area_of(path) for path in paths_in(content)}:
-            if area in NOT_A_SUBJECT or not area:
-                continue
-            episodes.setdefault(area, []).append(record["uuid"])
+        # A memory with no topic key can still count for several areas: the
+        # people who own the other two would go looking for it too.
+        for subject in subjects_of(record["name"] or "", record["content"] or ""):
+            episodes.setdefault(subject, []).append(record["uuid"])
 
     out = [
-        Cluster(topic=area, memory_count=len(uuids), episode_uuids=uuids)
-        for area, uuids in episodes.items()
+        Cluster(topic=subject, memory_count=len(uuids), episode_uuids=uuids)
+        for subject, uuids in episodes.items()
         if len(uuids) >= min_memories
     ]
     out.sort(key=lambda c: (-c.memory_count, c.topic))
@@ -99,7 +118,7 @@ async def clusters_for(
 
 
 async def memories_about(group_ids: list[str], topic: str, limit: int = 12) -> list[dict]:
-    """The memories behind an area — the raw material a draft is written from."""
+    """The memories behind a subject — the raw material a draft is written from."""
     graphiti = await get_graphiti()
     records, _, _ = await graphiti.driver.execute_query(
         """
@@ -116,7 +135,7 @@ async def memories_about(group_ids: list[str], topic: str, limit: int = 12) -> l
     out: list[dict] = []
     for record in records:
         content = record["content"] or ""
-        if any(area_of(path).lower() == wanted for path in paths_in(content)):
+        if wanted in {s.lower() for s in subjects_of(record["name"] or "", content)}:
             out.append(
                 {"name": record["name"], "content": content, "created_at": record["created_at"]}
             )
