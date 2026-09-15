@@ -354,6 +354,9 @@ class AskSource(BaseModel):
     uuid: str
     title: str
     author: str = ""
+    # The person's name when the org knows one, so a card reads "Miguel" and
+    # not the local part of whatever address they commit under.
+    author_name: str = ""
     created_at: datetime | None = None
     type: str = "note"
     scope: str = "private"

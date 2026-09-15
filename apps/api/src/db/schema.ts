@@ -363,6 +363,8 @@ export interface ChatSource {
   uuid: string;
   title: string;
   author: string;
+  /** Absent for memories written before the engine looked names up. */
+  author_name?: string;
   type: string;
   created_at: string | null;
 }

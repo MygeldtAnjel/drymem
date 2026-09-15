@@ -83,6 +83,7 @@ export interface ChatSource {
   uuid: string;
   title: string;
   author: string;
+  author_name?: string;
   type: string;
   created_at: string | null;
 }

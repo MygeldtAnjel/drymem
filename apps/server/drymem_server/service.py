@@ -842,12 +842,25 @@ class MemoryService:
         matched = [e for e in ranked if score(e) > 0]
         picked = (matched or ranked)[: ask_module.MAX_SOURCES]
 
+        # Emails are what the memories record; names are what people ask about.
+        # Without this, "who decided it?" got a refusal — nothing in the prompt
+        # connected `a.long.address@example.com` to the Miguel in the question.
+        emails = {
+            entry.episode.metadata.author
+            for entry in picked
+            if entry.episode.metadata and entry.episode.metadata.author
+        }
+        names = await self._names_for(emails)
+
         sources = [
             ask_module.Source(
                 index=i,
                 uuid=entry.episode.uuid,
                 title=entry.title or entry.episode.name,
                 author=entry.episode.metadata.author if entry.episode.metadata else "",
+                author_name=names.get(
+                    entry.episode.metadata.author if entry.episode.metadata else "", ""
+                ),
                 created_at=entry.episode.created_at,
                 memory_type=entry.memory_type,
                 scope=entry.episode.metadata.scope if entry.episode.metadata else "private",
@@ -858,6 +871,22 @@ class MemoryService:
         return await ask_module.answer(
             question=question, sources=sources, bodies=bodies, history=history
         )
+
+    async def _names_for(self, emails: set[str]) -> dict[str, str]:
+        """Display names for the people who wrote these memories, by email.
+
+        Scoped to the asker's org: an address that belongs to someone else's
+        org must not resolve to their name here.
+        """
+        if not emails:
+            return {}
+        rows = await self.session.execute(
+            select(User.email, User.name).where(
+                User.org_id == self.principal.org_id,
+                User.email.in_(emails),
+            )
+        )
+        return {email: name for email, name in rows.all() if name}
 
     async def capture_mode(self, *, project_key: str) -> str:
         """How this project wants sessions captured. See PLAN.md D38."""

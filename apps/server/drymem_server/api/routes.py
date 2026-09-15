@@ -434,6 +434,7 @@ async def ask_question(body: AskRequest, service: ServiceDep) -> AskResponse:
                 uuid=s.uuid,
                 title=s.title,
                 author=s.author,
+                author_name=s.author_name,
                 created_at=s.created_at,
                 type=s.memory_type,
                 scope=s.scope,

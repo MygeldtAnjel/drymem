@@ -98,6 +98,10 @@ class Source:
     created_at: datetime | None
     memory_type: str
     scope: str
+    # The person's name, when the org knows one. `author` is an email, and
+    # nothing tells a model that `a.long.address@example.com` is the Miguel the
+    # question is about — so "who decided it?" was unanswerable.
+    author_name: str = ""
 
 
 @dataclass
@@ -110,13 +114,22 @@ class Answer:
 
 
 def _render(sources: list[Source], bodies: dict[str, str]) -> str:
+    """One block per memory, in the shape the answer should come back in.
+
+    Two details that were quietly working against the rules above it. The date
+    was rendered `2026-09-14` while rule 7 forbids writing one — the prompt was
+    handing the model the format it then told it not to use. And the author was
+    an email, so "who decided it?" was unanswerable: nothing said that
+    `a.long.address@example.com` is the Miguel the question is about.
+    """
     blocks = []
     for source in sources:
-        when = source.created_at.strftime("%Y-%m-%d") if source.created_at else "unknown date"
+        when = source.created_at.strftime("%-d %B %Y") if source.created_at else "unknown date"
+        who = source.author_name or source.author or "unknown"
         body = bodies.get(source.uuid, "")[:MAX_SOURCE_CHARS]
         blocks.append(
             f"[{source.index}] {source.title}\n"
-            f"    kind: {source.memory_type} · by {source.author or 'unknown'} · {when}\n"
+            f"    kind: {source.memory_type} · written by {who} · {when}\n"
             f"{body}"
         )
     return "\n\n".join(blocks)

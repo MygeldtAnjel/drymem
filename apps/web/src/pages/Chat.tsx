@@ -68,7 +68,8 @@ function Sources({ message }: { message: ChatMessage }) {
               </span>
               <span className="text-muted-foreground mt-auto flex min-w-0 items-center gap-1 text-[11px]">
                 <span className="min-w-0 truncate">
-                  {source.author?.split("@")[0] ?? "unknown"} · {relative(source.created_at)}
+                  {source.author_name || source.author?.split("@")[0] || "unknown"} ·{" "}
+                  {relative(source.created_at)}
                 </span>
                 <ArrowUpRight className="ml-auto size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
               </span>
