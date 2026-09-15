@@ -37,6 +37,17 @@ export interface Project {
   negative: number;
 }
 
+/**
+ * A page cursor.
+ *
+ * Both halves are needed: the store's time filter is inclusive, so a timestamp
+ * alone returns the item it names on the next page as well.
+ */
+export interface Cursor {
+  before: string;
+  uuid: string;
+}
+
 export interface Episode {
   uuid: string;
   name: string;
@@ -496,13 +507,40 @@ export const api = {
     }));
   },
 
-  context: async (projectKey: string, limit = 100): Promise<Episode[]> => {
+  /**
+   * A page of memories, newest first.
+   *
+   * `before` is the cursor from the previous page; `next_before` is null on the
+   * last one. `order=recent` matters: the default puts shared memories first
+   * for an agent's token budget, which is not a time order and so cannot be
+   * paged through.
+   */
+  context: async (
+    projectKey: string,
+    limit = 50,
+    cursor?: Cursor | null,
+  ): Promise<{ episodes: Episode[]; next: Cursor | null }> => {
     const q = new URLSearchParams({
       project_key: projectKey,
       limit: String(limit),
+      order: "recent",
     });
-    return (await request<{ episodes: Episode[] }>(`/v1/memories/context?${q}`))
-      .episodes;
+    if (cursor) {
+      q.set("before", cursor.before);
+      q.set("before_uuid", cursor.uuid);
+    }
+    const data = await request<{
+      episodes: Episode[];
+      next_before: string | null;
+      next_uuid: string | null;
+    }>(`/v1/memories/context?${q}`);
+    return {
+      episodes: data.episodes ?? [],
+      next:
+        data.next_before && data.next_uuid
+          ? { before: data.next_before, uuid: data.next_uuid }
+          : null,
+    };
   },
 
   /**
@@ -542,10 +580,17 @@ export const api = {
   remove: (uuid: string) =>
     request(`/v1/memories/${uuid}`, { method: "DELETE" }),
 
-  sessions: async (projectKey: string): Promise<AgentSession[]> => {
-    const q = new URLSearchParams({ project_key: projectKey });
-    return (await request<{ sessions: AgentSession[] }>(`/v1/sessions?${q}`))
-      .sessions;
+  sessions: async (
+    projectKey: string,
+    limit = 25,
+    before?: string | null,
+  ): Promise<{ sessions: AgentSession[]; next_before: string | null }> => {
+    const q = new URLSearchParams({ project_key: projectKey, limit: String(limit) });
+    if (before) q.set("before", before);
+    const data = await request<{ sessions: AgentSession[]; next_before: string | null }>(
+      `/v1/sessions?${q}`,
+    );
+    return { sessions: data.sessions ?? [], next_before: data.next_before ?? null };
   },
   session: (projectKey: string, id: string): Promise<SessionDetail> => {
     const q = new URLSearchParams({ project_key: projectKey });

@@ -21,6 +21,7 @@ import {
   rememberProject,
   rememberedProject,
   type AgentSession,
+  type Cursor,
   type Cluster,
   type Episode,
   type Fact,
@@ -61,6 +62,10 @@ import { count } from "./format";
 import { SignIn } from "./SignIn";
 import { go, useRoute } from "./router";
 import { SearchX } from "lucide-react";
+
+/** One page. Big enough that most people never press the button, small enough
+ *  that the first screen arrives quickly. */
+const PAGE = 50;
 
 const TITLES: Record<string, { title: string; description?: string }> = {
   overview: {
@@ -183,6 +188,16 @@ function Workspace({
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [stats, setStats] = useState<Overview | null>(null);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
+  /*
+   * How much more there is.
+   *
+   * Null means the last page. These lists grow for as long as the project is
+   * worked on, and a fixed cap meant the product silently stopped showing you
+   * your own history at the hundredth memory.
+   */
+  const [moreMemories, setMoreMemories] = useState<Cursor | null>(null);
+  const [moreSessions, setMoreSessions] = useState<string | null>(null);
+  const [fetchingMore, setFetchingMore] = useState(false);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [catalogue, setCatalogue] = useState<CatalogueSkill[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
@@ -274,17 +289,19 @@ function Workspace({
           memberList,
           personList,
         ] = await Promise.all([
-          api.context(projectKey, 100),
+          api.context(projectKey, PAGE),
           api.overview(projectKey).catch(() => null),
-          api.sessions(projectKey).catch(() => []),
+          api.sessions(projectKey, PAGE).catch(() => ({ sessions: [], next_before: null })),
           api.skills(projectKey).catch(() => []),
           api.catalogue(projectKey).catch(() => []),
           api.members(projectKey).catch(() => []),
           api.people().catch(() => []),
         ]);
-        setEpisodes(context);
+        setEpisodes(context.episodes);
+        setMoreMemories(context.next);
         setStats(overview);
-        setSessions(sessionList);
+        setSessions(sessionList.sessions);
+        setMoreSessions(sessionList.next_before);
         setSkills(enabled);
         setCatalogue(wholeCatalogue);
         setMembers(memberList);
@@ -308,6 +325,42 @@ function Workspace({
     setDrafts({});
     void load(active);
   }, [active, load]);
+
+  const loadMoreMemories = async () => {
+    if (!moreMemories || fetchingMore) return;
+    setFetchingMore(true);
+    try {
+      const next = await api.context(active, PAGE, moreMemories);
+      // Guard against a duplicate: two pages sharing a boundary timestamp
+      // would otherwise render the same memory twice with the same key.
+      setEpisodes((current) => {
+        const seen = new Set(current.map((e) => e.uuid));
+        return [...current, ...next.episodes.filter((e) => !seen.has(e.uuid))];
+      });
+      setMoreMemories(next.next);
+    } catch (e) {
+      fail(e, "Loading more memories");
+    } finally {
+      setFetchingMore(false);
+    }
+  };
+
+  const loadMoreSessions = async () => {
+    if (!moreSessions || fetchingMore) return;
+    setFetchingMore(true);
+    try {
+      const next = await api.sessions(active, PAGE, moreSessions);
+      setSessions((current) => {
+        const seen = new Set(current.map((s) => s.session_id));
+        return [...current, ...next.sessions.filter((s) => !seen.has(s.session_id))];
+      });
+      setMoreSessions(next.next_before);
+    } catch (e) {
+      fail(e, "Loading more sessions");
+    } finally {
+      setFetchingMore(false);
+    }
+  };
 
   const chooseProject = (key: string) => {
     setActive(key);
@@ -627,6 +680,11 @@ function Workspace({
         stats={stats}
         episodes={episodes}
         sessions={sessions}
+        moreMemories={moreMemories}
+        moreSessions={moreSessions}
+        fetchingMore={fetchingMore}
+        onMoreMemories={loadMoreMemories}
+        onMoreSessions={loadMoreSessions}
         skills={skills}
         catalogue={catalogue}
         auditEvents={auditEvents}
@@ -693,6 +751,11 @@ function Screen(props: {
   stats: Overview | null;
   episodes: Episode[];
   sessions: AgentSession[];
+  moreMemories: Cursor | null;
+  moreSessions: string | null;
+  fetchingMore: boolean;
+  onMoreMemories: () => void;
+  onMoreSessions: () => void;
   skills: Skill[];
   catalogue: CatalogueSkill[];
   auditEvents: AuditEvent[];
@@ -773,6 +836,9 @@ function Screen(props: {
           onQuery={props.setQuery}
           onSearch={props.onSearch}
           onClearSearch={props.onClearSearch}
+          hasMore={Boolean(props.moreMemories)}
+          fetchingMore={props.fetchingMore}
+          onMore={props.onMoreMemories}
         />
       );
     case "chat":
@@ -782,7 +848,15 @@ function Screen(props: {
     case "sessions":
       if (route.id)
         return <SessionPage projectKey={props.active} id={route.id} />;
-      return <SessionsPage sessions={props.sessions} loading={props.loading} />;
+      return (
+        <SessionsPage
+          sessions={props.sessions}
+          loading={props.loading}
+          hasMore={Boolean(props.moreSessions)}
+          fetchingMore={props.fetchingMore}
+          onMore={props.onMoreSessions}
+        />
+      );
     case "skills":
       if (route.id) {
         return (

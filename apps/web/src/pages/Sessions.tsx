@@ -13,18 +13,11 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Boxes, ChevronRight, Info, SearchX } from "lucide-react";
 
-import { Blank, RowsSkeleton, ScopeChip, TypeChip } from "@/components/Bits";
+import { Blank, PersonChip, RowsSkeleton, ScopeChip, TypeChip } from "@/components/Bits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Tooltip,
   TooltipContent,
@@ -59,12 +52,83 @@ function SyntheticNote() {
   );
 }
 
+/**
+ * A sitting, as a card.
+ *
+ * This was a five-column table, and a table is for comparing rows on the same
+ * axis — which nobody does here. What a person wants off this screen is "what
+ * happened in that run", and the answer is the titles, which the table gave a
+ * single truncated line at the smallest size on the page. The card leads with
+ * them.
+ */
+function SessionCard({ session }: { session: Session }) {
+  return (
+    <li>
+      <button
+        className="border-border bg-card hover:border-input hover:bg-muted/30 group flex w-full min-w-0 flex-col gap-2.5 rounded-lg border p-4 text-left transition-colors"
+        onClick={() => go("sessions", session.session_id)}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Boxes className="text-muted-foreground size-4 shrink-0" />
+          <span className={"min-w-0 truncate " + (session.synthetic ? "text-sm" : "font-mono text-xs")}>
+            {sessionLabel(session)}
+          </span>
+          {session.synthetic && <SyntheticNote />}
+          <ChevronRight className="text-muted-foreground ml-auto size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+        </span>
+
+        {/* What actually happened, which is the only reason to open it. */}
+        {session.titles.length > 0 && (
+          <span className="flex min-w-0 flex-col gap-1">
+            {session.titles.slice(0, 3).map((title) => (
+              <span key={title} className="text-foreground min-w-0 truncate text-sm">
+                {title}
+              </span>
+            ))}
+            {session.memory_count > 3 && (
+              <span className="text-muted-foreground text-xs">
+                and {session.memory_count - 3} more
+              </span>
+            )}
+          </span>
+        )}
+
+        <span className="text-muted-foreground mt-auto flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-xs">
+          <PersonChip author={session.author} name={session.author_name} />
+          <span aria-hidden>·</span>
+          <span>{count(session.memory_count, "memory", "memories")}</span>
+          {session.shared > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <Badge variant="outline" className="text-success">
+                {session.shared} shared
+              </Badge>
+            </>
+          )}
+          <span
+            className="ml-auto"
+            title={`${when(session.started_at)} ${clock(session.started_at)}`}
+          >
+            {relative(session.ended_at)}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 export function SessionsPage({
   sessions,
   loading,
+  hasMore,
+  fetchingMore,
+  onMore,
 }: {
   sessions: Session[];
   loading: boolean;
+  hasMore: boolean;
+  fetchingMore: boolean;
+  onMore: () => void;
 }) {
   if (loading) {
     return (
@@ -77,90 +141,31 @@ export function SessionsPage({
   if (sessions.length === 0) {
     return (
       <Blank icon={Boxes} title="No sessions yet">
-        A session appears the first time an agent saves a memory in this
-        project.
+        A session appears the first time an agent saves a memory in this project.
       </Blank>
     );
   }
 
   return (
-    <Card className="overflow-hidden p-0">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Session</TableHead>
-            <TableHead>Who</TableHead>
-            <TableHead className="text-right">Memories</TableHead>
-            <TableHead className="text-right">Shared</TableHead>
-            <TableHead className="text-right">When</TableHead>
-            <TableHead className="w-8" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sessions.map((session) => (
-            <TableRow
-              key={session.session_id}
-              tabIndex={0}
-              role="link"
-              aria-label={`Open ${sessionLabel(session)}`}
-              className="hover:bg-muted/40 group cursor-pointer"
-              onClick={() => go("sessions", session.session_id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  go("sessions", session.session_id);
-                }
-              }}
-            >
-              <TableCell className="max-w-xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={
-                      "truncate " +
-                      (session.synthetic ? "" : "font-mono text-xs")
-                    }
-                  >
-                    {sessionLabel(session)}
-                  </span>
-                  {session.synthetic && <SyntheticNote />}
-                </div>
-                <p className="text-muted-foreground truncate text-xs">
-                  {session.titles.join(" · ") || "No titles"}
-                </p>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {who(session)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {session.memory_count}
-              </TableCell>
-              <TableCell className="text-right">
-                {session.shared > 0 ? (
-                  <Badge variant="outline" className="text-success">
-                    {session.shared}
-                  </Badge>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-right">
-                <span
-                  title={`${when(session.started_at)} ${clock(session.started_at)}`}
-                >
-                  {relative(session.ended_at)}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                <ChevronRight className="text-muted-foreground size-4 opacity-0 transition-opacity group-hover:opacity-100" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <p className="text-muted-foreground border-t px-4 py-2.5 text-xs">
-        {count(sessions.length, "session")}
-      </p>
-    </Card>
+    <div className="flex min-w-0 flex-col gap-4">
+      <ul className="grid min-w-0 gap-3 lg:grid-cols-2">
+        {sessions.map((session) => (
+          <SessionCard key={session.session_id} session={session} />
+        ))}
+      </ul>
+
+      <div className="flex items-center justify-center gap-3">
+        <p className="text-muted-foreground text-xs">
+          {count(sessions.length, "session")}
+          {hasMore ? " so far" : ""}
+        </p>
+        {hasMore && (
+          <Button variant="outline" size="sm" disabled={fetchingMore} onClick={onMore}>
+            {fetchingMore ? <Spinner className="size-3.5" /> : null} Load more
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

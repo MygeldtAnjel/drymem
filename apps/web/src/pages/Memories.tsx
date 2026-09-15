@@ -24,6 +24,7 @@ import { Crumbs } from "@/components/Crumbs";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Card,
   CardContent,
@@ -36,7 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Episode, Fact, TreeArea, TreeDecision } from "@/api";
 import { MEMORY_TYPES, TYPE_FILL, split } from "@/memory";
-import { firstLine, person, relative, stamp } from "@/format";
+import { count, firstLine, person, relative, stamp } from "@/format";
 import { go } from "@/router";
 
 export function MemoriesPage({
@@ -49,6 +50,9 @@ export function MemoriesPage({
   onQuery,
   onSearch,
   onClearSearch,
+  hasMore,
+  fetchingMore,
+  onMore,
 }: {
   episodes: Episode[];
   loading: boolean;
@@ -59,6 +63,9 @@ export function MemoriesPage({
   onQuery: (value: string) => void;
   onSearch: () => void;
   onClearSearch: () => void;
+  hasMore: boolean;
+  fetchingMore: boolean;
+  onMore: () => void;
 }) {
   const [type, setType] = useState("all");
   const [scope, setScope] = useState("all");
@@ -143,11 +150,26 @@ export function MemoriesPage({
                   : "No memory of this kind. Try another filter."}
               </Blank>
             ) : (
-              <ul className="flex flex-col">
-                {shown.map((episode) => (
-                  <MemoryRow key={episode.uuid} episode={episode} />
-                ))}
-              </ul>
+              <>
+                <ul className="flex flex-col">
+                  {shown.map((episode) => (
+                    <MemoryRow key={episode.uuid} episode={episode} />
+                  ))}
+                </ul>
+                {/* The list used to stop at a hundred and say nothing, so the
+                    hundred-and-first memory was one the product had quietly
+                    decided you would never see again. */}
+                {hasMore && (
+                  <div className="flex items-center justify-center gap-3 border-t p-3">
+                    <p className="text-muted-foreground text-xs">
+                      {count(episodes.length, "memory", "memories")} so far
+                    </p>
+                    <Button variant="outline" size="sm" disabled={fetchingMore} onClick={onMore}>
+                      {fetchingMore ? <Spinner className="size-3.5" /> : null} Load more
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </Card>
         </>
