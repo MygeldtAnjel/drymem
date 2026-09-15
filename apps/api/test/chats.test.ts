@@ -313,3 +313,87 @@ describe("deleting", () => {
     expect(rows.length).toBe(0);
   });
 });
+
+describe("a long transcript", () => {
+  /** Ask `turns` questions in one chat, and return its id. */
+  async function conversation(turns: number): Promise<string> {
+    stubEngine();
+    const started = await h.client.post("/v1/chats/ask", {
+      project_key: PROJECT,
+      question: "Turn number 1 of a long one",
+    });
+    const id = started.body.chat_id;
+    for (let n = 2; n <= turns; n += 1) {
+      await h.client.post("/v1/chats/ask", {
+        project_key: PROJECT,
+        question: `Turn number ${n} of a long one`,
+        chat_id: id,
+      });
+    }
+    return id;
+  }
+
+  it("opens on the end of the conversation, not the start", async () => {
+    // You open a chat to see how it ended, so the newest turns arrive first.
+    const id = await conversation(6);
+    const { body } = await h.client.get(`/v1/chats/${id}?limit=4`);
+
+    expect(body.messages).toHaveLength(4);
+    expect(body.messages.at(-1).role).toBe("assistant");
+    expect(body.messages[0].content).toContain("Turn number 5");
+    expect(body.next_before).toBeTruthy();
+  });
+
+  it("walks backwards to the first message and stops", async () => {
+    const id = await conversation(5);
+    const seen: string[] = [];
+    let before: number | null = null;
+
+    for (let page = 0; page < 20; page += 1) {
+      const q = before ? `?limit=4&before=${before}` : "?limit=4";
+      const { body } = await h.client.get(`/v1/chats/${id}${q}`);
+      // Prepended, because each page is older than the last.
+      seen.unshift(...body.messages.map((m: { id: string }) => m.id));
+      before = body.next_before;
+      if (!before) break;
+    }
+
+    expect(before).toBeNull();
+    expect(seen.length).toBe(10);
+    expect(new Set(seen).size).toBe(10);
+  });
+
+  it("keeps a question above its own answer", async () => {
+    // Both rows of a turn are written in one statement and share `created_at`
+    // exactly, so ordering by time is a tie — and a tie put the answer first.
+    const id = await conversation(3);
+    const { body } = await h.client.get(`/v1/chats/${id}?limit=100`);
+
+    expect(body.messages.map((m: { role: string }) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+    ]);
+  });
+
+  it("sends the model the tail, not the whole transcript", async () => {
+    const id = await conversation(9);
+    asked = [];
+    stubEngine();
+    await h.client.post("/v1/chats/ask", {
+      project_key: PROJECT,
+      question: "And the last one",
+      chat_id: id,
+    });
+
+    const history = asked.at(-1)!.history;
+    // Ten turns, not eighteen: the tail is what the model is shown.
+    expect(history.length).toBeLessThanOrEqual(10);
+    // Ending on the answer to the most recent question, in order.
+    expect(history.at(-1)!.role).toBe("assistant");
+    expect(history.at(-2)!.content).toContain("Turn number 9");
+  });
+});

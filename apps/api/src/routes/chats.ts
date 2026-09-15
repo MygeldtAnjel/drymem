@@ -70,12 +70,33 @@ async function chatFor(orgId: string, userId: string, id: string) {
   return chat;
 }
 
-const messagesOf = (chatId: string) =>
-  db
+/**
+ * The newest `limit` messages in a chat, oldest-first for rendering.
+ *
+ * Newest rather than oldest because a transcript is read from the bottom: you
+ * open a chat to see how it ended. `before` walks backwards from there.
+ *
+ * Ordered by `seq`, never by `created_at` — both rows of a turn are written in
+ * one statement and share a timestamp exactly, so ordering by time is a tie
+ * that can put an answer above its own question.
+ */
+async function messagesOf(chatId: string, limit: number, before?: number) {
+  const rows = await db
     .select()
     .from(schema.chatMessages)
-    .where(eq(schema.chatMessages.chatId, chatId))
-    .orderBy(schema.chatMessages.createdAt);
+    .where(
+      and(
+        eq(schema.chatMessages.chatId, chatId),
+        ...(before ? [lt(schema.chatMessages.seq, before)] : []),
+      ),
+    )
+    .orderBy(desc(schema.chatMessages.seq))
+    .limit(limit);
+  return rows.reverse();
+}
+
+/** How many turns of a transcript arrive with a chat, and per scroll after it. */
+const MESSAGE_PAGE = 40;
 
 /** A page of conversations. This list grows for as long as somebody uses it. */
 const listSchema = z.object({
@@ -117,15 +138,25 @@ chatRouter.get("/", async (req, res) => {
   });
 });
 
+const transcriptSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional().default(MESSAGE_PAGE),
+  /** Cursor: the `next_before` from the previous page, walking backwards. */
+  before: z.coerce.number().int().min(1).optional(),
+});
+
 chatRouter.get("/:id", async (req, res) => {
   const principal = principalOf(req);
   const chat = await chatFor(principal.orgId, principal.userId, param(req, "id"));
-  const messages = await messagesOf(chat.id);
+  const query = transcriptSchema.parse(req.query);
+  const messages = await messagesOf(chat.id, query.limit, query.before);
 
   res.json({
     id: chat.id,
     title: chat.title,
     updated_at: chat.updatedAt,
+    // The oldest message on this page is the cursor for the one before it. A
+    // short page means the top of the conversation.
+    next_before: messages.length === query.limit ? messages[0]!.seq : null,
     messages: messages.map((m) => ({
       id: m.id,
       role: m.role,
@@ -202,11 +233,10 @@ chatRouter.post("/ask", async (req, res) => {
     ? await chatFor(principal.orgId, principal.userId, body.chat_id)
     : null;
 
-  const earlier = existing ? await messagesOf(existing.id) : [];
-  const history = earlier.slice(-HISTORY_TURNS).map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
+  // Only the tail the model is shown. This used to read the whole transcript
+  // out of Postgres in order to throw all but the last ten rows away.
+  const earlier = existing ? await messagesOf(existing.id, HISTORY_TURNS) : [];
+  const history = earlier.map((m) => ({ role: m.role, content: m.content }));
 
   /*
    * What the conversation is about, as memory uuids.
