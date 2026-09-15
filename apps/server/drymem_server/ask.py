@@ -219,8 +219,9 @@ def _only_what_was_cited(text: str, sources: list[Source]) -> tuple[str, list[So
     marker in the prose, so both are renumbered together — first cited becomes
     [1], and the card beside it says 1.
 
-    A marker pointing at nothing is left exactly as written. Renumbering around
-    it would silently change which memory a sentence claims to rest on.
+    A marker pointing at nothing is dropped. The model does occasionally write
+    a [5] when it was given four memories, and leaving it there gives the reader
+    a citation they cannot open — the one thing a grounded answer must never do.
     """
     by_index = {s.index: s for s in sources}
     order: list[int] = []
@@ -229,16 +230,18 @@ def _only_what_was_cited(text: str, sources: list[Source]) -> tuple[str, list[So
         if n in by_index and n not in order:
             order.append(n)
 
-    if not order:
-        return text, []
-
     moved = {old: new for new, old in enumerate(order, start=1)}
-    renumbered = _CITATION.sub(
-        lambda m: f"[{moved[int(m.group(0)[1:-1])]}]"
-        if int(m.group(0)[1:-1]) in moved
-        else m.group(0),
-        text,
-    )
+
+    def point_at(match: re.Match[str]) -> str:
+        n = int(match.group(0)[1:-1])
+        return f"[{moved[n]}]" if n in moved else ""
+
+    renumbered = _CITATION.sub(point_at, text)
+    # Dropping a marker leaves the space and punctuation it sat between.
+    renumbered = re.sub(r" {2,}", " ", renumbered)
+    renumbered = re.sub(r" +([.,;:])", r"\1", renumbered).strip()
+    if not order:
+        return renumbered, []
     kept = [replace(by_index[old], index=new) for old, new in moved.items()]
     kept.sort(key=lambda s: s.index)
     return renumbered, kept

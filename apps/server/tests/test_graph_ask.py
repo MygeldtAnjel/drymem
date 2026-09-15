@@ -650,13 +650,22 @@ class TestOnlyWhatWasCited:
         assert kept == []
         assert text == "The memories do not say."
 
-    def test_a_marker_pointing_at_nothing_is_left_alone(self):
-        # Renumbering around it would change which memory a sentence claims.
+    def test_a_marker_pointing_at_nothing_is_dropped(self):
+        # Given four memories the model sometimes writes a [5]. Left in, it is a
+        # citation the reader cannot open, which is the one thing a grounded
+        # answer must never hand them.
         from drymem_server.ask import _only_what_was_cited
 
         text, kept = _only_what_was_cited("Out of range [9], but [2] is real.", self.sources())
-        assert text == "Out of range [9], but [1] is real."
+        assert text == "Out of range, but [1] is real."
         assert [s.uuid for s in kept] == ["u2"]
+
+    def test_a_dead_marker_goes_even_when_nothing_else_was_cited(self):
+        from drymem_server.ask import _only_what_was_cited
+
+        text, kept = _only_what_was_cited("Nothing real here [9].", self.sources())
+        assert text == "Nothing real here."
+        assert kept == []
 
 
 async def test_an_answer_only_carries_the_memories_it_cited(client, no_model):
