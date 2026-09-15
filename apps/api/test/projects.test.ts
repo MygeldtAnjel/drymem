@@ -215,7 +215,9 @@ describe("people", () => {
 
 describe("the audit trail", () => {
   it("records what happened, for an admin only", async () => {
-    const { body } = await h.client.get("/v1/audit");
+    // Asking for the whole trail on purpose: this is about what gets recorded,
+    // not about what fits on the first page.
+    const { body } = await h.client.get("/v1/audit?limit=200");
     const actions = body.events.map((e: { action: string }) => e.action);
     expect(actions).toContain("org.create");
     expect(actions).toContain("member.invite");

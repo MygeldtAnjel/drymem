@@ -82,20 +82,35 @@ describe("who enabled this skill", () => {
     expect(ids[0]).toBe(Math.max(...all.body.events.map((e: { id: number }) => e.id)));
   });
 
-  it("pages backwards without an offset", async () => {
-    const first = await h.client.get("/v1/audit?limit=2");
-    expect(first.body.next_before).toBeTruthy();
+  it("comes back as numbered pages with a total", async () => {
+    // An audit log is an archive an admin comes back to, so it gets page
+    // numbers rather than a button — and numbers need a total.
+    const first = await h.client.get("/v1/audit?limit=2&offset=0");
+    expect(first.body.total).toBeGreaterThan(2);
+    expect(first.body.events).toHaveLength(2);
 
-    const second = await h.client.get(`/v1/audit?limit=2&before=${first.body.next_before}`);
+    const second = await h.client.get("/v1/audit?limit=2&offset=2");
     const firstIds = first.body.events.map((e: { id: number }) => e.id);
     const secondIds = second.body.events.map((e: { id: number }) => e.id);
     expect(secondIds.every((id: number) => !firstIds.includes(id))).toBe(true);
+    // Newest first, so the next page is older than the one before it.
     expect(Math.max(...secondIds)).toBeLessThan(Math.min(...firstIds));
   });
 
-  it("says when there is no next page", async () => {
-    const { body } = await h.client.get("/v1/audit?limit=200");
-    expect(body.next_before).toBeNull();
+  it("counts under the same filter as the rows it returns", async () => {
+    // A total over everything beside a filtered page would draw page numbers
+    // for a set that is not on the screen.
+    const all = await h.client.get("/v1/audit?limit=200");
+    const filtered = await h.client.get("/v1/audit?action=skill.publish&limit=200");
+
+    expect(filtered.body.total).toBe(filtered.body.events.length);
+    expect(filtered.body.total).toBeLessThan(all.body.total);
+  });
+
+  it("returns nothing past the end rather than wrapping", async () => {
+    const { body } = await h.client.get("/v1/audit?limit=5&offset=10000");
+    expect(body.events).toEqual([]);
+    expect(body.total).toBeGreaterThan(0);
   });
 });
 

@@ -12,7 +12,7 @@
  */
 
 import { Router } from "express";
-import { and, desc, eq, gte, inArray, lt, sql as raw } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql as raw } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "../db/client.js";
@@ -74,9 +74,17 @@ const querySchema = z.object({
   action: z.string().max(100).optional(),
   actor: z.string().max(320).optional(),
   since: z.string().max(40).optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
-  /** The `id` of the last row seen. Ids are monotonic, so this needs no offset. */
-  before: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(25),
+  /**
+   * Which page, from zero.
+   *
+   * An offset rather than the `id` cursor this used to take, because an audit
+   * log is an archive somebody comes back to and page numbers need a total.
+   * Events arriving mid-read shift the window by however many arrived; for an
+   * append-only log read by an admin that is a fair trade for being able to
+   * jump to page 6.
+   */
+  offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
 auditRouter.get("/", async (req, res) => {
@@ -86,7 +94,6 @@ auditRouter.get("/", async (req, res) => {
   const where = [eq(schema.auditLog.orgId, principal.orgId)];
   if (query.group) where.push(inArray(schema.auditLog.action, GROUPS[query.group]!));
   if (query.action) where.push(eq(schema.auditLog.action, query.action));
-  if (query.before) where.push(lt(schema.auditLog.id, query.before));
   if (query.since) {
     const at = new Date(query.since);
     if (!Number.isNaN(at.getTime())) where.push(gte(schema.auditLog.createdAt, at));
@@ -95,19 +102,26 @@ auditRouter.get("/", async (req, res) => {
     where.push(eq(raw`lower(${schema.users.email})`, query.actor.trim().toLowerCase()));
   }
 
-  // One extra row rather than a count: the page only needs to know whether to
-  // offer "older", and counting a growing log on every request is wasteful.
   const rows = await db
     .select({ entry: schema.auditLog, actor: schema.users.email, name: schema.users.name })
     .from(schema.auditLog)
     .leftJoin(schema.users, eq(schema.users.id, schema.auditLog.actorId))
     .where(and(...where))
     .orderBy(desc(schema.auditLog.id))
-    .limit(query.limit + 1);
+    .limit(query.limit)
+    .offset(query.offset);
 
-  const page = rows.slice(0, query.limit);
+  // Counted under the same filters, or the page numbers describe a different
+  // set from the rows beneath them.
+  const [counted] = await db
+    .select({ n: raw<number>`count(*)::int` })
+    .from(schema.auditLog)
+    .leftJoin(schema.users, eq(schema.users.id, schema.auditLog.actorId))
+    .where(and(...where));
+
   res.json({
-    events: page.map((r) => ({
+    total: Number(counted?.n ?? 0),
+    events: rows.map((r) => ({
       id: r.entry.id,
       action: r.entry.action,
       target: r.entry.target,
@@ -115,8 +129,6 @@ auditRouter.get("/", async (req, res) => {
       actor_name: r.name,
       created_at: r.entry.createdAt,
     })),
-    // Null when there is no next page, so the caller has nothing to decide.
-    next_before: rows.length > query.limit ? page[page.length - 1]!.entry.id : null,
   });
 });
 
