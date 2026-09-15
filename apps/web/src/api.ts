@@ -517,16 +517,25 @@ export const api = {
     projectKey: string,
     limit: number,
     offset: number,
-  ): Promise<{ episodes: Episode[]; total: number }> => {
+    filter: { type?: string; scope?: string } = {},
+  ): Promise<{ episodes: Episode[]; total: number; by_type: Record<string, number> }> => {
     const q = new URLSearchParams({
       project_key: projectKey,
       limit: String(limit),
       offset: String(offset),
     });
-    const data = await request<{ episodes: Episode[]; total: number }>(
-      `/v1/memories/page?${q}`,
-    );
-    return { episodes: data.episodes ?? [], total: data.total ?? 0 };
+    if (filter.type && filter.type !== "all") q.set("type", filter.type);
+    if (filter.scope && filter.scope !== "all") q.set("scope", filter.scope);
+    const data = await request<{
+      episodes: Episode[];
+      total: number;
+      by_type: Record<string, number>;
+    }>(`/v1/memories/page?${q}`);
+    return {
+      episodes: data.episodes ?? [],
+      total: data.total ?? 0,
+      by_type: data.by_type ?? {},
+    };
   },
 
   /**

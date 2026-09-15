@@ -201,6 +201,11 @@ function Workspace({
    */
   const [page, setPage] = useState(1);
   const [totalMemories, setTotalMemories] = useState(0);
+  const [byType, setByType] = useState<Record<string, number>>({});
+  // Held here, not in the page, because the server does the filtering now and
+  // a filter change is a new first page rather than a re-render.
+  const [kind, setKind] = useState("all");
+  const [visibility, setVisibility] = useState("all");
   const [moreSessions, setMoreSessions] = useState<string | null>(null);
   const [moreSkills, setMoreSkills] = useState<string | null>(null);
   const [fetchingMore, setFetchingMore] = useState(false);
@@ -305,7 +310,10 @@ function Workspace({
         ]);
         setEpisodes(context.episodes);
         setTotalMemories(context.total);
+        setByType(context.by_type);
         setPage(1);
+        setKind("all");
+        setVisibility("all");
         setStats(overview);
         setSessions(sessionList.sessions);
         setMoreSessions(sessionList.next_before);
@@ -341,20 +349,29 @@ function Workspace({
    * between a pager and a "load more", and why an archive gets one: you can
    * come back to page 4 tomorrow instead of pressing a button four times.
    */
-  const goToPage = async (next: number) => {
+  const goToPage = async (next: number, filter?: { type?: string; scope?: string }) => {
     if (fetchingMore) return;
+    const type = filter?.type ?? kind;
+    const scope = filter?.scope ?? visibility;
     setFetchingMore(true);
     try {
-      const body = await api.memoriesPage(active, PAGE, (next - 1) * PAGE);
+      const body = await api.memoriesPage(active, PAGE, (next - 1) * PAGE, { type, scope });
       setEpisodes(body.episodes);
       setTotalMemories(body.total);
+      setByType(body.by_type);
       setPage(next);
+      setKind(type);
+      setVisibility(scope);
     } catch (e) {
       fail(e, "Loading that page");
     } finally {
       setFetchingMore(false);
     }
   };
+
+  /** Any filter change starts again at page one: page 4 of a different set is
+   *  a page nobody asked for. */
+  const filterMemories = (filter: { type?: string; scope?: string }) => void goToPage(1, filter);
 
   const loadMoreSessions = async () => {
     if (!moreSessions || fetchingMore) return;
@@ -713,9 +730,13 @@ function Workspace({
         sessions={sessions}
         page={page}
         totalMemories={totalMemories}
+        byType={byType}
+        kind={kind}
+        visibility={visibility}
         moreSessions={moreSessions}
         fetchingMore={fetchingMore}
         onPage={goToPage}
+        onFilter={filterMemories}
         onMoreSessions={loadMoreSessions}
         moreSkills={moreSkills}
         onMoreSkills={loadMoreSkills}
@@ -787,10 +808,14 @@ function Screen(props: {
   sessions: AgentSession[];
   page: number;
   totalMemories: number;
+  byType: Record<string, number>;
+  kind: string;
+  visibility: string;
   moreSessions: string | null;
   moreSkills: string | null;
   fetchingMore: boolean;
   onPage: (page: number) => void;
+  onFilter: (filter: { type?: string; scope?: string }) => void;
   onMoreSessions: () => void;
   onMoreSkills: () => void;
   skills: Skill[];
@@ -878,6 +903,10 @@ function Screen(props: {
           perPage={PAGE}
           busy={props.fetchingMore}
           onPage={props.onPage}
+          byType={props.byType}
+          kind={props.kind}
+          visibility={props.visibility}
+          onFilter={props.onFilter}
         />
       );
     case "chat":

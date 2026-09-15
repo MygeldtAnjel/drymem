@@ -8,7 +8,7 @@
  * conflating the two would make the results look broken.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Ban,
   NotebookPen,
@@ -55,6 +55,10 @@ export function MemoriesPage({
   perPage,
   busy,
   onPage,
+  byType,
+  kind,
+  visibility,
+  onFilter,
 }: {
   episodes: Episode[];
   loading: boolean;
@@ -70,23 +74,15 @@ export function MemoriesPage({
   perPage: number;
   busy: boolean;
   onPage: (page: number) => void;
+  /** Every kind in the project, counted project-wide rather than per page. */
+  byType: Record<string, number>;
+  kind: string;
+  visibility: string;
+  onFilter: (filter: { type?: string; scope?: string }) => void;
 }) {
-  const [type, setType] = useState("all");
-  const [scope, setScope] = useState("all");
-
-  const shown = useMemo(
-    () =>
-      episodes.filter(
-        (e) => (type === "all" || e.type === type) && (scope === "all" || e.scope === scope),
-      ),
-    [episodes, type, scope],
-  );
-
-  const counts = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const e of episodes) out[e.type] = (out[e.type] ?? 0) + 1;
-    return out;
-  }, [episodes]);
+  // The page arrives already filtered, so this is the page.
+  const shown = episodes;
+  const everything = Object.values(byType).reduce((n, count) => n + count, 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,19 +119,31 @@ export function MemoriesPage({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <Tabs value={type} onValueChange={setType}>
+            {/* Every kind the schema has, so the strip is the same shape on
+                every project — a kind with none of it reads as an honest zero
+                rather than disappearing. */}
+            <Tabs value={kind} onValueChange={(t) => onFilter({ type: t })}>
               <TabsList>
-                <TabsTrigger value="all">All {episodes.length}</TabsTrigger>
-                {Object.keys(MEMORY_TYPES)
-                  .filter((t) => counts[t])
-                  .map((t) => (
-                    <TabsTrigger key={t} value={t} className="capitalize">
-                      {t} {counts[t]}
-                    </TabsTrigger>
-                  ))}
+                <TabsTrigger value="all">
+                  All <Tally n={everything} on={kind === "all"} />
+                </TabsTrigger>
+                {Object.keys(MEMORY_TYPES).map((t) => (
+                  <TabsTrigger
+                    key={t}
+                    value={t}
+                    className="capitalize"
+                    disabled={!byType[t] && kind !== t}
+                  >
+                    {t} <Tally n={byType[t] ?? 0} on={kind === t} />
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
-            <Tabs value={scope} onValueChange={setScope} className="ml-auto">
+            <Tabs
+              value={visibility}
+              onValueChange={(v) => onFilter({ scope: v })}
+              className="ml-auto"
+            >
               <TabsList>
                 <TabsTrigger value="all">Everything</TabsTrigger>
                 <TabsTrigger value="team">Shared</TabsTrigger>
@@ -177,6 +185,25 @@ export function MemoriesPage({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * A count beside a tab label.
+ *
+ * A bare number ran into the word before it and read as part of the label;
+ * boxed, the eye takes it as a quantity without stopping.
+ */
+function Tally({ n, on }: { n: number; on: boolean }) {
+  return (
+    <span
+      className={
+        "ml-1 inline-flex min-w-4 items-center justify-center rounded px-1 text-[11px] tabular-nums " +
+        (on ? "bg-foreground/10 text-foreground" : "bg-muted text-muted-foreground")
+      }
+    >
+      {n}
+    </span>
   );
 }
 
