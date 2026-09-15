@@ -14,7 +14,7 @@
  */
 
 import { Router } from "express";
-import { and, desc, eq, inArray, sql as raw } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql as raw } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "../db/client.js";
@@ -141,10 +141,24 @@ skillRouter.get("/", async (req, res) => {
   });
 });
 
+/**
+ * A page of the catalogue, by name.
+ *
+ * The cursor is the last name on the page rather than an offset: publishing a
+ * skill while somebody is paging would otherwise shift every page after it and
+ * skip a row.
+ */
+const catalogueSchema = z.object({
+  project_key: z.string().max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(100),
+  /** Cursor: the `next_after` from the previous page. */
+  after: z.string().max(200).optional(),
+});
+
 /** Everything the organisation has, enabled here or not. */
 skillRouter.get("/catalogue", async (req, res) => {
   const principal = principalOf(req);
-  const query = z.object({ project_key: z.string().max(500).optional() }).parse(req.query);
+  const query = catalogueSchema.parse(req.query);
 
   let enabled = new Set<string>();
   if (query.project_key) {
@@ -168,10 +182,18 @@ skillRouter.get("/catalogue", async (req, res) => {
     })
     .from(schema.skills)
     .leftJoin(schema.users, eq(schema.users.id, schema.skills.authorId))
-    .where(eq(schema.skills.orgId, principal.orgId))
-    .orderBy(schema.skills.name);
+    .where(
+      and(
+        eq(schema.skills.orgId, principal.orgId),
+        ...(query.after ? [gt(schema.skills.name, query.after)] : []),
+      ),
+    )
+    .orderBy(schema.skills.name)
+    .limit(query.limit);
 
   res.json({
+    // A short page is the last page, so a caller never asks for nothing.
+    next_after: rows.length === query.limit ? rows[rows.length - 1]!.skill.name : null,
     skills: rows.map((r) => ({
       id: r.skill.id,
       name: r.skill.name,

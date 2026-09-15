@@ -489,3 +489,35 @@ describe("topics", () => {
     expect(calls).toBe(1);
   });
 });
+
+describe("paging the catalogue", () => {
+  it("walks to the end with no repeats and no gaps", async () => {
+    // Twenty base skills are seeded; the cursor is a name, not an offset, so
+    // publishing while somebody pages cannot skip a row.
+    const seen: string[] = [];
+    let after: string | null = null;
+    let pages = 0;
+    for (; pages < 40; ) {
+      const q = new URLSearchParams({ project_key: PROJECT, limit: "3" });
+      if (after) q.set("after", after);
+      const { body } = await h.client.get(`/v1/skills/catalogue?${q}`);
+      expect(body.skills.length).toBeLessThanOrEqual(3);
+      seen.push(...body.skills.map((s: { name: string }) => s.name));
+      after = body.next_after;
+      pages += 1;
+      if (!after) break;
+    }
+
+    // It has to have actually paged. Without this the test passes against a
+    // query with no LIMIT at all: one page returns everything, `next_after` is
+    // null because the page was short, and every other assertion still holds.
+    expect(pages).toBeGreaterThan(1);
+    expect(after).toBeNull();
+    expect(new Set(seen).size).toBe(seen.length);
+    // The same set as asking for all of them at once.
+    const { body: all } = await h.client.get(
+      `/v1/skills/catalogue?project_key=${PROJECT}&limit=200`,
+    );
+    expect(seen.sort()).toEqual(all.skills.map((s: { name: string }) => s.name).sort());
+  });
+});
