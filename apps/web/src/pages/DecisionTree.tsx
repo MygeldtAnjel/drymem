@@ -36,6 +36,7 @@ import "@xyflow/react/dist/style.css";
 
 import { Blank } from "@/components/Bits";
 import type { TreeArea, TreeDecision } from "@/api";
+import { pathTo } from "@/tree";
 import { person, relative } from "@/format";
 import { TYPE_FILL } from "@/memory";
 
@@ -185,11 +186,19 @@ function Tree({ root, unplaced, selectedId, onSelect }: Props) {
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // One rank. Opening two showed thirty-three nodes at once and `fitView`
-    // shrank them past reading; the tree is for arriving somewhere in two
-    // clicks, not for seeing everything at once.
-    if (root) setOpen(openToDepth(root, 1, new Set()));
-  }, [root]);
+    if (!root) return;
+    // Arrived by a link naming a decision: open the way down to it, so the
+    // thing the link promised is the thing on screen.
+    const path = selectedId ? pathTo(root, selectedId) : null;
+    if (path) {
+      setOpen(new Set(path));
+      return;
+    }
+    // Otherwise one rank. Opening two showed thirty-three nodes at once and
+    // `fitView` shrank them past reading; the tree is for arriving somewhere in
+    // two clicks, not for seeing everything at once.
+    setOpen(openToDepth(root, 1, new Set()));
+  }, [root, selectedId]);
 
   const toggle = useCallback((id: string) => {
     setOpen((current) => {

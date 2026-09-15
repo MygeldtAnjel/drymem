@@ -34,9 +34,9 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Tree, TreeDecision } from "@/api";
+import type { Tree, TreeArea, TreeDecision } from "@/api";
 import { MEMORY_TYPES } from "@/memory";
-import { relative } from "@/format";
+import { person, relative } from "@/format";
 import { go } from "@/router";
 
 /**
@@ -69,7 +69,7 @@ function DecisionPanel({
           </div>
           <h3 className="text-sm leading-snug font-medium">{decision.title}</h3>
           <p className="text-muted-foreground mt-1 text-xs">
-            {decision.author || "unknown"} · {relative(decision.created_at)}
+            {person(decision.author, decision.author_name)} · {relative(decision.created_at)}
           </p>
         </div>
         <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={onClose}>
@@ -107,7 +107,7 @@ function DecisionPanel({
   );
 }
 
-export function GraphPage({ projectKey }: { projectKey: string }) {
+export function GraphPage({ projectKey, focus }: { projectKey: string; focus?: string }) {
   const [kind, setKind] = useState("all");
   const [tree, setTree] = useState<Tree | null>(null);
   // Clicking a decision opens it beside the tree rather than navigating away:
@@ -130,6 +130,32 @@ export function GraphPage({ projectKey }: { projectKey: string }) {
   // A filter change rebuilds the tree, so the open decision may no longer be
   // in it. Closing is honest; leaving it open beside a tree it is not in is not.
   useEffect(() => setPicked(null), [projectKey, kind]);
+
+  /*
+   * Arrived by a link naming a decision: open it.
+   *
+   * `#/graph/<uuid>` is what "21 more in the decision tree" points at, and a
+   * link that only lands you on the page has not taken you anywhere — the
+   * thing it named is several collapsed ranks down. The tree opens the way to
+   * it; this opens the panel beside it.
+   *
+   * A filter can hide it. Rather than clear the filter behind the reader's
+   * back, the decision simply is not found and the tree opens as normal.
+   */
+  useEffect(() => {
+    if (!tree || !focus) return;
+    const find = (area: TreeArea): TreeDecision | null => {
+      const here = area.decisions.find((d) => d.id === focus);
+      if (here) return here;
+      for (const child of area.children) {
+        const below = find(child);
+        if (below) return below;
+      }
+      return null;
+    };
+    const found = find(tree.root);
+    if (found) setPicked(found);
+  }, [tree, focus]);
 
   return (
     <div className="flex flex-col gap-4">

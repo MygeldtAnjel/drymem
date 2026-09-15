@@ -923,7 +923,7 @@ function Screen(props: {
     case "chat":
       return <ChatPage projectKey={props.active} />;
     case "graph":
-      return <GraphPage projectKey={props.active} />;
+      return <GraphPage projectKey={props.active} focus={route.id || undefined} />;
     case "sessions":
       if (route.id)
         return <SessionPage projectKey={props.active} id={route.id} />;

@@ -370,7 +370,9 @@ export function MemoryDetail({
       <Crumbs
         trail={[
           { label: "Memories", page: "memories" },
-          ...(episode.author ? [{ label: episode.author.split("@")[0]!, page: "memories" }] : []),
+          ...(episode.author
+            ? [{ label: person(episode.author, episode.author_name), page: "memories" }]
+            : []),
           { label: episode.title || "Memory" },
         ]}
       />
@@ -574,7 +576,9 @@ function Related({ episode, projectKey }: { episode: Episode; projectKey: string
         {more > 0 && (
           <button
             className="text-muted-foreground hover:text-foreground text-left text-xs"
-            onClick={() => go("graph")}
+            // Named, not just the page: the tree opens the way down to this
+            // memory and puts it in the panel, which is what the link says.
+            onClick={() => go("graph", episode.uuid)}
           >
             {more} more in the decision tree →
           </button>
