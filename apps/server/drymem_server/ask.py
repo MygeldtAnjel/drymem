@@ -199,7 +199,6 @@ async def _answer_with_local(prompt: str, turns: list[dict] | None = None) -> tu
         #
         # There is nothing here to reason about anyway — the answer is a
         # summary of text the model was handed.
-        
         extra_body={"reasoning_effort": "none"},
     )
     return response.choices[0].message.content or "", settings.local_llm_model

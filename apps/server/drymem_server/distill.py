@@ -135,9 +135,7 @@ def _ensure_frontmatter(content: str, name: str, topic: str) -> str:
         body = "\n".join(lines[leading:]).lstrip()
         return f"---\n{head}\n---\n\n{body}"
 
-    return (
-        f"---\nname: {name}\ndescription: What this team learned working on {topic}.\n---\n\n{stripped}"
-    )
+    return f"---\nname: {name}\ndescription: What this team learned working on {topic}.\n---\n\n{stripped}"
 
 
 def _tidy(text: str) -> str:
