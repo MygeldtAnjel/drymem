@@ -63,9 +63,12 @@ function SyntheticNote() {
  */
 function SessionCard({ session }: { session: Session }) {
   return (
-    <li>
+    <li className="min-w-0">
+      {/* `h-full` is what makes two cards in a row the same height: the grid
+          stretches the `li`, but the button inside it only grew to its own
+          content, so a one-title card sat short beside a three-title one. */}
       <button
-        className="border-border bg-card hover:border-input hover:bg-muted/30 group flex w-full min-w-0 flex-col gap-2.5 rounded-lg border p-4 text-left transition-colors"
+        className="border-border bg-card hover:border-input hover:bg-muted/30 group flex h-full w-full min-w-0 flex-col gap-2.5 rounded-lg border p-4 text-left transition-colors"
         onClick={() => go("sessions", session.session_id)}
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -79,7 +82,7 @@ function SessionCard({ session }: { session: Session }) {
 
         {/* What actually happened, which is the only reason to open it. */}
         {session.titles.length > 0 && (
-          <span className="flex min-w-0 flex-col gap-1">
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
             {session.titles.slice(0, 3).map((title) => (
               <span key={title} className="text-foreground min-w-0 truncate text-sm">
                 {title}
@@ -93,7 +96,7 @@ function SessionCard({ session }: { session: Session }) {
           </span>
         )}
 
-        <span className="text-muted-foreground mt-auto flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-xs">
+        <span className="text-muted-foreground mt-auto flex min-w-0 w-full flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2.5 text-xs">
           <PersonChip author={session.author} name={session.author_name} />
           <span aria-hidden>·</span>
           <span>{count(session.memory_count, "memory", "memories")}</span>
@@ -148,7 +151,7 @@ export function SessionsPage({
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <ul className="grid min-w-0 gap-3 lg:grid-cols-2">
+      <ul className="grid min-w-0 items-stretch gap-3 lg:grid-cols-2">
         {sessions.map((session) => (
           <SessionCard key={session.session_id} session={session} />
         ))}
