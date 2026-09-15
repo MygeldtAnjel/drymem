@@ -455,10 +455,11 @@ function Workspace({
       list.map((e) => (e.uuid === uuid ? { ...e, ...patch } : e)),
     );
 
-  const rate = (episode: Episode, rating: 1 | -1) =>
+  const rate = (episode: Episode, rating: 1 | -1 | 0) =>
     act("Rating", async () => {
       await api.rate(episode.uuid, rating, facts ? query.trim() : "");
       patchEpisode(episode.uuid, { rating });
+      if (rating === 0) return "Rating taken back";
       return rating > 0 ? "Marked useful" : "Marked not useful";
     });
 
@@ -851,7 +852,7 @@ function Screen(props: {
   setQuery: (v: string) => void;
   onSearch: () => void;
   onClearSearch: () => void;
-  onRate: (episode: Episode, rating: 1 | -1) => void;
+  onRate: (episode: Episode, rating: 1 | -1 | 0) => void;
   onPromote: (episode: Episode) => void;
   onDelete: (episode: Episode) => void;
   onDraft: (topic: string) => void;

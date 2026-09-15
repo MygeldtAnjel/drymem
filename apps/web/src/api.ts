@@ -597,7 +597,7 @@ export const api = {
     return { memories: data.memories ?? [], facts: data.results ?? [] };
   },
 
-  rate: (uuid: string, rating: 1 | -1, query: string) =>
+  rate: (uuid: string, rating: 1 | -1 | 0, query: string) =>
     request(`/v1/memories/${uuid}/feedback`, {
       method: "POST",
       body: JSON.stringify({ rating, query }),

@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import {
   Ban,
+  Check,
   NotebookPen,
   Search as SearchIcon,
   Share2,
@@ -321,13 +322,15 @@ export function MemoryDetail({
 }: {
   episode: Episode;
   projectKey: string;
-  onRate: (rating: 1 | -1) => void;
+  onRate: (rating: 1 | -1 | 0) => void;
   onPromote: () => void;
   onDelete: () => void;
   busy: boolean;
 }) {
   const { lead, sections } = split(episode.content);
   const title = episode.title || episode.name;
+  // Null and zero both mean "no opinion"; the buttons only care which side.
+  const rated = episode.rating ?? 0;
 
   // The body's first heading is what became the title; printing it again puts
   // the same sentence on the page twice.
@@ -431,26 +434,54 @@ export function MemoryDetail({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
+              {/*
+                Both states have to be unmistakable, and pressing the one you
+                already chose has to do something. "No" used to render as
+                `secondary`, which beside `outline` is a shade of grey — so a
+                rating that had saved looked exactly like one that had not, and
+                the only way to undo a misclick was to press the other thumb,
+                which says something different.
+              */}
               <div className="flex gap-2">
                 <Button
-                  variant={episode.rating === 1 ? "default" : "outline"}
+                  variant={rated === 1 ? "default" : "outline"}
                   size="sm"
                   className="flex-1"
-                  onClick={() => onRate(1)}
+                  aria-pressed={rated === 1}
+                  onClick={() => onRate(rated === 1 ? 0 : 1)}
                   disabled={busy}
+                  title={rated === 1 ? "Press again to take it back" : undefined}
                 >
-                  <ThumbsUp data-icon="inline-start" /> Useful
+                  {rated === 1 ? (
+                    <Check data-icon="inline-start" />
+                  ) : (
+                    <ThumbsUp data-icon="inline-start" />
+                  )}{" "}
+                  Useful
                 </Button>
                 <Button
-                  variant={episode.rating === -1 ? "secondary" : "outline"}
+                  variant={rated === -1 ? "destructive" : "outline"}
                   size="sm"
                   className="flex-1"
-                  onClick={() => onRate(-1)}
+                  aria-pressed={rated === -1}
+                  onClick={() => onRate(rated === -1 ? 0 : -1)}
                   disabled={busy}
+                  title={rated === -1 ? "Press again to take it back" : undefined}
                 >
-                  <ThumbsDown data-icon="inline-start" /> No
+                  {rated === -1 ? (
+                    <Check data-icon="inline-start" />
+                  ) : (
+                    <ThumbsDown data-icon="inline-start" />
+                  )}{" "}
+                  Not useful
                 </Button>
               </div>
+              {rated !== 0 && (
+                <p className="text-muted-foreground text-xs">
+                  You marked this {rated === 1 ? "useful" : "not useful"}. Press it again to
+                  take it back.
+                </p>
+              )}
               <Separator />
               {episode.scope === "team" ? (
                 <p className="text-xs text-muted-foreground">
