@@ -126,8 +126,12 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
   const [error, setError] = useState<string | null>(null);
   const [more, setMore] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
+  const [older, setOlder] = useState<number | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
+  const transcript = useRef<HTMLDivElement>(null);
+  const top = useRef<HTMLDivElement>(null);
 
   /*
    * Nothing until there is a project to ask about.
@@ -209,16 +213,64 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
   const open = async (id: string) => {
     setOpenId(id);
     setError(null);
+    setOlder(null);
     const { api } = await import("@/api");
     const chat = await api.chat(id).catch(() => null);
     setMessages(chat?.messages ?? []);
+    setOlder(chat?.next_before ?? null);
+  };
+
+  /**
+   * The turns before the ones on screen.
+   *
+   * Scroll position is captured and restored around the prepend. Without it the
+   * browser keeps the same `scrollTop` while the content above grows, which
+   * throws the reader up the page to a message they were not looking at.
+   */
+  const loadOlder = async () => {
+    if (!openId || !older || loadingOlder) return;
+    setLoadingOlder(true);
+    const box = transcript.current;
+    const before = box ? box.scrollHeight - box.scrollTop : 0;
+    try {
+      const { api } = await import("@/api");
+      const page = await api.chat(openId, older);
+      setMessages((current) => {
+        const seen = new Set(current.map((m) => m.id));
+        return [...page.messages.filter((m) => !seen.has(m.id)), ...current];
+      });
+      setOlder(page.next_before ?? null);
+      requestAnimationFrame(() => {
+        if (box) box.scrollTop = box.scrollHeight - before;
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
   };
 
   const startNew = () => {
     setOpenId(null);
     setMessages([]);
     setError(null);
+    setOlder(null);
   };
+
+  /* The same trick as the chat list, at the other end: reaching the top of a
+     transcript fetches the turns before it. */
+  useEffect(() => {
+    const target = top.current;
+    if (!target || !older) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadOlder();
+      },
+      { root: transcript.current, rootMargin: "80px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [older, openId]);
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,7 +380,7 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
 
       {/* ---- the conversation -------------------------------------------- */}
       <Card className="flex min-w-0 flex-col overflow-hidden p-0 lg:h-[42rem]">
-        <CardContent className="min-w-0 flex-1 overflow-y-auto p-4">
+        <CardContent ref={transcript} className="min-w-0 flex-1 overflow-y-auto p-4">
           {messages.length === 0 ? (
             <Blank icon={Sparkles} title="Ask this project">
               Answered only from what your team wrote down, with a citation on every claim. Try
@@ -336,6 +388,11 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
             </Blank>
           ) : (
             <div className="flex flex-col gap-4">
+              {older && (
+                <div ref={top} className="text-muted-foreground text-center text-xs">
+                  {loadingOlder ? "Loading earlier turns…" : "Earlier in this conversation"}
+                </div>
+              )}
               {messages.map((message) => (
                 <Turn key={message.id} message={message} />
               ))}

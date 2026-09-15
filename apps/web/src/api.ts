@@ -651,10 +651,20 @@ export const api = {
     return { chats: data.chats ?? [], next_before: data.next_before ?? null };
   },
 
-  chat: (id: string) =>
-    request<{ id: string; title: string; messages: ChatMessage[] }>(
-      `/v1/chats/${id}`,
-    ),
+  /**
+   * A chat, ending at its newest message.
+   *
+   * `before` walks backwards through the transcript; `next_before` is null at
+   * the first message. A conversation is read from the bottom, so this is the
+   * one list where a page is older than the one before it.
+   */
+  chat: (id: string, before?: number | null) =>
+    request<{
+      id: string;
+      title: string;
+      messages: ChatMessage[];
+      next_before: number | null;
+    }>(`/v1/chats/${id}${before ? `?before=${before}` : ""}`),
 
   deleteChat: (id: string) =>
     request<void>(`/v1/chats/${id}`, { method: "DELETE" }),
