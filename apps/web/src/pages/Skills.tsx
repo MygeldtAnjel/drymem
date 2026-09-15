@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Flame,
   History,
   Plus,
   Search,
@@ -31,7 +32,7 @@ import {
   Wand2,
 } from "lucide-react";
 
-import { Blank } from "@/components/Bits";
+import { Blank, PersonChip } from "@/components/Bits";
 import { Input } from "@/components/ui/input";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +58,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CatalogueSkill, Cluster, Finding, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
-import { count, person, relative } from "@/format";
+import { count, relative } from "@/format";
 import { go } from "@/router";
 
 export type Draft = { name: string; content: string; model: string; memory_count: number };
@@ -159,15 +160,16 @@ function SkillCard({
         <SourceChip source={skill.source} />
         <Badge variant="outline">v{skill.latest_version}</Badge>
         {skill.uses > 0 && (
-          <Badge variant="outline" className="text-muted-foreground">
-            {count(skill.uses, "read")}
+          <Badge variant="outline" className="text-primary">
+            <Flame data-icon="inline-start" /> {count(skill.uses, "read")}
           </Badge>
         )}
       </div>
 
       <div className="border-border mt-auto flex min-w-0 flex-wrap items-center gap-2 border-t pt-3">
         <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-          {person(skill.author, skill.author_name)} · {relative(skill.updated_at)}
+          <PersonChip author={skill.author} name={skill.author_name} />
+          <span className="ml-1.5">· {relative(skill.updated_at)}</span>
         </span>
         {!enabledHere && (
           <Button size="sm" disabled={busy} onClick={() => onEnable(skill.name)}>

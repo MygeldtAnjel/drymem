@@ -25,8 +25,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { Blank } from "@/components/Bits";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Blank, PersonChip } from "@/components/Bits";
 import { Crumbs } from "@/components/Crumbs";
 import { Markdown } from "@/Markdown";
 import { Badge } from "@/components/ui/badge";
@@ -38,12 +37,6 @@ import { Findings, SourceChip, StateChip } from "@/pages/Skills";
 import type { CatalogueSkill, Skill, SkillVersion } from "@/api";
 import { frontmatter } from "@/memory";
 import { count, person, when } from "@/format";
-
-/** Initials for the byline. There are no uploaded avatars anywhere in drymem. */
-function initials(value: string): string {
-  const parts = value.split(/[@\s._-]+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
-}
 
 export function SkillPage({
   name,
@@ -154,13 +147,8 @@ export function SkillPage({
               )}
               {/* Provenance, not identity, so it reads small and last. */}
               <div className="text-muted-foreground mt-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                <span className="inline-flex items-center gap-1.5" title={author ?? undefined}>
-                  <Avatar className="size-4">
-                    <AvatarFallback className="text-[8px]">
-                      {initials(author ?? who)}
-                    </AvatarFallback>
-                  </Avatar>
-                  By {who}
+                <span className="inline-flex items-center gap-1">
+                  By <PersonChip author={author} name={meta?.author_name || versions?.[0]?.author_name} />
                 </span>
                 {meta && <span aria-hidden>·</span>}
                 {meta && <span>{count(meta.uses, "read")}</span>}

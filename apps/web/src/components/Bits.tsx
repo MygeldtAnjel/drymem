@@ -9,6 +9,7 @@
 
 import { Lock, Users, type LucideIcon } from "lucide-react";
 
+import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import {
   Empty,
@@ -19,8 +20,45 @@ import {
   EmptyTitle,
 } from "./ui/empty";
 import { Skeleton } from "./ui/skeleton";
+import { person } from "@/format";
 import { TYPES } from "@/memory";
 import { cn } from "@/lib/utils";
+
+/** Initials for a byline. drymem has no uploaded avatars, only these. */
+function initials(value: string): string {
+  const parts = value.split(/[@\s._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
+/**
+ * Who wrote something, with a face beside the name.
+ *
+ * A bare line of text reads as metadata; a small avatar reads as a person, and
+ * a catalogue is a place where "who made this" is part of deciding whether to
+ * trust it. The address stays on hover because that is the real identifier.
+ */
+export function PersonChip({
+  author,
+  name,
+  className,
+}: {
+  author: string | null | undefined;
+  name?: string | null;
+  className?: string;
+}) {
+  const label = person(author, name);
+  return (
+    <span
+      title={author ?? undefined}
+      className={cn("inline-flex min-w-0 items-center gap-1.5", className)}
+    >
+      <Avatar className="size-4 shrink-0">
+        <AvatarFallback className="text-[8px]">{initials(author ?? label)}</AvatarFallback>
+      </Avatar>
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
 
 export function TypeChip({ type, className }: { type: string; className?: string }) {
   const known = type in TYPES ? type : "note";
