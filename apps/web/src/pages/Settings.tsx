@@ -83,7 +83,7 @@ export function SettingsPage({
         <TabsTrigger value="server">Server</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="profile" className="flex max-w-3xl flex-col gap-4">
+      <TabsContent value="profile" className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Your profile</CardTitle>
@@ -93,7 +93,7 @@ export function SettingsPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <FieldGroup>
+            <FieldGroup className="max-w-2xl">
               <Field>
                 <FieldLabel htmlFor="role">Role</FieldLabel>
                 <Input id="role" value={session.role} readOnly disabled className="capitalize" />
@@ -139,7 +139,7 @@ export function SettingsPage({
         <TokensCard onCopy={onCopy} />
       </TabsContent>
 
-      <TabsContent value="project" className="flex max-w-3xl flex-col gap-4">
+      <TabsContent value="project" className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>This project</CardTitle>
@@ -149,7 +149,7 @@ export function SettingsPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <FieldGroup>
+            <FieldGroup className="max-w-2xl">
               <Field>
                 <FieldLabel htmlFor="project-name">Display name</FieldLabel>
                 <Input
@@ -248,7 +248,7 @@ export function SettingsPage({
         </Card>
       </TabsContent>
 
-      <TabsContent value="memory" className="flex max-w-3xl flex-col gap-4">
+      <TabsContent value="memory" className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Kinds of memory</CardTitle>
@@ -302,7 +302,7 @@ export function SettingsPage({
         </Card>
       </TabsContent>
 
-      <TabsContent value="server" className="flex max-w-3xl flex-col gap-4">
+      <TabsContent value="server" className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Where your memory lives</CardTitle>
@@ -435,7 +435,7 @@ function PasswordCard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <FieldGroup>
+          <FieldGroup className="max-w-2xl">
             <Field>
               <FieldLabel htmlFor="current">Current password</FieldLabel>
               <Input
