@@ -741,6 +741,9 @@ class MemoryService:
     async def rate(self, *, episode_uuid: str, rating: int, query: str) -> bool:
         """Record a thumb on a memory. Changing your mind replaces the rating.
 
+        A rating of 0 takes it back. Without it the only way to undo a misclick
+        was to press the other thumb, which is a different statement.
+
         Scoped to the caller's org, like delete: a uuid alone must not let one
         tenant write rows against another's memory.
         """

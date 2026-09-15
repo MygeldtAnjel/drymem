@@ -124,7 +124,12 @@ class DeleteResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    rating: int = Field(..., description="+1 or -1")
+    rating: int = Field(
+        ...,
+        ge=-1,
+        le=1,
+        description="+1 useful, -1 not, 0 to take back a rating you already gave",
+    )
     query: str = Field(
         "",
         max_length=500,

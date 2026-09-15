@@ -300,8 +300,10 @@ async def rate_memory(
     these rows, so the query that surfaced the memory is stored alongside the
     thumb — a rating with no query cannot be learned from.
     """
-    if body.rating not in (1, -1):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "rating must be 1 or -1.")
+    # 0 takes a rating back. The schema already bounds it; this guard used to
+    # reject the one value that undoes a misclick.
+    if body.rating not in (1, 0, -1):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "rating must be 1, 0 or -1.")
     if not await service.rate(episode_uuid=episode_uuid, rating=body.rating, query=body.query):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No such memory.")
     return FeedbackResponse(episode_uuid=episode_uuid, rating=body.rating, query=body.query)

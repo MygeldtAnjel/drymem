@@ -510,3 +510,40 @@ async def test_the_kind_counts_cover_the_project_not_the_page(client):
     # One row on the page, but the whole project in the counts.
     assert body["by_type"]["decision"] == 3
     assert body["by_type"]["convention"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_rating_can_be_taken_back(client):
+    """A misclick had no undo: the only way out was the other thumb, which is
+    a different statement about the memory."""
+    saved = await save(client, topic="rate/undo")
+    uuid = saved["episode_uuid"]
+
+    async def rating_now() -> int | None:
+        body = (
+            await client.get(
+                "/v1/memories/page", headers=auth(client), params={"project_key": PROJECT}
+            )
+        ).json()
+        return next(e["rating"] for e in body["episodes"] if e["uuid"] == uuid)
+
+    await client.post(f"/v1/memories/{uuid}/feedback", headers=auth(client), json={"rating": -1})
+    assert await rating_now() == -1
+
+    await client.post(f"/v1/memories/{uuid}/feedback", headers=auth(client), json={"rating": 0})
+    assert await rating_now() == 0
+
+    # And it can be rated again afterwards.
+    await client.post(f"/v1/memories/{uuid}/feedback", headers=auth(client), json={"rating": 1})
+    assert await rating_now() == 1
+
+
+@pytest.mark.asyncio
+async def test_a_rating_outside_the_three_is_refused(client):
+    saved = await save(client, topic="rate/bounds")
+    response = await client.post(
+        f"/v1/memories/{saved['episode_uuid']}/feedback",
+        headers=auth(client),
+        json={"rating": 5},
+    )
+    assert response.status_code == 422
