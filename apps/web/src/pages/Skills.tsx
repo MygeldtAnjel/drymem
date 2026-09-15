@@ -131,6 +131,7 @@ function SkillCard({
   busy,
   onEnable,
   onDeprecate,
+  onFilter,
 }: {
   skill: CatalogueSkill;
   enabledHere: boolean;
@@ -138,6 +139,7 @@ function SkillCard({
   busy: boolean;
   onEnable: (name: string) => void;
   onDeprecate: (name: string) => void;
+  onFilter: (topic: string) => void;
 }) {
   return (
     <li className="border-border bg-card hover:border-input flex min-w-0 flex-col gap-3 rounded-lg border p-4 transition-colors">
@@ -155,6 +157,25 @@ function SkillCard({
           {skill.description || skill.topic || "No description"}
         </span>
       </button>
+
+      {skill.topics.length > 0 && (
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {skill.topics.slice(0, 3).map((topic) => (
+            <button
+              key={topic}
+              className="border-border text-muted-foreground hover:border-input hover:text-foreground truncate rounded-full border px-2 py-0.5 text-[11px] transition-colors"
+              onClick={() => onFilter(topic)}
+            >
+              {topic}
+            </button>
+          ))}
+          {skill.topics.length > 3 && (
+            <span className="text-muted-foreground text-[11px]">
+              +{skill.topics.length - 3}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <SourceChip source={skill.source} />
@@ -236,7 +257,9 @@ export function SkillsPage({
   const needle = filter.trim().toLowerCase();
   const matching = needle
     ? published.filter((s) =>
-        `${s.name} ${s.description ?? ""} ${s.topic}`.toLowerCase().includes(needle),
+        `${s.name} ${s.description ?? ""} ${s.topic} ${s.topics.join(" ")}`
+          .toLowerCase()
+          .includes(needle),
       )
     : published;
 
@@ -392,7 +415,7 @@ export function SkillsPage({
                       className="pl-8"
                       value={filter}
                       onChange={(e) => setFilter(e.target.value)}
-                      placeholder="Filter by name or description"
+                      placeholder="Filter by name, description or tag"
                       aria-label="Filter the catalogue"
                     />
                   </div>
@@ -400,7 +423,7 @@ export function SkillsPage({
 
                 {matching.length === 0 ? (
                   <Blank icon={Search} title="Nothing matches">
-                    No skill here has “{filter}” in its name or description.
+                    No skill here has “{filter}” in its name, description or tags.
                   </Blank>
                 ) : (
                   <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -413,6 +436,7 @@ export function SkillsPage({
                         busy={busy}
                         onEnable={onEnable}
                         onDeprecate={onDeprecate}
+                        onFilter={setFilter}
                       />
                     ))}
                   </ul>

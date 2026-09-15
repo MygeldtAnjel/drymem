@@ -124,11 +124,6 @@ export function SkillPage({
                 {skill && <Badge variant="outline">v{skill.version}</Badge>}
                 {meta && <SourceChip source={meta.source} />}
                 {meta && <StateChip state={meta.state} />}
-                {meta?.topic && (
-                  <Badge variant="outline" className="text-muted-foreground font-normal">
-                    {meta.topic}
-                  </Badge>
-                )}
                 {enabledHere && (
                   <Badge className="bg-success/15 text-success">
                     <CheckCircle2 data-icon="inline-start" /> On this project
@@ -140,13 +135,8 @@ export function SkillPage({
                   </Badge>
                 )}
               </div>
-              {document.meta.description && (
-                <CardDescription className="mt-2 max-w-3xl text-sm leading-relaxed">
-                  {document.meta.description}
-                </CardDescription>
-              )}
-              {/* Provenance, not identity, so it reads small and last. */}
-              <div className="text-muted-foreground mt-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              {/* Provenance, not identity, so it reads small. */}
+              <div className="text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                 <span className="inline-flex items-center gap-1">
                   By <PersonChip author={author} name={meta?.author_name || versions?.[0]?.author_name} />
                 </span>
@@ -157,6 +147,25 @@ export function SkillPage({
                 {meta?.updated_at && <span aria-hidden>·</span>}
                 {meta?.updated_at && <span>updated {when(meta.updated_at)}</span>}
               </div>
+
+              {meta && meta.topics.length > 0 && (
+                <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5">
+                  {meta.topics.map((topic) => (
+                    <span
+                      key={topic}
+                      className="border-border text-muted-foreground rounded-full border px-2.5 py-0.5 text-xs"
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {document.meta.description && (
+                <CardDescription className="mt-3 max-w-3xl text-sm leading-relaxed">
+                  {document.meta.description}
+                </CardDescription>
+              )}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {enabledHere ? (

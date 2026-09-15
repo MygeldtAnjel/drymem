@@ -195,6 +195,8 @@ export interface CatalogueSkill {
   id: string;
   name: string;
   topic: string;
+  /** What it is about: `code-review`, `testing`. Derived when it is published. */
+  topics: string[];
   description: string | null;
   author: string | null;
   author_name?: string;
