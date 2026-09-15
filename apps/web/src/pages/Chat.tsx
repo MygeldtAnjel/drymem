@@ -450,13 +450,18 @@ export function ChatPage({ projectKey }: { projectKey: string }) {
 
     <Dialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
       <DialogContent>
+        {/* The title is a fixed question, not the chat's own title: a question
+            long enough to wrap ran under the close button, and ended in the
+            unreadable `?”?` whenever somebody had asked one. */}
         <DialogHeader>
-          <DialogTitle className="min-w-0 truncate">Delete “{confirm?.title}”?</DialogTitle>
+          <DialogTitle>Delete this conversation?</DialogTitle>
           <DialogDescription>
-            The whole conversation goes with it, and this cannot be undone. The memories it
-            cited are untouched.
+            It goes for good, along with every turn in it. The memories it cited are untouched.
           </DialogDescription>
         </DialogHeader>
+        <p className="border-border bg-muted/30 min-w-0 rounded-lg border p-3 text-sm">
+          <span className="line-clamp-2">{confirm?.title}</span>
+        </p>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Keep it</Button>
