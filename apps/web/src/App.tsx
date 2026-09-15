@@ -71,6 +71,12 @@ import { SearchX } from "lucide-react";
  */
 const PAGE = 25;
 
+/** The audit table is dense and read a screen at a time, so it starts smaller. */
+const AUDIT_PAGE = 20;
+
+/** Who did it and when, as the audit screen asks for it. */
+export type AuditWhere = { actor?: string; since?: string; until?: string };
+
 const TITLES: Record<string, { title: string; description?: string }> = {
   overview: {
     title: "Overview",
@@ -222,6 +228,9 @@ function Workspace({
   const [auditGroup, setAuditGroup] = useState("");
   const [auditPage, setAuditPage] = useState(1);
   const [auditTotal, setAuditTotal] = useState(0);
+  /** Who and when, held together: any change is a new first page. */
+  const [auditWhere, setAuditWhere] = useState<AuditWhere>({});
+  const [auditSize, setAuditSize] = useState(AUDIT_PAGE);
   const [auditLoading, setAuditLoading] = useState(false);
 
   const [facts, setFacts] = useState<Fact[] | null>(null);
@@ -510,11 +519,23 @@ function Workspace({
    * It is admin-only and most sessions never open it, so fetching it eagerly
    * would be one 403 per sign-in for every member of the team.
    */
-  const loadAudit = async (group: string, page = 1) => {
+  const loadAudit = async (
+    group: string,
+    page = 1,
+    where: AuditWhere = auditWhere,
+    size = auditSize,
+  ) => {
     setAuditLoading(true);
     try {
       const [body, summary] = await Promise.all([
-        api.audit({ group: group || undefined, limit: PAGE, offset: (page - 1) * PAGE }),
+        api.audit({
+          group: group || undefined,
+          actor: where.actor || undefined,
+          since: where.since || undefined,
+          until: where.until || undefined,
+          limit: size,
+          offset: (page - 1) * size,
+        }),
         // The summary describes the whole trail, so it is fetched once rather
         // than on every page turn.
         page === 1 ? api.auditSummary(30).catch(() => null) : Promise.resolve(auditSummary),
@@ -522,6 +543,8 @@ function Workspace({
       setAuditEvents(body.events);
       setAuditTotal(body.total);
       setAuditPage(page);
+      setAuditWhere(where);
+      setAuditSize(size);
       if (page === 1) setAuditSummary(summary);
     } catch (e) {
       fail(e, "Loading the audit trail");
@@ -535,6 +558,9 @@ function Workspace({
     setAuditGroup(group);
     void loadAudit(group, 1);
   };
+
+  const narrowAudit = (where: AuditWhere) => void loadAudit(auditGroup, 1, where);
+  const resizeAudit = (size: number) => void loadAudit(auditGroup, 1, auditWhere, size);
 
   useEffect(() => {
     if (route.page !== "audit") return;
@@ -759,6 +785,10 @@ function Workspace({
         auditLoading={auditLoading}
         auditPage={auditPage}
         auditTotal={auditTotal}
+        auditWhere={auditWhere}
+        auditSize={auditSize}
+        onAuditWhere={narrowAudit}
+        onAuditSize={resizeAudit}
         onAuditGroup={chooseAuditGroup}
         onAuditPage={(p: number) => void loadAudit(auditGroup, p)}
         clusters={clusters}
@@ -839,6 +869,10 @@ function Screen(props: {
   auditLoading: boolean;
   auditPage: number;
   auditTotal: number;
+  auditWhere: AuditWhere;
+  auditSize: number;
+  onAuditWhere: (where: AuditWhere) => void;
+  onAuditSize: (size: number) => void;
   onAuditGroup: (group: string) => void;
   onAuditPage: (page: number) => void;
   clusters: Cluster[];
@@ -1014,7 +1048,11 @@ function Screen(props: {
           group={props.auditGroup}
           page={props.auditPage}
           total={props.auditTotal}
-          perPage={PAGE}
+          perPage={props.auditSize}
+          where={props.auditWhere}
+          people={props.people}
+          onWhere={props.onAuditWhere}
+          onPerPage={props.onAuditSize}
           onGroup={props.onAuditGroup}
           onPage={props.onAuditPage}
         />

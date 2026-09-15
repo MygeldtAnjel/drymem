@@ -38,6 +38,7 @@ export function Pager({
   busy,
   onPage,
   onPerPage,
+  sizes = PER_PAGE,
 }: {
   /** One-based, because that is what the buttons say. */
   page: number;
@@ -46,6 +47,8 @@ export function Pager({
   busy?: boolean;
   onPage: (page: number) => void;
   onPerPage?: (perPage: number) => void;
+  /** Override when a screen wants a different set, like a dense audit table. */
+  sizes?: number[];
 }) {
   const pages = Math.max(1, Math.ceil(total / perPage));
   if (total === 0) return null;
@@ -81,7 +84,7 @@ export function Pager({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PER_PAGE.map((n) => (
+                {sizes.map((n) => (
                   <SelectItem key={n} value={String(n)}>
                     {n} per page
                   </SelectItem>

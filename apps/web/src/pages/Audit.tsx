@@ -18,8 +18,21 @@ import { Pager } from "@/components/Pager";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { AuditEvent, AuditSummary } from "@/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { AuditEvent, AuditSummary, Person } from "@/api";
+import type { AuditWhere } from "@/App";
 import { count, relative, when } from "@/format";
+
+/** A dense table read a screen at a time, so the steps are smaller. */
+const AUDIT_SIZES = [10, 20, 50];
 
 const GROUPS = [
   { key: "", label: "Everything" },
@@ -143,6 +156,10 @@ export function AuditPage({
   page,
   total,
   perPage,
+  where,
+  people,
+  onWhere,
+  onPerPage,
 }: {
   events: AuditEvent[];
   summary: AuditSummary | null;
@@ -154,6 +171,11 @@ export function AuditPage({
   page: number;
   total: number;
   perPage: number;
+  where: AuditWhere;
+  /** Everyone in the org, so "who" is a list rather than a typed address. */
+  people: Person[];
+  onWhere: (where: AuditWhere) => void;
+  onPerPage: (size: number) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -188,6 +210,64 @@ export function AuditPage({
               </TabsList>
             </div>
           </Tabs>
+
+          {/*
+            Who and when, which is how anybody actually reads an audit trail:
+            not "show me everything", but "what did she change on the 12th".
+            Both were already in the API and neither was on the screen.
+          */}
+          <div className="flex min-w-0 flex-wrap items-end gap-3">
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-muted-foreground text-xs">Who</span>
+              <Select
+                value={where.actor || "all"}
+                onValueChange={(v) => onWhere({ ...where, actor: v === "all" ? undefined : v })}
+                disabled={busy}
+              >
+                <SelectTrigger size="sm" className="w-52" aria-label="Filter by person">
+                  <SelectValue placeholder="Anyone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Anyone</SelectItem>
+                  {people.map((person) => (
+                    <SelectItem key={person.id} value={person.email}>
+                      {person.name || person.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground text-xs">From</span>
+              <Input
+                type="date"
+                className="h-8 w-40"
+                value={where.since ?? ""}
+                max={where.until || undefined}
+                disabled={busy}
+                onChange={(e) => onWhere({ ...where, since: e.target.value || undefined })}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground text-xs">To</span>
+              <Input
+                type="date"
+                className="h-8 w-40"
+                value={where.until ?? ""}
+                min={where.since || undefined}
+                disabled={busy}
+                onChange={(e) => onWhere({ ...where, until: e.target.value || undefined })}
+              />
+            </label>
+
+            {(where.actor || where.since || where.until) && (
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => onWhere({})}>
+                Clear
+              </Button>
+            )}
+          </div>
         </CardHeader>
 
         <CardContent className="min-w-0">
@@ -195,8 +275,12 @@ export function AuditPage({
             <RowsSkeleton rows={6} />
           ) : events.length === 0 ? (
             <Blank icon={ScrollText} title="Nothing here">
-              {group
-                ? "No events of this kind yet. Try another filter."
+              {/* An empty window is not an empty trail. Saying "the trail
+                  starts the first time somebody changes something" to an admin
+                  who has just narrowed to one day reads as "nothing was ever
+                  recorded", which is the opposite of true. */}
+              {group || where.actor || where.since || where.until
+                ? "Nothing matches these filters. Widen them, or clear them to see everything."
                 : "The trail starts the first time somebody changes something."}
             </Blank>
           ) : (
@@ -247,7 +331,15 @@ export function AuditPage({
 
               {/* Numbered, like the memories archive: an admin looking into
                   something comes back to it and should land on the same page. */}
-              <Pager page={page} total={total} perPage={perPage} busy={busy} onPage={onPage} />
+              <Pager
+                page={page}
+                total={total}
+                perPage={perPage}
+                busy={busy}
+                onPage={onPage}
+                onPerPage={onPerPage}
+                sizes={AUDIT_SIZES}
+              />
             </>
           )}
         </CardContent>

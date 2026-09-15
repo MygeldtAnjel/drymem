@@ -632,10 +632,22 @@ export const api = {
 
   /** Admins only; a member gets a 403 and the screen is not offered to them. */
   /** One numbered page of the trail, with a total counted under the same filter. */
-  audit: (options: { group?: string; offset?: number; limit?: number } = {}) => {
+  audit: (
+    options: {
+      group?: string;
+      actor?: string;
+      since?: string;
+      until?: string;
+      offset?: number;
+      limit?: number;
+    } = {},
+  ) => {
     const query = new URLSearchParams();
     if (options.group) query.set("group", options.group);
-    query.set("limit", String(options.limit ?? 25));
+    if (options.actor) query.set("actor", options.actor);
+    if (options.since) query.set("since", options.since);
+    if (options.until) query.set("until", options.until);
+    query.set("limit", String(options.limit ?? 20));
     query.set("offset", String(options.offset ?? 0));
     return request<{ events: AuditEvent[]; total: number }>(`/v1/audit?${query}`);
   },
