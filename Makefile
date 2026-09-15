@@ -1,7 +1,7 @@
 # One command per task, so two package managers never become two workflows.
 SERVER := apps/server
 
-.PHONY: help dev test types build fmt migrate up db-up db-down
+.PHONY: help dev test types build eval fmt migrate up db-up db-down
 help:
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
 
@@ -33,6 +33,11 @@ types:              ## Regenerate packages/api-types from the engine's OpenAPI s
 	@pnpm --filter @drymem/api-types run generate
 	@git diff --quiet packages/api-types || \
 	  (echo "api-types changed — commit the regenerated schema"; exit 1)
+
+eval:               ## Grade the answers: run real questions against the real model
+	@DRYMEM_TOKEN="$$(node apps/cli/dist/cli.js token)" \
+	 DRYMEM_PROJECT="$$(node apps/cli/dist/cli.js whoami | head -1 | cut -d' ' -f2)" \
+	 uv --directory $(SERVER) run python scripts/eval_ask.py $(if $(CASE),--case $(CASE),)
 
 build:              ## Bundle the CLI (base skills included)
 	pnpm --filter drymem run build
