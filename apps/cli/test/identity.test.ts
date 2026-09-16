@@ -131,19 +131,34 @@ describe("resolveAuthor", () => {
 });
 
 describe("scoped groups — shared fixture", () => {
-  for (const { key, userId, team, private: priv } of fixtures.scopes) {
-    it(`${key} -> ${team} / ${priv}`, () => {
-      expect(groupIdTeam(key)).toBe(team);
-      expect(groupIdPrivate(key, userId)).toBe(priv);
+  for (const { key, userId, orgId, team, private: priv } of fixtures.scopes) {
+    it(`${orgId.slice(0, 8)} ${key} -> ${team} / ${priv}`, () => {
+      expect(groupIdTeam(orgId, key)).toBe(team);
+      expect(groupIdPrivate(orgId, key, userId)).toBe(priv);
     });
   }
 
-  it("team and private never collide", () => {
+  it("never gives two organisations the same group for one project key", () => {
+    // The property the fixture exists to pin. Two orgs can both track the same
+    // git remote; keyed on the remote alone they shared a Neo4j group.
     const key = "github.com/acme/payments";
-    expect(groupIdTeam(key)).not.toBe(groupIdPrivate(key, "aaaaaaaa-1111"));
+    const user = "aaaaaaaa-1111-2222-3333-444444444444";
+    const a = "1a2b3c4d-0000-0000-0000-000000000000";
+    const b = "9f8e7d6c-0000-0000-0000-000000000000";
+    expect(groupIdTeam(a, key)).not.toBe(groupIdTeam(b, key));
+    expect(groupIdPrivate(a, key, user)).not.toBe(groupIdPrivate(b, key, user));
+  });
+
+  it("team and private never collide", () => {
+    const org = "1a2b3c4d-0000-0000-0000-000000000000";
+    const key = "github.com/acme/payments";
+    expect(groupIdTeam(org, key)).not.toBe(groupIdPrivate(org, key, "aaaaaaaa-1111"));
   });
 
   it("two users get different groups", () => {
-    expect(groupIdPrivate("k", "aaaaaaaa-1111")).not.toBe(groupIdPrivate("k", "bbbbbbbb-2222"));
+    const org = "1a2b3c4d-0000-0000-0000-000000000000";
+    expect(groupIdPrivate(org, "k", "aaaaaaaa-1111")).not.toBe(
+      groupIdPrivate(org, "k", "bbbbbbbb-2222"),
+    );
   });
 });
