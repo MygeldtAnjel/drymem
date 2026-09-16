@@ -20,6 +20,9 @@ test:               ## Every suite: engine, control plane, cli, web
 	pnpm --filter drymem run test
 	pnpm --filter @drymem/web run test
 
+test-e2e:           ## The suites that need real Neo4j and Ollama, not the doubles
+	@DRYMEM_E2E=1 uv --directory $(SERVER) run pytest -m e2e
+
 migrate:            ## Apply the schema. Alembic is the single authority.
 	cd $(SERVER) && .venv/bin/alembic upgrade head
 
