@@ -210,6 +210,22 @@ class MemoryService:
         if not self.principal.is_admin:
             raise Forbidden("Only an organisation admin can do that.")
 
+    async def done(self) -> None:
+        """End the unit of work here, before the response goes out.
+
+        `get_session` commits after its `yield`, and FastAPI runs that teardown
+        once the response has been sent — measured at about 40ms late. Any
+        client that acts on the reply immediately can read a database that does
+        not have the row yet, and this product's clients do exactly that: save
+        then share, share then list. It showed up as a memory refusing to be
+        promoted seconds after it was written, a shared memory missing from a
+        teammate's list, and a project absent from the project list that had
+        just created it — all intermittent, all the same 40ms.
+
+        An API must not answer "done" before the write is visible.
+        """
+        await self.session.commit()
+
     def audit(self, action: str, target: str) -> None:
         self.session.add(
             AuditLog(
@@ -309,7 +325,7 @@ class MemoryService:
             session_id=session_id or None,
         )
         self.session.add(row)
-        await self.session.flush()
+        await self.done()
 
         return SavedMemory(
             row=row,
@@ -704,7 +720,7 @@ class MemoryService:
             if other and other != episode_uuid:
                 await self.store.delete(other)
         await self.session.delete(row)
-        await self.session.flush()
+        await self.done()
         return True
 
     async def promote(self, *, episode_uuid: str) -> Memory | None:
@@ -756,7 +772,7 @@ class MemoryService:
         memory.promoted_at = datetime.now(UTC)
         memory.promoted_by = self.principal.user_id
         self.audit("memory.promote", episode_uuid)
-        await self.session.flush()
+        await self.done()
         return memory
 
     async def _episode_eventually(self, episode_uuid: str) -> Episode | None:
@@ -822,7 +838,7 @@ class MemoryService:
                     query=query,
                 )
             )
-        await self.session.flush()
+        await self.done()
         return True
 
     async def members(self, *, project_key: str) -> list[tuple[User, str]] | None:
@@ -1278,7 +1294,7 @@ class MemoryService:
 
         member.role = role
         self.audit("project.set_role", f"{project_key}:{email}:{role}")
-        await self.session.flush()
+        await self.done()
         return await self.members(project_key=project_key)
 
     async def remove_member(self, *, project_key: str, email: str) -> list[tuple[User, str]] | None:
@@ -1310,7 +1326,7 @@ class MemoryService:
 
         await self.session.delete(member)
         self.audit("project.remove_member", f"{project_key}:{email}")
-        await self.session.flush()
+        await self.done()
         return await self.members(project_key=project_key)
 
     async def overview(self, *, project_key: str) -> Overview | None:
@@ -1469,7 +1485,7 @@ class MemoryService:
             return False
         await self.session.delete(skill)
         self.audit("skill.delete", f"{project_key}:{name}")
-        await self.session.flush()
+        await self.done()
         return True
 
     @staticmethod
