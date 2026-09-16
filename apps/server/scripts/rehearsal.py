@@ -19,11 +19,19 @@ and says which person saw what they should not have.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
+
+# Built once by `make build`; the rehearsal drives the same bundle a user runs.
+CLI = Path(__file__).resolve().parents[3] / "apps" / "cli" / "dist" / "cli.js"
 
 BASE = "http://127.0.0.1:8081"
 PROJECT = "github.com/acme/payments"
@@ -97,6 +105,25 @@ def must(status: int, body: dict, what: str, expected: int = 200) -> dict:
         print(f"\n{what} failed: {status} {body}", file=sys.stderr)
         raise SystemExit(1)
     return body
+
+
+def run_git(cwd: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
+
+
+def cli(cwd: Path, env: dict, *args: str) -> tuple[int, str]:
+    """The real bundled CLI, against the rehearsal server."""
+    done = subprocess.run(
+        ["node", str(CLI), *args],
+        cwd=str(cwd),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        # The exit code is the thing being checked, so a failure is data here.
+        check=False,
+    )
+    return done.returncode, done.stdout + done.stderr
 
 
 def check(what: str, condition: bool, detail: str = "") -> None:
@@ -295,7 +322,46 @@ def main() -> int:
         not any(s["name"] == "payments-testing" for s in there.get("skills", [])),
     )
 
-    step("10. The trail says who did what")
+    step("10. The CLI, on a machine that has just cloned the repo")
+    # Everything above went over HTTP, which is the browser's path. This is the
+    # agent's: a token, a checkout, and the skills landing on disk where Claude
+    # Code will read them.
+    token = must(*ana.post("/auth/tokens", {"label": "rehearsal"}), "minting a token")["token"]
+    checkout = Path(tempfile.mkdtemp(prefix="drymem-rehearsal-"))
+    run_git(checkout, "init", "-q")
+    run_git(checkout, "remote", "add", "origin", f"https://{PROJECT}.git")
+
+    env = {
+        **os.environ,
+        "DRYMEM_SERVER_URL": BASE,
+        "DRYMEM_TOKEN": token,
+        # A platform has to be detected before skills have anywhere to land.
+        "HOME": str(checkout),
+    }
+    (checkout / ".claude").mkdir(exist_ok=True)
+
+    code, out = cli(checkout, env, "whoami")
+    check("the CLI resolves the project from the git remote", PROJECT in out, out.strip()[:160])
+
+    code, out = cli(checkout, env, "skills", "pull")
+    check("`skills pull` succeeds", code == 0, out.strip()[:200])
+    landed = list(checkout.glob(".claude/skills/*/SKILL.md"))
+    check(
+        "the skill is on disk where the agent reads it",
+        any("payments-testing" in str(p) for p in landed),
+        f"found {[str(p.relative_to(checkout)) for p in landed]}",
+    )
+    lock = checkout / ".drymem" / "skills.lock"
+    check("and the lockfile records it, so a teammate gets the same", lock.exists())
+    if lock.exists():
+        check("by name and digest", "payments-testing" in lock.read_text())
+
+    code, out = cli(checkout, env, "context", "5")
+    check("the CLI reads the team's memories", "Adyen" in out, out.strip()[:160])
+
+    shutil.rmtree(checkout, ignore_errors=True)
+
+    step("11. The trail says who did what")
     _, trail = miguel.get("/v1/audit?limit=200")
     actions = {e["action"] for e in trail.get("events", [])}
     check("the audit recorded the invitations", "member.invite" in actions, str(sorted(actions)))
