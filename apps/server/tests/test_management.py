@@ -547,3 +547,18 @@ async def test_a_rating_outside_the_three_is_refused(client):
         json={"rating": 5},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_an_old_memory_can_still_be_shared(client):
+    """Promotion used to scan the author's 200 most recent episodes for the
+    uuid it already had, so the 201st memory could never be shared."""
+    first = await save(client, topic="old/first", session_id="s-window")
+    for i in range(205):
+        await save(client, topic=f"old/filler-{i}", session_id="s-window")
+
+    response = await client.post(
+        f"/v1/memories/{first['episode_uuid']}/promote", headers=auth(client)
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["scope"] == "team"

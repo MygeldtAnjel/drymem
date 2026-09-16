@@ -8,6 +8,7 @@ the index, so the index never points at an episode that does not exist.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -37,6 +38,12 @@ from drymem_server.settings import settings
 logger = logging.getLogger(__name__)
 
 _TITLE_LIMIT = 500
+
+# How long promotion waits for a just-written episode to become readable.
+# Roughly 1.5s in total, which a person clicking "share" does not notice and an
+# eventually consistent graph usually needs far less of.
+PROMOTE_ATTEMPTS = 5
+PROMOTE_BACKOFF = 0.1
 
 
 def denylist() -> list[str]:
@@ -520,25 +527,39 @@ class MemoryService:
         if not memories:
             return [], int(total or 0)
 
-        # The team copy when there is one: it is the version marked shared, and
-        # "shared" is the more useful of the two things to be told.
-        wanted = [m.team_episode_uuid or m.episode_uuid for m in memories]
+        # Both uuids are asked for, and the team copy is preferred when it comes
+        # back.
+        #
+        # Promotion writes a second episode into the team group, and that write
+        # is not instantly visible to the next read — a rehearsal caught a
+        # memory vanishing from a teammate's list for a moment right after it
+        # was shared, because only the team uuid was requested and a missing
+        # body dropped the row silently. The private original is always there,
+        # and its text is the same text.
+        wanted = [m.episode_uuid for m in memories] + [
+            m.team_episode_uuid for m in memories if m.team_episode_uuid
+        ]
         bodies = await self.store.by_uuids(uuids=wanted)
 
         scores = await self._ratings_for([m.id for m in memories])
-        entries = [
-            Entry(
-                episode=bodies[uuid],
-                title=memory.title,
-                memory_type=memory.memory_type,
-                session_id=memory.session_id or "",
-                topic_key=memory.topic_key or "",
-                promoted_at=memory.promoted_at,
-                rating=scores.get(memory.id, 0),
+        entries = []
+        for memory in memories:
+            episode = bodies.get(memory.team_episode_uuid or "") or bodies.get(
+                memory.episode_uuid
             )
-            for memory, uuid in zip(memories, wanted, strict=True)
-            if uuid in bodies
-        ]
+            if episode is None:
+                continue
+            entries.append(
+                Entry(
+                    episode=episode,
+                    title=memory.title,
+                    memory_type=memory.memory_type,
+                    session_id=memory.session_id or "",
+                    topic_key=memory.topic_key or "",
+                    promoted_at=memory.promoted_at,
+                    rating=scores.get(memory.id, 0),
+                )
+            )
         return entries, int(total or 0)
 
     async def _ratings_for(self, memory_ids: list) -> dict:
@@ -712,10 +733,7 @@ class MemoryService:
         if project is None:
             return None
 
-        episodes = await self.store.recent(
-            group_ids=[self.private_group(project.project_key)], limit=200
-        )
-        original = next((e for e in episodes if e.uuid == episode_uuid), None)
+        original = await self._episode_eventually(episode_uuid)
         if original is None:
             return None
 
@@ -740,6 +758,31 @@ class MemoryService:
         self.audit("memory.promote", episode_uuid)
         await self.session.flush()
         return memory
+
+    async def _episode_eventually(self, episode_uuid: str) -> Episode | None:
+        """One episode, allowing for the graph not having caught up yet.
+
+        Two bugs met here. Promotion used to pull the author's 200 most recent
+        episodes and scan them for the uuid it already had, so anyone with more
+        than 200 private memories could never share an older one — that one is
+        gone with the direct lookup.
+
+        The second is why this retries. A write to Graphiti is not visible to
+        the next read, and the rehearsal caught it: share a memory seconds after
+        writing it and promotion returned "no such memory", intermittently, for
+        a memory plainly in the database. Waiting a moment is the honest fix for
+        an eventually consistent store; the bound means a genuinely missing
+        episode still fails rather than hanging.
+        """
+        for attempt in range(PROMOTE_ATTEMPTS):
+            found = await self.store.by_uuids(uuids=[episode_uuid])
+            episode = found.get(episode_uuid)
+            if episode is not None:
+                return episode
+            if attempt + 1 < PROMOTE_ATTEMPTS:
+                await asyncio.sleep(PROMOTE_BACKOFF * (attempt + 1))
+        logger.warning("episode %s never became readable", episode_uuid)
+        return None
 
     async def rate(self, *, episode_uuid: str, rating: int, query: str) -> bool:
         """Record a thumb on a memory. Changing your mind replaces the rating.
