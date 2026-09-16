@@ -91,20 +91,37 @@
     {
       "key": "github.com/acme/drymem",
       "userId": "1fe1c7cf-1e51-47ef-bc88-d1e8c23faff7",
-      "team": "github-com-acme-drymem-team",
-      "private": "github-com-acme-drymem-u-1fe1c7cf"
+      "team": "1a2b3c4d-github-com-acme-drymem-team",
+      "private": "1a2b3c4d-github-com-acme-drymem-u-1fe1c7cf",
+      "orgId": "1a2b3c4d-0000-0000-0000-000000000000"
     },
     {
       "key": "github.com/acme/drymem",
       "userId": "aaaaaaaa-0000-0000-0000-000000000000",
-      "team": "github-com-acme-drymem-team",
-      "private": "github-com-acme-drymem-u-aaaaaaaa"
+      "team": "1a2b3c4d-github-com-acme-drymem-team",
+      "private": "1a2b3c4d-github-com-acme-drymem-u-aaaaaaaa",
+      "orgId": "1a2b3c4d-0000-0000-0000-000000000000"
     },
     {
       "key": "local/api-1a2b3c4d",
       "userId": "beefcafe-1111-2222-3333-444444444444",
-      "team": "local-api-1a2b3c4d-team",
-      "private": "local-api-1a2b3c4d-u-beefcafe"
+      "team": "1a2b3c4d-local-api-1a2b3c4d-team",
+      "private": "1a2b3c4d-local-api-1a2b3c4d-u-beefcafe",
+      "orgId": "1a2b3c4d-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "github.com/acme/drymem",
+      "userId": "1fe1c7cf-1e51-47ef-bc88-d1e8c23faff7",
+      "orgId": "1a2b3c4d-0000-0000-0000-000000000000",
+      "team": "1a2b3c4d-github-com-acme-drymem-team",
+      "private": "1a2b3c4d-github-com-acme-drymem-u-1fe1c7cf"
+    },
+    {
+      "key": "github.com/acme/drymem",
+      "userId": "1fe1c7cf-1e51-47ef-bc88-d1e8c23faff7",
+      "orgId": "9f8e7d6c-0000-0000-0000-000000000000",
+      "team": "9f8e7d6c-github-com-acme-drymem-team",
+      "private": "9f8e7d6c-github-com-acme-drymem-u-1fe1c7cf"
     }
   ]
 }

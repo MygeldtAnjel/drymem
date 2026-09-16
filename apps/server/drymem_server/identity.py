@@ -145,20 +145,38 @@ def group_id_for(cwd: str | Path) -> str:
     return sanitize_group_id(resolve_project_key(cwd))
 
 
-def group_id_team(project_key: str) -> str:
-    """Where promoted memories live. Every project member reads this."""
-    return sanitize_group_id(f"{project_key}/team")
+def _short(value: object) -> str:
+    """Eight hex of a uuid.
+
+    Not the whole thing: a full uuid pushes the id past the 60-char cap into the
+    hash branch, which is deterministic but unreadable for anyone debugging
+    against Neo4j directly. Eight hex is 4 billion values.
+    """
+    return str(value).replace("-", "")[:8]
 
 
-def group_id_private(project_key: str, user_id: object) -> str:
+def group_id_team(org_id: object, project_key: str) -> str:
+    """Where promoted memories live. Every project member reads this.
+
+    **Scoped by organisation, not by project key alone.** A project key is a git
+    remote, and two organisations can perfectly well both track
+    `github.com/acme/payments` — one forked it, the other depends on it. Keyed
+    on the project alone they shared a Neo4j group, and a member of the second
+    org read the first org's shared memories through their own project. The
+    control plane's `org_id` check passed the whole way, because both callers
+    were legitimately members of *a* project with that key.
+    """
+    return sanitize_group_id(f"{_short(org_id)}/{project_key}/team")
+
+
+def group_id_private(org_id: object, project_key: str, user_id: object) -> str:
     """Where one person's unshared memories live.
 
-    Eight hex of the user's uuid, not the whole thing: a full uuid pushes the id
-    past the 60-char cap into the hash branch, which is deterministic but
-    unreadable for anyone debugging against Neo4j directly. Eight hex is 4
-    billion values inside a single project.
+    The user id already makes this unique across organisations; the org is here
+    so both group ids are built the same way and neither can be derived without
+    knowing which tenant is asking.
     """
-    return sanitize_group_id(f"{project_key}/u/{str(user_id).replace('-', '')[:8]}")
+    return sanitize_group_id(f"{_short(org_id)}/{project_key}/u/{_short(user_id)}")
 
 
 def resolve_author(cwd: str | Path) -> str:

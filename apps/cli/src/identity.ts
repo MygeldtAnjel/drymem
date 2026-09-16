@@ -149,20 +149,32 @@ export function groupIdFor(cwd: string): string {
   return sanitizeGroupId(resolveProjectKey(cwd));
 }
 
-/** Where promoted memories live. Every project member reads this. */
-export function groupIdTeam(projectKey: string): string {
-  return sanitizeGroupId(`${projectKey}/team`);
+/**
+ * Eight hex of a uuid.
+ *
+ * Not the whole thing: a full uuid pushes the id past the 60-char cap into the
+ * hash branch, which is deterministic but unreadable for anyone debugging
+ * against Neo4j directly.
+ */
+function short(value: string): string {
+  return value.replace(/-/g, "").slice(0, 8);
 }
 
 /**
- * Where one person's unshared memories live.
+ * Where promoted memories live. Every project member reads this.
  *
- * Eight hex of the user's uuid, not the whole thing: a full uuid pushes the id
- * past the 60-char cap into the hash branch, which is deterministic but
- * unreadable for anyone debugging against Neo4j directly.
+ * **Scoped by organisation, not by project key alone.** A project key is a git
+ * remote, and two organisations can both track `github.com/acme/payments`.
+ * Keyed on the project alone they shared a Neo4j group, and a member of one
+ * read the other's shared memories.
  */
-export function groupIdPrivate(projectKey: string, userId: string): string {
-  return sanitizeGroupId(`${projectKey}/u/${userId.replace(/-/g, "").slice(0, 8)}`);
+export function groupIdTeam(orgId: string, projectKey: string): string {
+  return sanitizeGroupId(`${short(orgId)}/${projectKey}/team`);
+}
+
+/** Where one person's unshared memories live. */
+export function groupIdPrivate(orgId: string, projectKey: string, userId: string): string {
+  return sanitizeGroupId(`${short(orgId)}/${projectKey}/u/${short(userId)}`);
 }
 
 /** Who is saving this memory. Their git identity, or a machine-local one. */

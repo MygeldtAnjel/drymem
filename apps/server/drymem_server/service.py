@@ -157,7 +157,7 @@ class MemoryService:
 
     def private_group(self, project_key: str) -> str:
         """Where this caller's own memories go. Writes only ever land here."""
-        return group_id_private(project_key, self.principal.user_id)
+        return group_id_private(self.principal.org_id, project_key, self.principal.user_id)
 
     async def readable_groups(self, project_key: str) -> list[str]:
         """What this caller may read: the team's group and their own.
@@ -174,7 +174,10 @@ class MemoryService:
         joins they stop being read, which is what makes `migrate-scopes` a
         visible step rather than a silent leak.
         """
-        groups = [group_id_team(project_key), self.private_group(project_key)]
+        groups = [
+            group_id_team(self.principal.org_id, project_key),
+            self.private_group(project_key),
+        ]
         if await self._is_sole_member(project_key):
             groups.append(sanitize_group_id(project_key))
         return groups
@@ -719,7 +722,7 @@ class MemoryService:
         copy = await self.store.save(
             name=original.name,
             body=original.content,
-            group_id=group_id_team(project.project_key),
+            group_id=group_id_team(self.principal.org_id, project.project_key),
             metadata=Metadata(
                 project_key=project.project_key,
                 author=self.principal.email,
