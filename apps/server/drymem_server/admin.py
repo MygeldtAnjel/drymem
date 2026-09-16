@@ -374,6 +374,57 @@ async def user_delete(email: str) -> int:
     return 0
 
 
+async def org_create(name: str, owner_email: str, owner_name: str | None) -> int:
+    """Put a second organisation on this server.
+
+    There was no way to. `POST /auth/signup` refuses once the server has an
+    organisation — deliberately, because drymem is invitation-only after the
+    first account — and nothing else created one. A self-hosted install has
+    exactly one company on it and that is correct; a hosted one could not
+    onboard a second customer at all.
+
+    The owner is created **without a password**, which the schema already allows,
+    and sets their own through the existing forgot-password flow. An operator
+    provisioning an account should never choose, see or transmit a password.
+
+    Idempotent on the slug: running it twice does not make a second Acme.
+    """
+    from drymem_server.db.models import ORG_OWNER
+
+    email = owner_email.strip().lower()
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        org = await _org(session, name)
+
+        existing = (
+            await session.execute(select(User).where(User.email == email))
+        ).scalar_one_or_none()
+        if existing is not None:
+            if existing.org_id != org.id:
+                print(
+                    f"{email} already belongs to another organisation.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(f"{name} already exists, owned by {email}.")
+            return 0
+
+        session.add(
+            User(
+                org_id=org.id,
+                email=email,
+                name=(owner_name or "").strip() or None,
+                role=ORG_OWNER,
+                password_hash=None,
+            )
+        )
+        await session.commit()
+
+    print(f"Created {name!r} with owner {email}.")
+    print("They set their password with 'Forgot password' on the sign-in page.")
+    return 0
+
+
 async def migrate_orgs() -> int:
     """Move every memory into a group id that includes its organisation.
 
@@ -516,6 +567,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
+    p = sub.add_parser("org-create", help="Add an organisation and its owner")
+    p.add_argument("name", help="The organisation's display name")
+    p.add_argument("--owner", required=True, help="Email of the person who will own it")
+    p.add_argument("--owner-name", default=None, help="Their display name, optional")
+
     p = sub.add_parser("user-rename", help="Change a user's email, in both stores")
     p.add_argument("old")
     p.add_argument("new")
@@ -539,6 +595,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--days", type=int, default=14)
 
     args = parser.parse_args(argv)
+    if args.command == "org-create":
+        return asyncio.run(org_create(args.name, args.owner, args.owner_name))
     if args.command == "user-rename":
         return asyncio.run(user_rename(args.old, args.new))
     if args.command == "user-delete":
