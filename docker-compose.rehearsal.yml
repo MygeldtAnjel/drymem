@@ -1,0 +1,100 @@
+# A second, throwaway drymem, for rehearsing what a team actually does with it.
+#
+# Every port, volume and container name differs from `docker-compose.yml`, so
+# this can run beside a working instance without touching a single byte of it.
+# `make rehearsal` brings it up, drives a team through it, and tears it down.
+#
+# Run it with an explicit project name so the volumes are namespaced too:
+#   docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml up -d
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: rehearsal-neo4j
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    environment:
+      NEO4J_AUTH: neo4j/rehearsal_pass
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512M
+    volumes:
+      - rehearsal_neo4j_data:/data
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: rehearsal-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: drymem
+      POSTGRES_PASSWORD: rehearsal_pass
+      POSTGRES_DB: drymem
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drymem"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - rehearsal_pg_data:/var/lib/postgresql/data
+
+  engine:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: rehearsal-engine
+    # Postgres is healthy from inside its container before its published port
+    # is reachable from the host, and these two talk through that port. Without
+    # a restart the engine loses the race and the whole stack fails to start.
+    restart: on-failure
+    # Host networking for the same reason the real stack uses it: Ollama
+    # listens on the host's loopback only.
+    network_mode: host
+    environment:
+      DRYMEM_BIND: 127.0.0.1
+      DRYMEM_PORT: 8091
+      SERVICE_SECRET: rehearsal-secret-at-least-sixteen
+      DATABASE_URL: postgresql+asyncpg://drymem:rehearsal_pass@localhost:5433/drymem
+      NEO4J_URI: bolt://localhost:7688
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: rehearsal_pass
+      DRYMEM_EXTRACTOR: ${DRYMEM_EXTRACTOR:-ollama}
+      LOCAL_LLM_URL: ${LOCAL_LLM_URL:-http://localhost:11434/v1}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen3.6:35b-a3b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: rehearsal-api
+    restart: on-failure
+    network_mode: host
+    environment:
+      BIND: 127.0.0.1
+      PORT: 8081
+      DATABASE_URL: postgres://drymem:rehearsal_pass@localhost:5433/drymem
+      MEMORY_URL: http://127.0.0.1:8091
+      SERVICE_SECRET: rehearsal-secret-at-least-sixteen
+      PUBLIC_URL: http://127.0.0.1:8081
+      COOKIE_SECURE: "false"
+      # No Resend key: invitations come back in the response instead of being
+      # emailed, which is what the rehearsal needs and what a laptop can do.
+      RESEND_API_KEY: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      engine:
+        condition: service_healthy
+
+volumes:
+  rehearsal_neo4j_data:
+  rehearsal_pg_data:

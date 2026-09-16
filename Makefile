@@ -23,6 +23,12 @@ test:               ## Every suite: engine, control plane, cli, web
 test-e2e:           ## The suites that need real Neo4j and Ollama, not the doubles
 	@DRYMEM_E2E=1 uv --directory $(SERVER) run pytest -m e2e
 
+rehearsal:          ## A team using drymem on a throwaway stack, start to finish
+	@docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml up -d --build
+	@uv --directory $(SERVER) run python scripts/rehearsal.py; status=$$?; \
+	  docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v; \
+	  exit $$status
+
 migrate:            ## Apply the schema. Alembic is the single authority.
 	cd $(SERVER) && .venv/bin/alembic upgrade head
 
