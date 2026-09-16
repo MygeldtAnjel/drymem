@@ -29,6 +29,9 @@ rehearsal:          ## A team using drymem on a throwaway stack, start to finish
 	  docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v; \
 	  exit $$status
 
+backup:             ## Dump both databases (stops the stack for a moment)
+	@scripts/backup.sh dump backups/
+
 migrate:            ## Apply the schema. Alembic is the single authority.
 	cd $(SERVER) && .venv/bin/alembic upgrade head
 

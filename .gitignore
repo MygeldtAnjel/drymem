@@ -27,3 +27,4 @@ apps/api/dist/
 
 # Review captures are regenerated; the design records are not
 .impeccable/review/
+backups/
