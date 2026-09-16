@@ -65,7 +65,20 @@ async def test_metadata_survives_the_round_trip(store, group_id):
 
 
 async def test_a_later_memory_supersedes_a_contradicting_earlier_one(store, group_id):
-    """The whole reason we pay for Graphiti instead of using full-text search."""
+    """The whole reason we pay for Graphiti instead of using full-text search.
+
+    **Expect this one to flake.** It asserts that a local 35B model noticed a
+    contradiction and invalidated the older fact, which is model behaviour, not
+    ours — measured at roughly one failure in six runs, and only when the whole
+    `-m e2e` set runs in one process, which is several minutes of sustained
+    extraction. Observed failure: the live facts still named Adyen after Stripe
+    replaced it.
+
+    Left strict on purpose. Loosening it to accept either answer would delete
+    the only check on the product's central claim. A red here means "re-run and
+    look", not "the graph is broken" — and a *repeatable* red is worth chasing,
+    because it would mean the extractor stopped reasoning about time.
+    """
     await store.save(
         name="payments/provider",
         body="The payments module authorises card charges through Adyen.",
