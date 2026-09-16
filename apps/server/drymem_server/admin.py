@@ -147,6 +147,7 @@ async def migrate_scopes(project_key: str) -> int:
             )
         ).all()
         owner = {uuid: author for uuid, author in rows}
+        org_id = project.org_id
 
     driver = AsyncGraphDatabase.driver(
         os.getenv("NEO4J_URI", settings.neo4j_uri),
@@ -165,7 +166,7 @@ async def migrate_scopes(project_key: str) -> int:
                 if author is None:
                     orphaned += 1
                     continue
-                target = group_id_private(project_key, author)
+                target = group_id_private(org_id, project_key, author)
                 await neo.run(
                     "MATCH (n) WHERE n.group_id = $old AND n.uuid = $uuid SET n.group_id = $new",
                     old=legacy,
@@ -179,7 +180,7 @@ async def migrate_scopes(project_key: str) -> int:
             # several they are left alone rather than guessed at.
             authors = {owner[u] for u in uuids if u in owner}
             if len(authors) == 1:
-                target = group_id_private(project_key, next(iter(authors)))
+                target = group_id_private(org_id, project_key, next(iter(authors)))
                 await neo.run(
                     "MATCH (n) WHERE n.group_id = $old SET n.group_id = $new",
                     old=legacy,
@@ -373,6 +374,144 @@ async def user_delete(email: str) -> int:
     return 0
 
 
+async def migrate_orgs() -> int:
+    """Move every memory into a group id that includes its organisation.
+
+    Group ids used to be built from the project key alone, and a project key is
+    a git remote — so two organisations that both tracked
+    `github.com/acme/payments` shared one Neo4j group, and a member of either
+    read the other's shared memories. Adding the org to the id closes that, and
+    orphans everything already stored until this has run.
+
+    Idempotent: an episode already in its new group is left alone.
+
+    **A group holding more than one organisation's episodes is the leak having
+    already happened.** Its episodes are moved individually, by the org each one
+    belongs to, and its entities and relationships are left where they are —
+    they cannot be attributed to a tenant after the fact, and guessing would
+    move one org's extracted facts into another's.
+    """
+    import os
+
+    from neo4j import AsyncGraphDatabase
+
+    from drymem_server.identity import group_id_private, group_id_team
+
+    factory = sessionmaker_for(settings.database_url)
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    Memory.episode_uuid,
+                    Memory.team_episode_uuid,
+                    Memory.author_id,
+                    Project.project_key,
+                    Project.org_id,
+                ).join(Project, Project.id == Memory.project_id)
+            )
+        ).all()
+
+    if not rows:
+        print("No memories to move.")
+        return 0
+
+    # Three maps, built in one pass: where each episode should live, where each
+    # old group should become, and which organisations were found in each old
+    # group — the last one is what says whether the group can be moved whole.
+    target: dict[str, str] = {}
+    moves: dict[str, str] = {}
+    tenants: dict[str, set] = {}
+    for private_uuid, team_uuid, author_id, project_key, org_id in rows:
+        pairs = []
+        if private_uuid:
+            pairs.append(
+                (
+                    private_uuid,
+                    _legacy_private(project_key, author_id),
+                    group_id_private(org_id, project_key, author_id),
+                )
+            )
+        if team_uuid:
+            pairs.append(
+                (team_uuid, _legacy_team(project_key), group_id_team(org_id, project_key))
+            )
+        for uuid, old_group, new_group in pairs:
+            target[uuid] = new_group
+            moves[old_group] = new_group
+            tenants.setdefault(old_group, set()).add(org_id)
+
+    shared = {group for group, orgs in tenants.items() if len(orgs) > 1}
+
+    driver = AsyncGraphDatabase.driver(
+        os.getenv("NEO4J_URI", settings.neo4j_uri),
+        auth=(settings.neo4j_user, settings.neo4j_password),
+    )
+    moved = already = missing = 0
+    try:
+        async with driver.session() as neo:
+            for uuid, new in target.items():
+                result = await neo.run(
+                    "MATCH (e:Episodic) WHERE e.uuid = $uuid RETURN e.group_id AS g", uuid=uuid
+                )
+                record = await result.single()
+                if record is None:
+                    missing += 1
+                    continue
+                if record["g"] == new:
+                    already += 1
+                    continue
+                await neo.run(
+                    "MATCH (e:Episodic) WHERE e.uuid = $uuid SET e.group_id = $new",
+                    uuid=uuid,
+                    new=new,
+                )
+                moved += 1
+
+            # Entities and edges follow their group wholesale, but only where
+            # that group belonged to exactly one organisation.
+            for old, new in moves.items():
+                if old in shared or old == new:
+                    continue
+                await neo.run(
+                    "MATCH (n) WHERE n.group_id = $old AND NOT n:Episodic SET n.group_id = $new",
+                    old=old,
+                    new=new,
+                )
+                await neo.run(
+                    "MATCH ()-[r]->() WHERE r.group_id = $old SET r.group_id = $new",
+                    old=old,
+                    new=new,
+                )
+    finally:
+        await driver.close()
+
+    print(f"Moved {moved} episode(s); {already} already in place.")
+    if missing:
+        print(f"  {missing} index row(s) point at an episode the graph does not have.")
+    if shared:
+        print(
+            f"  {len(shared)} group(s) held more than one organisation — "
+            "their episodes moved, their entities did not:",
+            file=sys.stderr,
+        )
+        for group in sorted(shared):
+            print(f"    {group}", file=sys.stderr)
+    return 0
+
+
+def _legacy_team(project_key: str) -> str:
+    """The team group id as it was built before organisations were in it."""
+    from drymem_server.identity import sanitize_group_id
+
+    return sanitize_group_id(f"{project_key}/team")
+
+
+def _legacy_private(project_key: str, user_id) -> str:
+    from drymem_server.identity import sanitize_group_id
+
+    return sanitize_group_id(f"{project_key}/u/{str(user_id).replace('-', '')[:8]}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="drymem-admin", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -391,6 +530,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("migrate-scopes", help="Move pre-3A memories into their author's group")
     p.add_argument("project_key")
 
+    sub.add_parser(
+        "migrate-orgs",
+        help="Move memories into organisation-scoped groups (run once, after upgrading)",
+    )
+
     p = sub.add_parser("stats", help="The numbers the pilot is judged on")
     p.add_argument("--days", type=int, default=14)
 
@@ -403,6 +547,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(backfill(args.project_key, args.email))
     if args.command == "migrate-scopes":
         return asyncio.run(migrate_scopes(args.project_key))
+    if args.command == "migrate-orgs":
+        return asyncio.run(migrate_orgs())
     return asyncio.run(stats(args.days))
 
 
