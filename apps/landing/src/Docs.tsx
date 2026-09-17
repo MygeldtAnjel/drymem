@@ -6,7 +6,7 @@
  * the order live here because a folder listing is not a reading order.
  */
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import gettingStarted from "@docs/ONBOARDING.md?raw";
 import operations from "@docs/operations.md?raw";
@@ -42,20 +42,37 @@ export const DOCS: Doc[] = [
   },
 ];
 
-export function Docs({ slug }: { slug: string }) {
+export function Docs({ slug, anchor }: { slug: string; anchor: string }) {
   const doc = DOCS.find((d) => d.slug === slug) ?? DOCS[0]!;
   const { html, headings } = useMemo(() => renderMarkdown(doc.source), [doc.source]);
 
-  // A hash route and an in-page anchor share one `#`, so the browser cannot
-  // scroll to a heading on its own — the route swallows it. Done here instead.
+  /*
+   * A hash route and an in-page anchor share one `#`, so the browser cannot
+   * scroll to a heading on its own — the route swallows the whole fragment.
+   *
+   * `anchor` is a dependency, not just `slug`: clicking a second heading in the
+   * same document leaves the slug alone, so an effect keyed on the slug runs
+   * once and then never again. That is why every link under "On this page"
+   * worked exactly one time, and only for the first one clicked.
+   */
+  const landed = useRef(false);
   useEffect(() => {
-    const anchor = window.location.hash.split("#")[2];
+    // Arriving on a link jumps; clicking one here glides. The same call with
+    // `smooth` on first load scrolls from the top of a document that is still
+    // being laid out, and frequently arrives nowhere.
+    const behavior = landed.current ? "smooth" : "instant";
+    landed.current = true;
+
     if (!anchor) {
-      window.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0, behavior });
       return;
     }
-    document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth" });
-  }, [slug]);
+    // The heading is in a document that has just re-rendered; wait for paint.
+    const frame = requestAnimationFrame(() =>
+      document.getElementById(anchor)?.scrollIntoView({ behavior, block: "start" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [slug, anchor]);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-12 sm:px-8 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-14">
@@ -92,7 +109,12 @@ export function Docs({ slug }: { slug: string }) {
                   <li key={h.id} className={h.level === 3 ? "pl-3" : ""}>
                     <a
                       href={`#/docs/${doc.slug}#${h.id}`}
-                      className="text-sm text-muted-foreground transition hover:text-foreground"
+                      aria-current={h.id === anchor ? "location" : undefined}
+                      className={`text-sm transition ${
+                        h.id === anchor
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
                       {h.text}
                     </a>

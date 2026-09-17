@@ -10,6 +10,8 @@
  * renderer unsafe the day it is pointed at something else.
  */
 
+import { DIAGRAMS } from "@/diagrams";
+
 const escape = (s: string) =>
   s
     .replace(/&/g, "&amp;")
@@ -85,15 +87,20 @@ export function renderMarkdown(source: string): { html: string; headings: Headin
     const line = lines[i]!;
 
     // Fenced code. The language is kept off the page: a label nobody reads,
-    // on every block, in a document that is mostly shell.
+    // on every block, in a document that is mostly shell. The exception is
+    // `diagram:<id>`, which swaps the block's ASCII art for a drawing.
     if (line.startsWith("```")) {
       flush();
+      const lang = line.slice(3).trim();
       const body: string[] = [];
       i += 1;
       while (i < lines.length && !lines[i]!.startsWith("```")) body.push(lines[i]!), (i += 1);
       i += 1;
+      const drawn = lang.startsWith("diagram:") ? DIAGRAMS[lang.slice(8)] : undefined;
       out.push(
-        `<pre class="${C.pre}"><code class="${C.preCode}">${escape(body.join("\n"))}</code></pre>`,
+        drawn
+          ? `<figure class="my-7 overflow-x-auto rounded-xl border bg-card p-5 sm:p-6">${drawn}</figure>`
+          : `<pre class="${C.pre}"><code class="${C.preCode}">${escape(body.join("\n"))}</code></pre>`,
       );
       continue;
     }

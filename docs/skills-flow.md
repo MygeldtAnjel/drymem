@@ -4,7 +4,7 @@ Short answer: **it does not travel through git.** Git carries your code. Skills
 come from the drymem server, fetched by each teammate's own machine with their
 own token. Nothing needs write access to the repository.
 
-```
+```diagram:skill-flow
   ADMIN (web UI or CLI)                 DRYMEM SERVER            TEAMMATE'S MACHINE
   ─────────────────────                 ─────────────            ──────────────────
 

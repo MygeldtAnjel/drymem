@@ -55,7 +55,7 @@ function useTheme(): [boolean, () => void] {
 export function App() {
   const hash = useHashRoute();
   const [dark, toggleTheme] = useTheme();
-  const docs = /^#\/docs\/?([a-z-]*)/.exec(hash);
+  const docs = /^#\/docs\/?([a-z-]*)(?:#(.*))?$/.exec(hash);
 
   // An in-page anchor arriving in the URL — someone opening a shared
   // `…/#request` — is scrolled to here. The browser tries it on load and gives
@@ -113,7 +113,9 @@ export function App() {
         </div>
       </header>
 
-      <div className="flex-1">{docs ? <Docs slug={docs[1] || "getting-started"} /> : <Home />}</div>
+      <div className="flex-1">
+        {docs ? <Docs slug={docs[1] || "getting-started"} anchor={docs[2] ?? ""} /> : <Home />}
+      </div>
 
       <Footer />
     </div>
