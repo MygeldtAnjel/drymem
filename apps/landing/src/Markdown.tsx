@@ -40,6 +40,10 @@ const C = {
   td: "border-b px-3 py-2 align-top text-muted-foreground",
 } as const;
 
+/** Heading text with its inline markers removed, for anywhere that is not HTML. */
+const plain = (text: string) =>
+  text.replace(/`([^`]+)`/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
+
 /** A heading's anchor, so the sidebar can link to it and a URL can be shared. */
 export const slug = (text: string) =>
   text
@@ -111,7 +115,10 @@ export function renderMarkdown(source: string): { html: string; headings: Headin
       const level = heading[1]!.length;
       const text = heading[2]!.trim();
       const id = slug(text);
-      if (level === 2 || level === 3) headings.push({ level, text, id });
+      // The contents list is text, not markup: a heading written `### \`setup\``
+      // renders as code in the body and must not arrive in the sidebar wearing
+      // its backticks.
+      if (level === 2 || level === 3) headings.push({ level, text: plain(text), id });
       const cls = level === 1 ? C.h1 : level === 2 ? C.h2 : level === 3 ? C.h3 : C.h4;
       out.push(`<h${level} id="${id}" class="${cls}">${inline(text)}</h${level}>`);
       i += 1;
