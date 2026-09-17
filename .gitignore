@@ -32,3 +32,6 @@ apps/landing/dist/
 # Review captures are regenerated; the design records are not
 .impeccable/review/
 backups/
+
+# Working notes from the design tooling, not part of the product.
+.impeccable/

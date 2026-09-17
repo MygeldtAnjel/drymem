@@ -82,7 +82,7 @@ inviteRouter.post("/", requireUser, requireAdmin, async (req, res) => {
     .where(eq(schema.orgs.id, principal.orgId))
     .limit(1);
   // A name, not an address: "Miguel invited you" is a sentence, and
-  // "a.long.address@example.com invited you" is a puzzle (PLAN.md D62).
+  // "a.long.address@example.com invited you" is a puzzle .
   const [inviter] = await db
     .select({ name: schema.users.name })
     .from(schema.users)

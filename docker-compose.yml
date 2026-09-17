@@ -9,7 +9,10 @@ services:
       - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"   # Browser UI
       - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"   # Bolt protocol
     environment:
-      NEO4J_AUTH: neo4j/drymem_pass
+      # Generated per install by scripts/install.sh. The fallback exists so a
+      # clone still starts for someone poking at it; a published default is a
+      # password every drymem on the internet shares.
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-drymem_dev_only}
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*
@@ -27,7 +30,7 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: drymem
-      POSTGRES_PASSWORD: drymem_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drymem_dev_only}
       POSTGRES_DB: drymem
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U drymem"]
@@ -53,10 +56,10 @@ services:
       DRYMEM_BIND: 127.0.0.1
       DRYMEM_PORT: 8090
       SERVICE_SECRET: ${SERVICE_SECRET:?set SERVICE_SECRET in .env}
-      DATABASE_URL: postgresql+asyncpg://drymem:drymem_pass@localhost:${POSTGRES_PORT:-5432}/drymem
+      DATABASE_URL: postgresql+asyncpg://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@localhost:${POSTGRES_PORT:-5432}/drymem
       NEO4J_URI: bolt://localhost:${NEO4J_BOLT_PORT:-7687}
       NEO4J_USER: neo4j
-      NEO4J_PASSWORD: drymem_pass
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-drymem_dev_only}
       DRYMEM_EXTRACTOR: ${DRYMEM_EXTRACTOR:-ollama}
       # Ollama runs on the host, not in the compose network.
       LOCAL_LLM_URL: ${LOCAL_LLM_URL:-http://localhost:11434/v1}
@@ -82,7 +85,7 @@ services:
     environment:
       BIND: 127.0.0.1
       PORT: ${PORT:-8080}
-      DATABASE_URL: postgres://drymem:drymem_pass@localhost:${POSTGRES_PORT:-5432}/drymem
+      DATABASE_URL: postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@localhost:${POSTGRES_PORT:-5432}/drymem
       MEMORY_URL: http://127.0.0.1:8090
       SERVICE_SECRET: ${SERVICE_SECRET:?set SERVICE_SECRET in .env}
       PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080}

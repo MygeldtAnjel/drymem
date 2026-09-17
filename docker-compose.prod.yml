@@ -34,7 +34,7 @@ services:
     environment:
       DRYMEM_BIND: 0.0.0.0
       DRYMEM_PORT: 8090
-      DATABASE_URL: postgresql+asyncpg://drymem:drymem_pass@postgres:5432/drymem
+      DATABASE_URL: postgresql+asyncpg://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem
       NEO4J_URI: bolt://neo4j:7687
       LOCAL_LLM_URL: ${LOCAL_LLM_URL:?set LOCAL_LLM_URL to a model this network can reach}
 
@@ -47,7 +47,7 @@ services:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
     environment:
       BIND: 0.0.0.0
-      DATABASE_URL: postgres://drymem:drymem_pass@postgres:5432/drymem
+      DATABASE_URL: postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem
       MEMORY_URL: http://engine:8090
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL to the address people type}

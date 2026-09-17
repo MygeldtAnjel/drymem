@@ -162,7 +162,14 @@ echo
 
 # ---- write it ---------------------------------------------------------------
 
-SERVICE_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '\n=' | tr '+/' '-_')
+secret() { head -c 24 /dev/urandom | base64 | tr -d '\n=' | tr '+/' '-_'; }
+
+SERVICE_SECRET=$(secret)
+# The databases get their own credentials per install. A password shipped in a
+# public repository is a password every drymem on the internet shares, and these
+# two listen on loopback for exactly as long as nobody changes that.
+POSTGRES_PASSWORD=$(secret)
+NEO4J_PASSWORD=$(secret)
 
 cat > "$ENV_FILE" <<ENV
 # Written by scripts/install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ).
@@ -183,6 +190,12 @@ LOCAL_LLM_MODEL=$LOCAL_LLM_MODEL
 EMBEDDING_MODEL=$EMBEDDING_MODEL
 EMBEDDING_DIM=$EMBEDDING_DIM
 ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+
+# ---- the databases ----------------------------------------------------------
+# Generated here, used by the containers and by nothing else. Changing either
+# after the first start orphans the data that was written under the old one.
+POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+NEO4J_PASSWORD=$NEO4J_PASSWORD
 
 # ---- ports ------------------------------------------------------------------
 PORT=$API_PORT
