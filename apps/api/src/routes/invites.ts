@@ -16,7 +16,7 @@ import { env } from "../env.js";
 import { record } from "../lib/audit.js";
 import { hashPassword, hashToken, randomToken, WeakPassword } from "../lib/crypto.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
-import { link, sendInvite } from "../lib/email.js";
+import { link, sendInvite, sendWelcome } from "../lib/email.js";
 import { startSession } from "../lib/sessions.js";
 import { param } from "../lib/params.js";
 import { principalOf, requireAdmin, requireUser } from "../middleware/auth.js";
@@ -256,6 +256,17 @@ inviteRouter.post("/:token/accept", async (req, res) => {
   await record({ orgId: user.orgId, userId: user.id }, "member.join", user.email);
 
   const [org] = await db.select().from(schema.orgs).where(eq(schema.orgs.id, user.orgId)).limit(1);
+
+  // Accepting the invitation was the activation step — holding the mailbox is
+  // what the link proved. This is the next one: a browser session reads the
+  // memory, but nothing writes to it until their agent's machine is connected.
+  void sendWelcome({
+    to: user.email,
+    orgName: org?.name ?? "your team",
+    appUrl: link(""),
+    owner: false,
+  });
+
   res.json({
     id: user.id,
     email: user.email,

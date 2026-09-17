@@ -17,7 +17,7 @@ import { record } from "../lib/audit.js";
 import { seedCatalogue } from "../lib/seed.js";
 import { hashPassword, hashToken, randomToken, verifyPassword, WeakPassword } from "../lib/crypto.js";
 import { badRequest, conflict, limiter, notFound, unauthorized } from "../lib/errors.js";
-import { link, sendPasswordChanged, sendReset } from "../lib/email.js";
+import { link, sendPasswordChanged, sendReset, sendWelcome } from "../lib/email.js";
 import { authorizeUrl, githubEnabled, GithubError, identify } from "../lib/github.js";
 import { endAllSessions, endSession, startSession } from "../lib/sessions.js";
 import { param } from "../lib/params.js";
@@ -202,6 +202,16 @@ authRouter.post("/signup", async (req, res) => {
   await startSession(user!.id, req.get("user-agent"), res);
   await record({ orgId: org!.id, userId: user!.id }, "org.create", org!.name);
   await record({ orgId: org!.id, userId: user!.id }, "user.signup", user!.email);
+
+  // Signing up is not an activation step — they are already signed in, on a
+  // server they just installed. This carries the part the browser cannot do:
+  // the two commands that connect a machine.
+  void sendWelcome({
+    to: user!.email,
+    orgName: org!.name,
+    appUrl: link(""),
+    owner: true,
+  });
 
   // A catalogue with something in it, so the first visit is not an empty page.
   // Published, not enabled: a lead still chooses what runs on the team's laptops.

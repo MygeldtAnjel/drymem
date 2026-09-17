@@ -23,7 +23,9 @@ import { join, resolve } from "node:path";
 // server — nothing here opens a socket.
 process.env.SERVICE_SECRET ??= "email-preview-not-a-real-secret";
 
-const { inviteLetter, passwordChangedLetter, resetLetter } = await import("../src/lib/email.js");
+const { inviteLetter, passwordChangedLetter, resetLetter, welcomeLetter } = await import(
+  "../src/lib/email.js"
+);
 type Letter = Awaited<ReturnType<typeof resetLetter>>;
 
 const argv = process.argv.slice(2);
@@ -32,6 +34,24 @@ const out = resolve(argv.find((a) => !a.startsWith("--") && a !== sendTo) ?? "em
 const base = "https://drymem.example.com/#";
 
 const letters: Array<[string, Letter]> = [
+  [
+    "welcome-owner",
+    welcomeLetter({
+      to: "miguel@ciudadela.example",
+      orgName: "Ciudadela & Co",
+      appUrl: `${base}/`,
+      owner: true,
+    }),
+  ],
+  [
+    "welcome-member",
+    welcomeLetter({
+      to: "jose@acme.test",
+      orgName: "Ciudadela & Co",
+      appUrl: `${base}/`,
+      owner: false,
+    }),
+  ],
   [
     "invite",
     inviteLetter({

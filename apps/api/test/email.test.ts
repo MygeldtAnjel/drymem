@@ -34,6 +34,14 @@ const invite = (over: Partial<Parameters<EmailModule["inviteLetter"]>[0]> = {}) 
     ...over,
   });
 
+const welcome = (owner: boolean) =>
+  email.welcomeLetter({
+    to: "jose@acme.test",
+    orgName: "Acme",
+    appUrl: "http://127.0.0.1:8080/#/",
+    owner,
+  });
+
 const reset = () =>
   email.resetLetter({ to: "jose@acme.test", url: "http://127.0.0.1:8080/#/reset/tok", minutes: 60 });
 
@@ -48,7 +56,7 @@ const changed = () =>
 
 describe("what every letter owes the reader", () => {
   it("says something in the inbox preview, and hides it in the body", () => {
-    for (const letter of [invite(), reset(), changed()]) {
+    for (const letter of [welcome(true), welcome(false), invite(), reset(), changed()]) {
       // Without a preheader the client quotes the first text it finds, which is
       // the wordmark: every drymem email previewed as "drymem drymem".
       expect(letter.html).toMatch(/max-height:0;max-width:0;opacity:0;overflow:hidden/);
@@ -145,6 +153,42 @@ describe("the password-changed notice", () => {
       resetUrl: "http://127.0.0.1:8080/#/forgot",
     });
     expect(letter.html).toContain("an unrecognised browser");
+  });
+});
+
+describe("the welcome", () => {
+  it("carries the two commands that connect a machine, in both halves", () => {
+    for (const owner of [true, false]) {
+      const { html, text } = welcome(owner);
+      expect(html).toContain("npx drymem login");
+      expect(html).toContain("npx drymem setup");
+      expect(text).toContain("npx drymem login");
+      expect(text).toContain("npx drymem setup");
+    }
+  });
+
+  it("leaves a prompt character out, so the line can be copied whole", () => {
+    expect(welcome(false).html).not.toContain("$ npx");
+    expect(welcome(false).text).not.toContain("$ npx");
+  });
+
+  it("tells an owner and a member different things", () => {
+    const boss = welcome(true);
+    const member = welcome(false);
+    expect(boss.subject).not.toBe(member.subject);
+    expect(boss.html).toContain("you own it");
+    expect(boss.html).toContain("Invite the rest of the team");
+    expect(member.html).toContain("accepted an invitation");
+  });
+
+  it("escapes the organisation name here too", () => {
+    const { html } = email.welcomeLetter({
+      to: "jose@acme.test",
+      orgName: "<b>Acme</b>",
+      appUrl: "http://127.0.0.1:8080/#/",
+      owner: false,
+    });
+    expect(html).toContain("&lt;b&gt;Acme&lt;/b&gt;");
   });
 });
 

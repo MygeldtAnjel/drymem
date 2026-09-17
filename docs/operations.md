@@ -57,10 +57,18 @@ or transmit a password.
 
 ## Email
 
-Three messages leave drymem: an invitation, a password reset, and a notice that
-a password was changed. All three are best-effort — the invitation and reset
-links are also returned to the admin or written to the server log, so a server
-with no mail configured is fully usable (D42).
+Four messages leave drymem: a welcome, an invitation, a password reset, and a
+notice that a password was changed. All of them are best-effort — the invitation
+and reset links are also returned to the admin or written to the server log, so
+a server with no mail configured is fully usable (D42).
+
+**There is no activation email, deliberately.** An invitation link is already
+proof that somebody holds the mailbox, and the one signup a server ever accepts
+is made by the person installing it, who is sitting in front of it — gating that
+on a click in an email would lock the owner out of their own server on the
+default configuration, which has no mail at all. The welcome takes its place: it
+carries `drymem login` and `drymem setup`, the two commands the browser cannot
+run for you, and without which a signed-in account is connected to nothing.
 
 Set `RESEND_API_KEY` and `EMAIL_FROM` to turn sending on.
 

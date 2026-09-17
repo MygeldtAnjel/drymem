@@ -19,6 +19,7 @@ import { Resend } from "resend";
 import { emailEnabled, env } from "../env.js";
 import {
   button,
+  commands,
   esc,
   fallback,
   heading,
@@ -117,6 +118,79 @@ const device = (agent: string | null | undefined): string => {
             : "";
   return os ? `${browser} on ${os}` : browser;
 };
+
+/**
+ * Welcome — the only email that exists because of what the product is.
+ *
+ * drymem has no activation step: an invitation link is already proof that
+ * somebody holds the mailbox, and the one signup a server ever accepts is made
+ * by the person installing it, sitting in front of it. What a new account does
+ * need is the step the web app cannot do for them. Signing in to a browser
+ * connects nothing; the memory reaches an agent only once `drymem login` and
+ * `drymem setup` have run on the machine the agent runs on.
+ *
+ * So this is not a greeting with a product tour in it. It is the two commands,
+ * in the place people keep things they need again on a second machine.
+ */
+export interface WelcomeOpts {
+  to: string;
+  orgName: string;
+  appUrl: string;
+  /** The owner made the organisation; a member was let into one. */
+  owner: boolean;
+}
+
+export function welcomeLetter(opts: WelcomeOpts): Letter {
+  const run = ["npx drymem login", "npx drymem setup"];
+  const opening = opts.owner
+    ? `You created <b>${esc(opts.orgName)}</b> on drymem and you own it.`
+    : `Your account at <b>${esc(opts.orgName)}</b> is ready.`;
+
+  return {
+    subject: opts.owner
+      ? "Your drymem organisation is ready"
+      : `Welcome to ${opts.orgName} on drymem`,
+    html: render({
+      title: opts.owner ? "Your drymem organisation is ready" : `Welcome to ${opts.orgName}`,
+      preheader: "Two commands connect your coding agent to the team's memory.",
+      rows: [
+        heading(opts.owner ? `${opts.orgName} is set up` : `Welcome to ${opts.orgName}`),
+        paragraph(
+          `${opening} Signing in to the web app is half of it — the memory only reaches your coding agent once this machine is connected. In a repository you work in, run:`,
+        ),
+        commands(run),
+        paragraph(
+          "<b>login</b> once per machine, <b>setup</b> once per repository. From then on every session reads the team's memory at startup, and writes back what it worked out.",
+        ),
+        button(opts.appUrl, "Open drymem"),
+        note(
+          opts.owner
+            ? "Invite the rest of the team from Members, and pick which skills each project runs."
+            : "Nothing else to do — what you save is private to you until you share it.",
+        ),
+      ].join(""),
+      footnote: opts.owner
+        ? "You got this because you created an organisation on this drymem server."
+        : `You got this because you accepted an invitation to ${esc(opts.orgName)}.`,
+    }),
+    text: text([
+      opts.owner
+        ? `You created ${opts.orgName} on drymem and you own it.`
+        : `Your account at ${opts.orgName} on drymem is ready.`,
+      ``,
+      `Signing in to the web app is half of it — the memory only reaches your`,
+      `coding agent once this machine is connected. In a repository you work in:`,
+      ``,
+      ...run.map((line) => `  ${line}`),
+      ``,
+      `login once per machine, setup once per repository.`,
+      ``,
+      `Open drymem: ${opts.appUrl}`,
+    ]),
+  };
+}
+
+export const sendWelcome = (opts: WelcomeOpts): Promise<Sent> => send(opts.to, welcomeLetter(opts));
 
 export interface InviteOpts {
   to: string;

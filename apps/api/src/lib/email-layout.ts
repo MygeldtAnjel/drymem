@@ -127,6 +127,21 @@ export const panel = (rows: Array<[string, string]>) => `
         </table>
       </td></tr>`;
 
+/**
+ * Commands to run, in a box you can copy out of.
+ *
+ * No `$` prefix: people copy the whole line, and a prompt character pasted into
+ * a shell is an error message instead of a working machine.
+ */
+export const commands = (lines: string[]) => `
+      <tr><td style="padding:0 0 20px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dm-panel" style="background:${light.panel};border:1px solid ${light.border};border-radius:10px">
+          <tr><td class="dm-h1" style="padding:14px 16px;font-family:${MONO};font-size:13px;line-height:1.9;color:${light.heading}">${lines
+            .map((line) => esc(line))
+            .join("<br>")}</td></tr>
+        </table>
+      </td></tr>`;
+
 /** Small print under the action: how long the link lives, how often it works. */
 export const note = (text: string) => `
       <tr><td class="dm-meta" style="font-family:${FONT};font-size:13px;line-height:1.6;color:${light.meta};padding:0 0 18px">${esc(
