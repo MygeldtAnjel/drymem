@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "A skill's states",
+    "viewBox": [
+      980,
+      640
+    ],
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main",
+        "label": "From draft to installed",
+        "focus": [
+          "draft",
+          "scanned",
+          "published",
+          "enabled"
+        ],
+        "note": "The happy path. Every published version is pinned by sha, so a project stays on what it chose."
+      },
+      {
+        "id": "gates",
+        "label": "Where it stops",
+        "focus": [
+          "scanned",
+          "rejected",
+          "pending",
+          "published"
+        ],
+        "note": "A credential ends it. Anything the scanner flags waits for a human."
+      },
+      {
+        "id": "end",
+        "label": "Retiring one",
+        "focus": [
+          "enabled",
+          "removed",
+          "deprecated"
+        ],
+        "note": "Deprecating stops new enables; projects already on it keep working. Removing from a project deletes it at the next session."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Catalogue phases"
+    },
+    {
+      "id": "review",
+      "label": "Waiting on an admin"
+    },
+    {
+      "id": "terminal",
+      "label": "Terminal exits"
+    }
+  ],
+  "states": [
+    {
+      "id": "draft",
+      "type": "start",
+      "label": "Draft",
+      "sublabel": "distill · author · import",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "not installed"
+    },
+    {
+      "id": "scanned",
+      "type": "decision",
+      "label": "Scanned",
+      "sublabel": "secrets? findings?",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "gate"
+    },
+    {
+      "id": "published",
+      "type": "active",
+      "label": "Published",
+      "sublabel": "version n · sha256",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "topics tagged"
+    },
+    {
+      "id": "enabled",
+      "type": "success",
+      "label": "Enabled",
+      "sublabel": "pinned per project",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "pulled at start"
+    },
+    {
+      "id": "removed",
+      "type": "neutral",
+      "label": "Removed",
+      "sublabel": "disabled on project",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "deleted next session"
+    },
+    {
+      "id": "pending",
+      "type": "waiting",
+      "label": "Pending",
+      "sublabel": "admin approves",
+      "lane": "review",
+      "col": 0,
+      "tag": "held"
+    },
+    {
+      "id": "rejected",
+      "type": "failure",
+      "label": "Rejected",
+      "sublabel": "422 · not stored",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "terminal"
+    },
+    {
+      "id": "deprecated",
+      "type": "neutral",
+      "label": "Deprecated",
+      "sublabel": "no new enables",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "scanned",
+      "to": "pending",
+      "label": "findings",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "labelSegment": 1
+    },
+    {
+      "from": "pending",
+      "to": "published",
+      "label": "approve",
+      "variant": "default",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight"
+    },
+    {
+      "from": "scanned",
+      "to": "rejected",
+      "label": "credential",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "channelY": 356,
+      "labelDy": 41
+    },
+    {
+      "from": "enabled",
+      "to": "deprecated",
+      "label": "deprecate",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Identical bytes are the same version",
+      "items": [
+        "Publishing twice by accident returns `unchanged` and adds nothing to the history",
+        "A newer version does not move a project: its lead updates the pin"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Only an org admin can import from outside",
+      "items": [
+        "An imported skill runs on every laptop on the project; that is an organisation decision, not a project one"
+      ]
+    }
+  ]
+}

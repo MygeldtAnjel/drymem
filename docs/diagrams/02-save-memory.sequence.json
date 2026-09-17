@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Saving a memory — mem_finalize_session, end to end",
+    "viewBox": [
+      1080,
+      740
+    ],
+    "column_fit": "spread",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "identity",
+        "label": "Who is asking",
+        "focus": [
+          "claude",
+          "mcp",
+          "api",
+          "engine"
+        ],
+        "note": "The API resolves the bearer token once and signs a principal. The engine authenticates nobody itself."
+      },
+      {
+        "id": "safety",
+        "label": "Nothing leaves unscrubbed",
+        "focus": [
+          "engine",
+          "scrub",
+          "postgres"
+        ],
+        "note": "Scrubbing happens first. A redacted key still saves; a private-key block fails the save and is audited."
+      },
+      {
+        "id": "durability",
+        "label": "Graph first, index second, commit before reply",
+        "focus": [
+          "engine",
+          "ollama",
+          "neo4j",
+          "postgres",
+          "api"
+        ],
+        "note": "The index never points at a missing episode, and the row is committed before the 200 — a reader acting on the reply sees it."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Claude Code",
+      "sublabel": "session"
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "drymem mcp",
+      "sublabel": "stdio → HTTP"
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "API",
+      "sublabel": "Express"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "Engine",
+      "sublabel": "FastAPI"
+    },
+    {
+      "id": "scrub",
+      "type": "security",
+      "label": "Scrubber",
+      "sublabel": "regex first"
+    },
+    {
+      "id": "ollama",
+      "type": "cloud",
+      "label": "Local model",
+      "sublabel": "extraction"
+    },
+    {
+      "id": "neo4j",
+      "type": "database",
+      "label": "Neo4j",
+      "sublabel": "Graphiti"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "index"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 248,
+      "label": "Identity"
+    },
+    {
+      "from": 255,
+      "to": 345,
+      "label": "Safety gate"
+    },
+    {
+      "from": 355,
+      "to": 545,
+      "label": "Write"
+    },
+    {
+      "from": 555,
+      "to": 650,
+      "label": "Reply"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "from": "claude",
+      "to": "mcp",
+      "y": 170,
+      "label": "mem_finalize_session",
+      "variant": "default"
+    },
+    {
+      "id": "m2",
+      "from": "mcp",
+      "to": "api",
+      "y": 200,
+      "label": "POST /v1/memories · bearer",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m3",
+      "from": "api",
+      "to": "engine",
+      "y": 230,
+      "label": "signed principal (HS256)",
+      "variant": "security"
+    },
+    {
+      "id": "m4",
+      "from": "engine",
+      "to": "scrub",
+      "y": 265,
+      "label": "scrub(body)",
+      "variant": "security"
+    },
+    {
+      "id": "m5",
+      "from": "scrub",
+      "to": "engine",
+      "y": 295,
+      "label": "redacted · or 422 + audit",
+      "variant": "return"
+    },
+    {
+      "id": "m6",
+      "from": "engine",
+      "to": "postgres",
+      "y": 330,
+      "label": "ensure_project",
+      "variant": "default"
+    },
+    {
+      "id": "m7",
+      "from": "engine",
+      "to": "neo4j",
+      "y": 370,
+      "label": "add_episode(org/project/u)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m8",
+      "from": "neo4j",
+      "to": "ollama",
+      "y": 400,
+      "label": "extract entities + facts",
+      "variant": "dashed"
+    },
+    {
+      "id": "m9",
+      "from": "ollama",
+      "to": "neo4j",
+      "y": 430,
+      "label": "entities · facts",
+      "variant": "return"
+    },
+    {
+      "id": "m10",
+      "from": "neo4j",
+      "to": "engine",
+      "y": 460,
+      "label": "episode_uuid",
+      "variant": "return"
+    },
+    {
+      "id": "m11",
+      "from": "engine",
+      "to": "postgres",
+      "y": 500,
+      "label": "INSERT memories row",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m12",
+      "from": "engine",
+      "to": "postgres",
+      "y": 530,
+      "label": "COMMIT before reply",
+      "variant": "security"
+    },
+    {
+      "id": "m13",
+      "from": "engine",
+      "to": "api",
+      "y": 570,
+      "label": "200 {episode_uuid, degraded}",
+      "variant": "return"
+    },
+    {
+      "id": "m14",
+      "from": "api",
+      "to": "mcp",
+      "y": 600,
+      "label": "200",
+      "variant": "return"
+    },
+    {
+      "id": "m15",
+      "from": "mcp",
+      "to": "claude",
+      "y": 630,
+      "label": "saved · topic_key",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 195,
+      "to": 605,
+      "type": "security"
+    },
+    {
+      "participant": "engine",
+      "from": 225,
+      "to": 575,
+      "type": "backend"
+    },
+    {
+      "participant": "neo4j",
+      "from": 365,
+      "to": 465,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "The two guarantees",
+      "items": [
+        "Scrub before store or model: a stored secret is searchable, shared on promotion, and fed back into prompts",
+        "Commit before reply: the 40ms teardown-commit race made sharing a coin flip until it was moved"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Details the arrows leave out",
+      "items": [
+        "ensure_project: the first save in a repo creates the project; the saver becomes lead",
+        "scope=private, session id and topic_key go on the index row; the text goes only to Neo4j",
+        "If extraction fails the episode is still saved and the reply says degraded: true"
+      ]
+    }
+  ]
+}

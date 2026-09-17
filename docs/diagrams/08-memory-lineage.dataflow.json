@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Where memory comes from, and where it goes",
+    "viewBox": [
+      1080,
+      640
+    ],
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "in",
+        "label": "Three ways in",
+        "focus": [
+          "agent",
+          "cli",
+          "import",
+          "scrub"
+        ],
+        "note": "An agent at session end, a person typing, or a backfill of what the team already wrote down. All three pass the same scrubber."
+      },
+      {
+        "id": "stores",
+        "label": "Two stores",
+        "focus": [
+          "scrub",
+          "engine",
+          "neo4j",
+          "postgres"
+        ],
+        "note": "The text and the facts extracted from it live in the graph. Everything you count, list, filter or rate lives in the index."
+      },
+      {
+        "id": "out",
+        "label": "Three kinds of reader",
+        "focus": [
+          "neo4j",
+          "postgres",
+          "pages",
+          "chat",
+          "discover"
+        ],
+        "note": "The same rows and episodes, read three ways — and the loop: recurring subjects with no skill become skill drafts."
+      }
+    ]
+  },
+  "stages": [
+    {
+      "label": "Sources"
+    },
+    {
+      "label": "Gate"
+    },
+    {
+      "label": "Engine"
+    },
+    {
+      "label": "Stores"
+    },
+    {
+      "label": "Readers"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "agent",
+      "type": "external",
+      "label": "Agent session",
+      "sublabel": "mem_finalize_session",
+      "stage": 0,
+      "row": 0,
+      "width": 120,
+      "tag": "Claude Code"
+    },
+    {
+      "id": "cli",
+      "type": "external",
+      "label": "A person",
+      "sublabel": "drymem save",
+      "stage": 0,
+      "row": 1,
+      "width": 120
+    },
+    {
+      "id": "import",
+      "type": "external",
+      "label": "Import",
+      "sublabel": "claude-memory · git · docs",
+      "stage": 0,
+      "row": 2,
+      "width": 120,
+      "tag": "idempotent"
+    },
+    {
+      "id": "scrub",
+      "type": "security",
+      "label": "Scrubber",
+      "sublabel": "redact · refuse keys",
+      "stage": 1,
+      "row": 1,
+      "width": 120
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "Memory engine",
+      "sublabel": "org-scoped group",
+      "stage": 2,
+      "row": 1,
+      "width": 120
+    },
+    {
+      "id": "neo4j",
+      "type": "database",
+      "label": "Neo4j",
+      "sublabel": "text · entities · facts",
+      "stage": 3,
+      "row": 0,
+      "width": 120,
+      "tag": "only copy of the text"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "memories index",
+      "stage": 3,
+      "row": 2,
+      "width": 120,
+      "tag": "counts · pages"
+    },
+    {
+      "id": "pages",
+      "type": "frontend",
+      "label": "Web pages",
+      "sublabel": "Memories · Sessions · Tree",
+      "stage": 4,
+      "row": 1,
+      "width": 140
+    },
+    {
+      "id": "chat",
+      "type": "frontend",
+      "label": "Chat · session start",
+      "sublabel": "grounded, cited",
+      "stage": 4,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "discover",
+      "type": "backend",
+      "label": "Discover → Distill",
+      "sublabel": "graph topic keys, no skill",
+      "stage": 4,
+      "row": 2,
+      "width": 140,
+      "tag": "the loop"
+    }
+  ],
+  "flows": [
+    {
+      "from": "agent",
+      "to": "scrub",
+      "label": "summary + topic_key",
+      "variant": "emphasis",
+      "route": "auto"
+    },
+    {
+      "from": "cli",
+      "to": "scrub",
+      "variant": "default",
+      "route": "straight",
+      "label": "text",
+      "labelDx": -22
+    },
+    {
+      "from": "import",
+      "to": "scrub",
+      "label": "one per file / commit",
+      "variant": "default",
+      "route": "auto"
+    },
+    {
+      "from": "scrub",
+      "to": "engine",
+      "label": "cleaned",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -40
+    },
+    {
+      "from": "engine",
+      "to": "neo4j",
+      "label": "add_episode",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "left",
+      "via": [
+        [
+          530,
+          157
+        ]
+      ],
+      "labelSegment": 1
+    },
+    {
+      "from": "engine",
+      "to": "postgres",
+      "label": "index row",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          530,
+          385
+        ]
+      ],
+      "labelSegment": 1
+    },
+    {
+      "from": "neo4j",
+      "to": "pages",
+      "label": "bodies by uuid",
+      "variant": "dashed",
+      "route": "auto"
+    },
+    {
+      "from": "postgres",
+      "to": "pages",
+      "label": "page · count",
+      "variant": "default",
+      "route": "auto"
+    },
+    {
+      "from": "neo4j",
+      "to": "chat",
+      "label": "readable groups only",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelDy": -23
+    },
+    {
+      "from": "postgres",
+      "to": "discover",
+      "label": "which have a skill",
+      "variant": "dashed",
+      "route": "straight",
+      "labelDy": 53
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Why two stores",
+      "items": [
+        "add_episode writes into the org/project/user group; the index row is committed before the reply",
+        "A page number needs a total; the graph has two episodes for every shared memory and no offset. The index has one row.",
+        "Promotion copies the episode into the team group and adds team_episode_uuid to the same row."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Every read is scoped",
+      "items": [
+        "readable_groups = the team's group + your own. A third person's private memory cannot come back.",
+        "Proven against real Neo4j on all three read paths — recent, fulltext, facts (make test-e2e)",
+        "Discover reads recurring topic keys from the graph and checks the skills catalogue in Postgres for gaps"
+      ]
+    }
+  ]
+}

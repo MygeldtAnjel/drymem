@@ -51,6 +51,9 @@ eval:               ## Grade the answers: run real questions against the real mo
 	 DRYMEM_PROJECT="$$(node apps/cli/dist/cli.js whoami | head -1 | cut -d' ' -f2)" \
 	 uv --directory $(SERVER) run python scripts/eval_ask.py $(if $(CASE),--case $(CASE),)
 
+diagrams:           ## Validate and render docs/diagrams with archify (pinned)
+	@sh scripts/diagrams.sh
+
 build:              ## Bundle the CLI (base skills included)
 	pnpm --filter drymem run build
 

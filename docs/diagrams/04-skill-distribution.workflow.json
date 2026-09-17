@@ -1,0 +1,265 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "How a skill reaches every teammate's agent",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "publish",
+        "label": "Publishing goes through a gate",
+        "focus": [
+          "publish",
+          "scanner",
+          "rejected",
+          "approve",
+          "catalogue"
+        ],
+        "note": "A skill runs on every teammate's agent. A credential is refused outright; anything suspicious waits for an org admin."
+      },
+      {
+        "id": "deliver",
+        "label": "Nothing to commit, nothing to run",
+        "focus": [
+          "enable",
+          "session",
+          "disk"
+        ],
+        "note": "Git carries code. Each machine fetches skills with its own token when the agent starts. The lockfile is a gitignored cache."
+      },
+      {
+        "id": "remove",
+        "label": "Removal is the same flow",
+        "focus": [
+          "remove",
+          "session",
+          "disk"
+        ],
+        "note": "Only skills drymem wrote carry the marker that lets pull delete them. A hand-written skill in the same folder is never touched."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "lead",
+      "label": "Publisher / lead — UI or CLI"
+    },
+    {
+      "id": "server",
+      "label": "drymem server"
+    },
+    {
+      "id": "admin",
+      "label": "Org admin"
+    },
+    {
+      "id": "machine",
+      "label": "Each teammate's machine"
+    }
+  ],
+  "phases": [
+    {
+      "id": "p1",
+      "label": "Publish",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "p2",
+      "label": "Enable",
+      "fromCol": 2,
+      "toCol": 2
+    },
+    {
+      "id": "p3",
+      "label": "Deliver",
+      "fromCol": 3,
+      "toCol": 4
+    }
+  ],
+  "nodes": [
+    {
+      "id": "publish",
+      "lane": "lead",
+      "col": 0,
+      "type": "external",
+      "label": "Add skill",
+      "sublabel": "UI or CLI publish",
+      "width": 150
+    },
+    {
+      "id": "rejected",
+      "lane": "lead",
+      "col": 1,
+      "type": "security",
+      "label": "Rejected · 422",
+      "sublabel": "credential · not stored",
+      "width": 160
+    },
+    {
+      "id": "enable",
+      "lane": "lead",
+      "col": 2,
+      "type": "external",
+      "label": "Enable on project",
+      "sublabel": "pins a version",
+      "width": 150
+    },
+    {
+      "id": "remove",
+      "lane": "lead",
+      "col": 3,
+      "type": "external",
+      "label": "Remove from project",
+      "sublabel": "DELETE …/enable",
+      "width": 160
+    },
+    {
+      "id": "scanner",
+      "lane": "server",
+      "col": 0,
+      "type": "security",
+      "label": "Scanner",
+      "sublabel": "regex over content",
+      "width": 140
+    },
+    {
+      "id": "catalogue",
+      "lane": "server",
+      "col": 1,
+      "type": "database",
+      "label": "Catalogue",
+      "sublabel": "published · sha256",
+      "width": 150
+    },
+    {
+      "id": "approve",
+      "lane": "admin",
+      "col": 1,
+      "type": "external",
+      "label": "Pending → approve",
+      "sublabel": "org admin reads it",
+      "width": 160
+    },
+    {
+      "id": "session",
+      "lane": "machine",
+      "col": 3,
+      "type": "backend",
+      "label": "Session start → pull",
+      "sublabel": "SessionStart hook",
+      "width": 170
+    },
+    {
+      "id": "disk",
+      "lane": "machine",
+      "col": 4,
+      "type": "database",
+      "label": ".claude/skills/",
+      "sublabel": "written · or deleted",
+      "width": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "publish",
+      "to": "scanner",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "e2",
+      "from": "scanner",
+      "to": "rejected",
+      "label": "private key / token",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e3",
+      "from": "scanner",
+      "to": "catalogue",
+      "label": "clean",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "e4",
+      "from": "scanner",
+      "to": "approve",
+      "label": "review finding",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "e5",
+      "from": "approve",
+      "to": "catalogue",
+      "label": "published",
+      "variant": "default",
+      "role": "return"
+    },
+    {
+      "id": "e6",
+      "from": "catalogue",
+      "to": "enable",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "e7",
+      "from": "enable",
+      "to": "session",
+      "label": "server lists it for the project",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "e8",
+      "from": "session",
+      "to": "disk",
+      "label": "only what changed",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "e9",
+      "from": "remove",
+      "to": "session",
+      "label": "next session",
+      "variant": "dashed",
+      "role": "branch"
+    }
+  ],
+  "mainPath": [
+    "publish",
+    "scanner",
+    "catalogue",
+    "enable",
+    "session",
+    "disk"
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Why not through git",
+      "items": [
+        "The web UI cannot write to your repository — that needs write access to every repo, a bot, a commit per click",
+        "A committed lockfile went stale the moment anyone clicked Add, then rewrote itself in every working tree",
+        "Anyone with repo write could skip the scanner by editing a file"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What git pull does, and the one-time setup",
+      "items": [
+        "git pull does nothing for skills — it fetches code. Sync happens at agent session start; `npx drymem skills pull` is the escape hatch",
+        "`npx drymem setup` once per repo per machine installs the hook. Topics are tagged by the local model after publish, best effort",
+        "An open session sees a new skill at its next restart — a post-merge hook would close that gap"
+      ]
+    }
+  ]
+}

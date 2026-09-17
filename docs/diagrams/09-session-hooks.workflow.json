@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "What the hooks do during a Claude Code session",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "start", "label": "Session start", "focus": ["start", "context", "skills", "api", "protocol"],
+        "note": "Two things at once: recent project memory is injected as context, and enabled skills are synced to disk. Either may fail harmlessly." },
+      { "id": "during", "label": "During work", "focus": ["protocol", "work", "compact"],
+        "note": "The protocol says: search silently before a task, save silently after meaningful work. After compaction, context is reloaded." },
+      { "id": "stop", "label": "When it ends", "focus": ["stop", "check", "fallback"],
+        "note": "If the agent never saved and the session did something substantial, the Stop hook saves a memory itself." }
+    ]
+  },
+  "lanes": [
+    { "id": "claude", "label": "Claude Code" },
+    { "id": "hook",   "label": "drymem hook (exit 0 always)" },
+    { "id": "server", "label": "drymem server" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "session-start", "fromCol": 0, "toCol": 2 },
+    { "id": "p2", "label": "working",       "fromCol": 3, "toCol": 3 },
+    { "id": "p3", "label": "session-stop",  "fromCol": 4, "toCol": 5 }
+  ],
+  "nodes": [
+    { "id": "start",    "lane": "claude", "col": 0, "type": "external", "label": "SessionStart",        "sublabel": "matcher: startup", "width": 140 },
+    { "id": "protocol", "lane": "claude", "col": 2, "type": "external", "label": "Protocol + context",  "sublabel": "in the system prompt", "width": 160 },
+    { "id": "work",     "lane": "claude", "col": 3, "type": "external", "label": "search → work → save", "sublabel": "mem_search · mem_finalize_session", "width": 200 },
+    { "id": "stop",     "lane": "claude", "col": 4, "type": "external", "label": "Stop",                "sublabel": "session ends", "width": 130 },
+    { "id": "skills",   "lane": "hook",   "col": 0, "type": "backend",  "label": "syncSkills",          "sublabel": "pull → .claude/skills/", "width": 150 },
+    { "id": "context",  "lane": "hook",   "col": 1, "type": "backend",  "label": "injectContext",       "sublabel": "GET /memories/context · team first", "width": 180 },
+    { "id": "compact",  "lane": "hook",   "col": 3, "type": "backend",  "label": "post-compaction",     "sublabel": "reload context", "width": 150 },
+    { "id": "check",    "lane": "hook",   "col": 4, "type": "backend",  "label": "did the agent save?", "sublabel": "reads the transcript", "width": 160 },
+    { "id": "api",      "lane": "server", "col": 1, "type": "security", "label": "API",                 "sublabel": "bearer token · per machine", "width": 150 },
+    { "id": "fallback", "lane": "server", "col": 5, "type": "backend",  "label": "save-session",        "sublabel": "only if substantial and unsaved", "width": 180 }
+  ],
+  "edges": [
+    { "id": "e1",  "from": "start",    "to": "context",  "variant": "emphasis", "role": "main" },
+    { "id": "e2",  "from": "start",    "to": "skills",   "variant": "emphasis", "role": "branch" },
+    { "id": "e3",  "from": "skills",   "to": "api",      "label": "enabled skills", "variant": "default", "role": "async" },
+    { "id": "e4",  "from": "context",  "to": "api",      "label": "context", "variant": "default", "role": "async" },
+    { "id": "e5",  "from": "context",  "to": "protocol", "variant": "emphasis", "role": "main" },
+    { "id": "e6",  "from": "protocol", "to": "work",     "variant": "emphasis", "role": "main" },
+    { "id": "e7",  "from": "work",     "to": "compact",  "label": "if the context compacts", "variant": "dashed", "role": "branch" },
+    { "id": "e8",  "from": "work",     "to": "stop",     "variant": "default", "role": "main" },
+    { "id": "e9",  "from": "stop",     "to": "check",    "variant": "emphasis", "role": "main" },
+    { "id": "e10", "from": "check",    "to": "fallback", "label": "not saved · substantial", "variant": "emphasis", "role": "branch" }
+  ],
+  "mainPath": ["start", "context", "protocol", "work", "stop", "check", "fallback"],
+  "cards": [
+    { "dot": "rose", "title": "A hook must never break the session", "items": [
+      "Unknown hook name, no config, server down — all exit 0 with a line on stderr",
+      "Context and skills run with allSettled: one failing does not stop the other" ] },
+    { "dot": "amber", "title": "Also", "items": [
+      "SubagentStop prints a reminder to persist findings with mem_finalize_session",
+      "Context injection asks the engine, which may ask the local model — noticeable at startup on a busy laptop" ] }
+  ]
+}

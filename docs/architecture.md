@@ -1,7 +1,9 @@
 # drymem — Architecture
 
 Companion to [PLAN.md](../PLAN.md). PLAN.md says *what* we build and in what
-order; this document says *how the pieces fit* and is kept current as they land.
+order; this document says *how the pieces fit*. The pictures live in
+[docs/diagrams](diagrams/README.md) — nine archify pages, one per flow — and
+are the reviewable version of what is written here.
 
 ---
 
@@ -10,205 +12,170 @@ order; this document says *how the pieces fit* and is kept current as they land.
 ```mermaid
 flowchart LR
     subgraph laptop["Developer laptop"]
+        P["Teammate<br/>browser"]
         CC["Claude Code"]
         subgraph client["drymem client (npx, TypeScript)"]
             MCP["mcp<br/>stdio ↔ HTTP"]
             CLI["cli"]
-            TUI["tui (Ink)"]
             HOOKS["hooks"]
         end
     end
 
-    subgraph server["drymem server (docker compose)"]
-        API["FastAPI<br/>auth · ACL · scrubber"]
-        STORE["MemoryStore<br/>(Graphiti wrapper)"]
-        EXT["Extractor<br/>adapter"]
-        REG["Registry"]
-        NEO[("Neo4j<br/>memory graph")]
-        PG[("Postgres<br/>users · projects · index")]
+    subgraph host["docker compose host"]
+        API["API — Express :8080<br/>identity · control plane · serves the web app"]
+        ENG["Memory engine — FastAPI :8090<br/>scrubber · memories · ask · skills scanner"]
+        NEO[("Neo4j<br/>memory text · entities · facts")]
+        PG[("Postgres<br/>users · orgs · projects · index · skills · audit · chats")]
     end
-
     OLLAMA["Ollama<br/>local model"]
-    GIT["packages/skills<br/>base set"]
 
+    P -->|cookie| API
     CC -->|MCP tools| MCP
     CC -->|SessionStart / Stop| HOOKS
-    HOOKS --> CLI
-    MCP & CLI & TUI -->|HTTPS + bearer token| API
-    API --> STORE --> NEO
-    API --> REG --> PG
-    STORE --> EXT --> OLLAMA
-    REG --> GIT
+    MCP & CLI & HOOKS -->|bearer token| API
+    API -->|signed principal| ENG
+    API --> PG
+    ENG --> PG
+    ENG --> NEO
+    ENG -.-> OLLAMA
 ```
 
-**The rule that keeps this honest:** nothing on the laptop imports `graphiti_core`
-or `neo4j`, and no surface (MCP, CLI, TUI, hooks) talks to a database. They all
-go through one `DrymemClient` over HTTP. That is what makes the client
-installable with `npx` and the security boundary a single place.
+**The rule that keeps this honest:** nothing on the laptop imports
+`graphiti_core` or a database driver, and no surface (web, MCP, CLI, hooks)
+talks to a database. Everything goes through the API over HTTP. The API is the
+only published port; the engine listens on the compose network only.
 
 ### Component responsibilities
 
 | Component | Owns | Never does |
 |---|---|---|
-| `apps/cli` · mcp | Exposing `mem_*` tools to Claude over stdio; forwarding to HTTP | Business logic, storage |
-| `apps/cli` · cli | Human and hook entry points (`setup`, `save`, `search`, `promote`, `import`, `skills`) | Storage |
-| `apps/cli` · tui | Browsing, search, rating, promotion | Storage |
-| `apps/cli` · hooks | Shell shims Claude Code fires on session events | Anything slow or blocking |
-| `apps/server` · api | Auth, project ACL, scrubbing, request validation | Talking to the LLM directly |
-| `apps/server` · memory | `MemoryStore` — the only code that knows Graphiti exists | Knowing about HTTP |
-| `apps/server` · extraction | Extractor adapters (Ollama, Fake, Anthropic) | Knowing about HTTP |
-| `apps/server` · skills | Registry: which skill, which version, which project | Holding skill *content* (git does) |
+| `apps/web` | The browser UI: memories, sessions, chat, skills, projects, members, audit | Talk to anything but the API |
+| `apps/cli` · mcp | Exposing `mem_*` tools to the agent over stdio; forwarding to HTTP | Business logic, storage |
+| `apps/cli` · cli | `login`, `setup`, `save`, `search`, `promote`, `import`, `skills …`, `hook …` | Storage |
+| `apps/cli` · hooks | What Claude Code fires on session events: context in, skills synced, fallback save | Anything that can fail the session (always exit 0) |
+| `apps/api` | Identity (cookie or token), orgs, projects, membership, invites, skills catalogue, chats, audit; mints the signed principal | Touch Neo4j; know how memories are stored |
+| `apps/server` · api | Verify the principal, validate, scrub, route | Authenticate people |
+| `apps/server` · memory | `MemoryStore` — the only code that knows Graphiti exists | Know about HTTP |
+| `apps/server` · extraction, ask, topics | Talk to the local model | Know about HTTP |
+| `apps/server` · skills scanner | Refuse credentials, flag findings | Decide who may publish (the API does) |
+
+Skill **content** lives on the server, in the catalogue. Git carries code. The
+lockfile under `.drymem/` is a gitignored cache.
 
 ---
 
-## 2. Data flow — one save
+## 2. One save
 
-`mem_finalize_session` is the hot path. The summary is written by Claude inside
-the session; drymem never summarises a transcript (PLAN.md D6).
+`mem_finalize_session` is the hot path. The summary is written by the agent
+inside the session; drymem never summarises a transcript (PLAN.md D6).
+Picture: [02-save-memory](diagrams/html/02-save-memory.html).
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant CC as Claude Code
-    participant C as drymem client
-    participant API as server/api
+    participant C as drymem mcp
+    participant API as API (Express)
+    participant E as Engine (FastAPI)
     participant S as scrubber
-    participant M as MemoryStore
-    participant E as Extractor
     participant N as Neo4j
     participant P as Postgres
 
-    CC->>C: mem_finalize_session(summary, topic_key)
-    Note over C: resolve project_key<br/>from git remote
+    CC->>C: mem_finalize_session(summary, topic_key, type)
     C->>API: POST /v1/memories + bearer token
-    API->>API: authn → authz (member of project?)
-    API->>S: scrub(summary)
-    S-->>API: redacted summary
-    Note over S: refuses on hard-fail patterns<br/>(private keys) rather than redacting
-    API->>M: add_episode(group_id = project:u:user)
-    M->>E: extract entities + relations
-    E-->>M: nodes, edges
-    M->>N: write episode + graph
-    N-->>M: episode_uuid
-    API->>P: insert memories row (author, tool, scope=private)
-    API-->>C: {id, entities, relations}
-    C-->>CC: "Saved: 12 entities, 8 relations"
+    API->>API: resolve token → sign principal (HS256, short-lived)
+    API->>E: forward with X-Drymem-Principal
+    E->>S: scrub(summary)
+    S-->>E: redacted · or PrivateKeyFound → 422 + audit
+    E->>P: ensure_project (first save creates it; saver is lead)
+    E->>N: add_episode(group = org/project/u/author) + extraction
+    N-->>E: episode_uuid
+    E->>P: INSERT memories row (title, type, scope=private, session, topic)
+    E->>P: COMMIT — before the response, not after
+    E-->>API: 200 {episode_uuid, scrubbed, degraded}
+    API-->>C: 200
 ```
 
-**Failure rule.** Extraction is the slow, fallible part. The episode is written
-to Neo4j and the row to Postgres even if extraction returns nothing useful — a
-memory with no extracted entities is still retrievable by recency and by text.
-Losing the memory because the model hiccuped is not acceptable.
+Two rules the arrows encode. **Scrub first**: a stored secret is searchable,
+shared on promotion and fed back into prompts. **Commit before reply**: the
+teardown-commit lag made sharing a coin flip until it was moved (D81).
+If extraction fails the episode is still saved and the reply says `degraded`.
 
 ---
 
-## 3. Data flow — one search
+## 3. One answer
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant CC as Claude Code
-    participant C as drymem client
-    participant API as server/api
-    participant M as MemoryStore
-    participant N as Neo4j
-    participant P as Postgres
+Picture: [03-ask](diagrams/html/03-ask.html).
 
-    CC->>C: mem_search("payments")
-    C->>API: GET /v1/memories/search?q=payments
-    API->>API: resolve visible groups
-    Note over API: [project:team,<br/>project:u:<me>]
-    API->>M: search(query, group_ids)
-    M->>N: hybrid search (semantic + BM25 + graph)
-    N-->>M: edges (facts) ranked
-    API->>P: join author, scope, promoted_at
-    API-->>C: facts + who + when + scope
-    C-->>CC: "Found 6: (team, Miguel, 3d ago) ..."
-```
+1. The API loads the last turns and the uuids the previous answer cited, and
+   forwards the question to the engine.
+2. The engine searches graph facts and full-text episodes over exactly
+   `readable_groups` = the project's team group + the caller's own group.
+   Candidates are scored (graph hit +3, carried +2, word match +1); the top four
+   go to the model with author names and dates in prose.
+3. Only cited memories come back, renumbered from one; a marker pointing at
+   nothing is dropped. No match → no model call, `grounded: false`.
+4. The API stores the turn as chat messages ordered by `seq`, not by timestamp.
 
-**Why the Postgres join matters.** A fact with no author and no date is a rumour.
-Every retrieved memory carries who vouched for it and when, so the agent — and
-the human reading the TUI — can weigh it.
+`make eval` runs real questions against the real model and grades every prompt
+rule.
 
 ---
 
 ## 4. Isolation model
 
-One Neo4j `group_id` per visibility bucket. This is Graphiti's native isolation,
-so we get it for free and it is the same mechanism at every tier.
+One Neo4j `group_id` per visibility bucket. Group ids carry the organisation, so
+two companies tracking the same git remote never share a group (D79):
 
 ```
-<project_key>:team          promoted, visible to every project member
-<project_key>:u:<user_id>   private to that user
+<org8>/<project_key>/team           shared: every project member reads it
+<org8>/<project_key>/u/<user8>      private to that person
 ```
 
-- A search runs over `[team] + [own private]`. Never another user's private group.
-- **Promotion re-ingests** the episode into the team group and stamps
-  `memories.promoted_at`. The private original stays; the team copy is the shared one.
-- `project_key` comes from the normalised git remote (PLAN.md D7), so two clones
-  at different paths on different machines resolve to the same project.
+- A read runs over `[team] + [own]`. Never another person's private group, and
+  never fetch-everything-then-filter: the database is asked for those groups only.
+- **Promotion re-ingests** the episode into the team group and adds
+  `team_episode_uuid` to the same index row. The private original stays.
+- Postgres holds the index (who, when, project, scope, rating, session); Neo4j
+  holds the only copy of the text. A page number needs a total; the graph has
+  two episodes for every shared memory and no offset — the index has one row.
+- Proven against real Neo4j on all three read paths (`make test-e2e`).
 
-At the SaaS tier this same mechanism scales two ways: small teams share one Neo4j
-partitioned by `group_id`; enterprise clients get a dedicated Neo4j instance
-(PLAN.md step 6).
+Picture: [06-memory-scope](diagrams/html/06-memory-scope.html) and
+[08-memory-lineage](diagrams/html/08-memory-lineage.html).
 
 ---
 
 ## 5. Trust boundaries
 
-```mermaid
-flowchart TB
-    U["Untrusted: summary text from the agent"] --> SC["Scrubber"]
-    SC --> T["Trusted store"]
-    T --> R["Retrieval → back into an agent's context"]
-    R -.->|"prompt-injection risk"| U
-```
+1. **Laptop → API.** Cookie (with `X-Drymem-Client`) or bearer token per
+   machine; login and signup are rate-limited. A project you are not a member
+   of is a 404, not a 403.
+2. **API → engine.** The API mints a short-lived HS256 principal; the engine
+   verifies it and authenticates nobody itself. A forged principal is 401.
+3. **Summary → store.** Everything passes the scrubber. Secret patterns are
+   redacted; a private key block fails the save loudly and is audited.
+4. **Store → agent context.** Retrieved memories are text that goes back into a
+   model's context. A memory is data, never instructions — a teammate's memory
+   is a second author in your context window.
+5. **Skill → every laptop.** A published skill runs on every teammate's agent.
+   The scanner refuses credentials outright; findings wait for an org admin;
+   only org admins import from outside. Skills are pulled by each machine with
+   its own token at session start — never written to the repository.
 
-Three boundaries worth naming, because each has a rule:
-
-1. **Laptop → server.** Bearer token per user; project ACL on every request. A
-   user reaching for a project they aren't a member of gets 404, not 403 — we
-   don't confirm the project exists.
-2. **Summary → store.** Everything passes the scrubber first. Secret patterns are
-   redacted; a detected private key block **fails the save loudly** rather than
-   being silently redacted, because a leaked key needs a human to know about it.
-3. **Store → agent context.** Retrieved memories are text that goes back into a
-   model's context. A memory is data, never instructions. The MCP tool output
-   labels them as recalled memories so the agent treats them as context, not
-   commands. This matters more once memories are shared: a teammate's memory is
-   a second author in your context window.
+Pictures: [04-skill-distribution](diagrams/html/04-skill-distribution.html),
+[05-skill-states](diagrams/html/05-skill-states.html),
+[09-session-hooks](diagrams/html/09-session-hooks.html).
 
 ---
 
 ## 6. Deployment
 
-```mermaid
-flowchart LR
-    subgraph box["One host — docker compose"]
-        CADDY["Caddy<br/>TLS"] --> APP["drymem-server"]
-        APP --> NEO[("Neo4j")]
-        APP --> PGX[("Postgres")]
-    end
-    APP -.-> OLL["Ollama<br/>(host GPU)"]
-    BK["nightly dumps → object storage"] -.- box
-```
-
-Only Caddy is exposed. Neo4j and Postgres bind to the compose network — never a
-public port, which is the single most common way a Neo4j gets owned.
-
-Two pilot options (PLAN.md step 4): Miguel's workstation over Tailscale (GPU
-already there, €0), or the cheapest EU VPS. Same compose file either way.
-
----
-
-## 7. What changes between steps
-
-| After step | Architecture reality |
-|---|---|
-| 1 | Single user. No server: MCP process talks to local Neo4j + local Ollama. The `MemoryStore` interface exists, so step 2A moves it without touching tool logic. |
-| 2A | Server exists. Client is TypeScript over HTTP. Neo4j and Postgres in compose on Miguel's machine. |
-| 2B | TUI on the same client. |
-| 3A | `scope` and promotion live. Multi-user for real. |
-| 3B | Skills registry + git sync. |
-| 4 | Deployed where teammates can reach it. |
-| 6 | Multi-org; dedicated Neo4j per enterprise client. |
+`docker-compose.yml` + `docker-compose.prod.yml`: Postgres, Neo4j and the
+engine on a private bridge; the API is the one published port. Put a TLS
+terminator in front of it and set `COOKIE_SECURE=true`. The model is whatever
+`LOCAL_LLM_URL` names — the compose refuses to start without it. Backups:
+`scripts/backup.sh dump|restore` (both volumes, stack stopped). Provisioning a
+second organisation: `drymem-admin org-create`. See
+[operations.md](operations.md) and
+[07-onboarding](diagrams/html/07-onboarding.html).

@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "From nothing to a teammate's first session",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "org", "label": "One organisation per server, unless provisioned", "focus": ["signup", "org", "second", "provision"],
+        "note": "Signup works exactly once. A second organisation is provisioned by the operator; its owner has no password and sets their own." },
+      { "id": "people", "label": "Invitation only", "focus": ["invite", "token", "accept", "member", "project"],
+        "note": "Nobody joins uninvited. Without a mail provider the link goes to the server log — the response never says whether an address exists." },
+      { "id": "machine", "label": "The machine side", "focus": ["member", "login", "setup"],
+        "note": "`drymem login` stores a token per machine; `drymem setup` installs hooks and the MCP server per repo. After that, sessions just work." }
+    ]
+  },
+  "lanes": [
+    { "id": "operator", "label": "Operator / admin" },
+    { "id": "server",   "label": "drymem server" },
+    { "id": "person",   "label": "New teammate" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "Organisation", "fromCol": 0, "toCol": 1 },
+    { "id": "p2", "label": "People",       "fromCol": 2, "toCol": 3 },
+    { "id": "p3", "label": "Machine",      "fromCol": 4, "toCol": 5 }
+  ],
+  "nodes": [
+    { "id": "signup",    "lane": "operator", "col": 0, "type": "external", "label": "First signup",            "sublabel": "creates the org · you are owner", "width": 170 },
+    { "id": "provision", "lane": "operator", "col": 1, "type": "backend",  "label": "drymem-admin org-create", "sublabel": "owner sets a password via reset link", "width": 200 },
+    { "id": "invite",    "lane": "operator", "col": 2, "type": "external", "label": "Invite",                  "sublabel": "email + role", "width": 130 },
+    { "id": "project",   "lane": "operator", "col": 4, "type": "external", "label": "Add to project",          "sublabel": "or save a memory: creator is lead", "width": 180 },
+    { "id": "org",       "lane": "server",   "col": 1, "type": "database", "label": "Organisation",            "sublabel": "orgs · users(owner)", "width": 150 },
+    { "id": "token",     "lane": "server",   "col": 3, "type": "security", "label": "Invite token",            "sublabel": "hashed · expires", "width": 140 },
+    { "id": "member",    "lane": "server",   "col": 4, "type": "database", "label": "Project member",          "sublabel": "lead or member", "width": 150 },
+    { "id": "second",    "lane": "person",   "col": 0, "type": "external", "label": "Second signup",           "sublabel": "409 — ask for an invitation", "width": 170 },
+    { "id": "accept",    "lane": "person",   "col": 3, "type": "external", "label": "Accept",                  "sublabel": "sets password · signed in", "width": 150 },
+    { "id": "login",     "lane": "person",   "col": 4, "type": "backend",  "label": "npx drymem login",        "sublabel": "token for this machine", "width": 160 },
+    { "id": "setup",     "lane": "person",   "col": 5, "type": "backend",  "label": "npx drymem setup",        "sublabel": "hooks + MCP · first session", "width": 170 }
+  ],
+  "edges": [
+    { "id": "e1",  "from": "signup",    "to": "org",     "variant": "emphasis", "role": "main" },
+    { "id": "e2",  "from": "second",    "to": "org",     "label": "refused",  "variant": "security", "role": "error" },
+    { "id": "e3",  "from": "provision", "to": "org",     "label": "+ owner",  "variant": "default",  "role": "branch" },
+    { "id": "e4",  "from": "org",       "to": "invite",  "variant": "default", "role": "main" },
+    { "id": "e5",  "from": "invite",    "to": "token",   "variant": "security", "role": "main" },
+    { "id": "e6",  "from": "token",     "to": "accept",  "label": "email · or log", "variant": "dashed", "role": "async" },
+    { "id": "e7",  "from": "accept",    "to": "member",  "variant": "default", "role": "main" },
+    { "id": "e8",  "from": "project",   "to": "member",  "variant": "emphasis", "role": "branch" },
+    { "id": "e9",  "from": "member",    "to": "login",   "variant": "default", "role": "main" },
+    { "id": "e10", "from": "login",     "to": "setup",   "variant": "emphasis", "role": "main" }
+  ],
+  "mainPath": ["signup", "org", "invite", "token", "accept", "member", "login", "setup"],
+  "cards": [
+    { "dot": "rose", "title": "Rate limits, in memory per process", "items": [
+      "login + signup: 10 per minute per IP",
+      "password reset: 5 per 10 minutes per IP" ] },
+    { "dot": "amber", "title": "Also signs in", "items": [
+      "GitHub OAuth — verified primary email only, existing accounts only, never provisions a stranger",
+      "Forgot-password link goes to email with Resend, otherwise to the server log" ] }
+  ]
+}

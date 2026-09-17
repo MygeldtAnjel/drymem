@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "A memory's life — who can read it, and when",
+    "viewBox": [
+      980,
+      640
+    ],
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main",
+        "label": "Private, then shared",
+        "focus": [
+          "written",
+          "scrubbed",
+          "private",
+          "shared"
+        ],
+        "note": "Every memory starts private to its author. Sharing copies it into the team group; the original stays with the author."
+      },
+      {
+        "id": "gate",
+        "label": "The one hard stop",
+        "focus": [
+          "written",
+          "scrubbed",
+          "refused"
+        ],
+        "note": "A private-key block fails the save and is audited. Everything else is redacted and kept — blocking teaches people to stop saving."
+      },
+      {
+        "id": "later",
+        "label": "Getting old, and going",
+        "focus": [
+          "shared",
+          "superseded",
+          "deleted"
+        ],
+        "note": "A later memory that contradicts an earlier one marks it superseded. Delete removes both copies and the index row."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Scope over time"
+    },
+    {
+      "id": "terminal",
+      "label": "Terminal exits"
+    }
+  ],
+  "states": [
+    {
+      "id": "written",
+      "type": "start",
+      "label": "Written",
+      "sublabel": "agent · CLI · import",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "scrubbed",
+      "type": "decision",
+      "label": "Scrubbed",
+      "sublabel": "keys redacted",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "audited"
+    },
+    {
+      "id": "private",
+      "type": "active",
+      "label": "Private",
+      "sublabel": "author only",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "default"
+    },
+    {
+      "id": "shared",
+      "type": "success",
+      "label": "Shared",
+      "sublabel": "team copy",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "promote"
+    },
+    {
+      "id": "superseded",
+      "type": "neutral",
+      "label": "Superseded",
+      "sublabel": "newer memory wins",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "struck through"
+    },
+    {
+      "id": "refused",
+      "type": "failure",
+      "label": "Refused",
+      "sublabel": "422 · audited",
+      "lane": "terminal",
+      "col": 0,
+      "tag": "terminal"
+    },
+    {
+      "id": "deleted",
+      "type": "failure",
+      "label": "Deleted",
+      "sublabel": "both copies + row",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "terminal"
+    }
+  ],
+  "transitions": [
+    {
+      "from": "scrubbed",
+      "to": "refused",
+      "label": "private key",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "shared",
+      "to": "deleted",
+      "label": "delete",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "route": "straight",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Isolation is the database's job",
+      "items": [
+        "Neo4j is asked for exactly the groups this caller may read — never fetch-everything-then-filter",
+        "Group ids carry the organisation: two companies tracking the same git remote never share a group (D79)"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Rated, and learned from",
+      "items": [
+        "Useful / not useful, per person, with the query that surfaced it — the pilot's precision metric",
+        "A rating can be taken back; changing your mind replaces it. A private memory can be deleted too."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,367 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "drymem — system architecture",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "browser",
+        "label": "Browser path",
+        "focus": [
+          "person",
+          "web",
+          "api",
+          "postgres",
+          "engine"
+        ],
+        "note": "A person signs in with a cookie. Express owns identity and the control plane, and serves the React app."
+      },
+      {
+        "id": "agent",
+        "label": "Agent path",
+        "focus": [
+          "claude",
+          "hooks",
+          "mcp",
+          "cli",
+          "api",
+          "engine",
+          "ollama"
+        ],
+        "note": "Claude Code fires hooks and calls MCP tools. Everything on the laptop talks HTTP with a bearer token; nothing imports a database driver."
+      },
+      {
+        "id": "storage",
+        "label": "Two stores, one truth each",
+        "focus": [
+          "engine",
+          "postgres",
+          "neo4j",
+          "ollama"
+        ],
+        "note": "Postgres is the index (who, when, project, scope, rating). Neo4j holds the only copy of each memory's text, in org-scoped groups."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "person",
+      "type": "external",
+      "label": "Teammate",
+      "sublabel": "browser",
+      "pos": [
+        30,
+        90
+      ],
+      "size": [
+        110,
+        50
+      ]
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Claude Code",
+      "sublabel": "or Codex / Cursor",
+      "pos": [
+        30,
+        300
+      ],
+      "size": [
+        110,
+        54
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Web app",
+      "sublabel": "React · shadcn",
+      "pos": [
+        200,
+        90
+      ],
+      "size": [
+        120,
+        50
+      ],
+      "tag": "served by api"
+    },
+    {
+      "id": "hooks",
+      "type": "backend",
+      "label": "hooks",
+      "sublabel": "session-start / stop",
+      "pos": [
+        200,
+        232
+      ],
+      "size": [
+        120,
+        50
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "mcp",
+      "sublabel": "mem_* tools · stdio",
+      "pos": [
+        200,
+        302
+      ],
+      "size": [
+        120,
+        50
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "backend",
+      "label": "cli",
+      "sublabel": "npx drymem …",
+      "pos": [
+        200,
+        372
+      ],
+      "size": [
+        120,
+        50
+      ]
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "API",
+      "sublabel": "Express :8080",
+      "pos": [
+        430,
+        210
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "the only public port"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "Memory engine",
+      "sublabel": "FastAPI :8090",
+      "pos": [
+        630,
+        210
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "never published"
+    },
+    {
+      "id": "ollama",
+      "type": "cloud",
+      "label": "Local model",
+      "sublabel": "Ollama · qwen 35B",
+      "pos": [
+        630,
+        80
+      ],
+      "size": [
+        140,
+        58
+      ],
+      "tag": "extract · ask · tag"
+    },
+    {
+      "id": "neo4j",
+      "type": "database",
+      "label": "Neo4j",
+      "sublabel": "Graphiti graph",
+      "pos": [
+        850,
+        210
+      ],
+      "size": [
+        150,
+        58
+      ],
+      "tag": "memory text lives here"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Postgres",
+      "sublabel": "index · users · skills",
+      "pos": [
+        530,
+        400
+      ],
+      "size": [
+        150,
+        54
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Developer laptop",
+      "wraps": [
+        "person",
+        "claude",
+        "web",
+        "hooks",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "docker compose host",
+      "wraps": [
+        "api",
+        "engine",
+        "postgres",
+        "neo4j"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "c1",
+      "from": "person",
+      "to": "web",
+      "label": "https",
+      "variant": "default"
+    },
+    {
+      "id": "c2",
+      "from": "web",
+      "to": "api",
+      "label": "cookie + X-Drymem-Client",
+      "variant": "security"
+    },
+    {
+      "id": "c3",
+      "from": "claude",
+      "to": "hooks",
+      "label": "Start · Stop",
+      "variant": "default",
+      "labelDy": 17
+    },
+    {
+      "id": "c4",
+      "from": "claude",
+      "to": "mcp",
+      "variant": "default"
+    },
+    {
+      "id": "c5",
+      "from": "hooks",
+      "to": "api",
+      "label": "bearer token",
+      "variant": "emphasis",
+      "labelSegment": 0,
+      "labelDx": -16,
+      "labelDy": -19
+    },
+    {
+      "id": "c6",
+      "from": "mcp",
+      "to": "api",
+      "label": "bearer token",
+      "variant": "emphasis",
+      "labelSegment": 0,
+      "labelDx": -16,
+      "labelDy": -19
+    },
+    {
+      "id": "c7",
+      "from": "cli",
+      "to": "api",
+      "label": "bearer token",
+      "variant": "emphasis",
+      "labelSegment": 0,
+      "labelDx": -16,
+      "labelDy": -19
+    },
+    {
+      "id": "c8",
+      "from": "api",
+      "to": "engine",
+      "label": "signed principal (HS256)",
+      "variant": "security",
+      "labelDy": -23
+    },
+    {
+      "id": "c9",
+      "from": "api",
+      "to": "postgres",
+      "label": "control plane",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "via": [
+        [
+          500,
+          427
+        ]
+      ],
+      "labelSegment": 0
+    },
+    {
+      "id": "c10",
+      "from": "engine",
+      "to": "postgres",
+      "label": "memory index",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [
+        [
+          700,
+          427
+        ]
+      ],
+      "labelSegment": 0
+    },
+    {
+      "id": "c11",
+      "from": "engine",
+      "to": "neo4j",
+      "label": "org-scoped group_ids",
+      "variant": "emphasis",
+      "labelDy": -23
+    },
+    {
+      "id": "c12",
+      "from": "engine",
+      "to": "ollama",
+      "label": "extraction · answers",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "One rule",
+      "items": [
+        "Nothing on the laptop imports graphiti or a DB driver — every surface goes through the API over HTTP",
+        "The engine listens on loopback only; the API is the sole public port",
+        "The API mints a short-lived HS256 principal; the engine trusts nothing else"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Where things live",
+      "items": [
+        "Postgres: users, orgs, projects, memberships, memory index, skills catalogue, audit, chats",
+        "Neo4j: the text of every memory, entities and facts — one group per org × project × (team | person)",
+        "Skill content: on the server. Git carries code only. Ollama runs on the host, outside compose."
+      ]
+    }
+  ]
+}
