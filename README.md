@@ -121,6 +121,10 @@ make dev            # engine and API
 make test           # every suite
 ```
 
+The console is built, not committed. `pnpm --filter @drymem/web run build` puts
+it where the API serves it from; `pnpm --filter @drymem/web run dev` is the one
+you want while working on it.
+
 | | |
 |---|---|
 | `apps/server` | The memory engine — Python, FastAPI, Graphiti |

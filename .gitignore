@@ -40,3 +40,8 @@ backups/
 PLAN.md
 docs/specs/
 docs/PLAN-v1.md
+
+# The console's build output. The Docker image builds it itself; committing it
+# means every `vite build` leaves a dirty tree and every review carries a
+# minified diff nobody reads.
+apps/server/drymem_server/web/
