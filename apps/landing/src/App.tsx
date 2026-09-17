@@ -57,6 +57,20 @@ export function App() {
   const [dark, toggleTheme] = useTheme();
   const docs = /^#\/docs\/?([a-z-]*)/.exec(hash);
 
+  // An in-page anchor arriving in the URL — someone opening a shared
+  // `…/#request` — is scrolled to here. The browser tries it on load and gives
+  // up, because at that moment React has not painted the section yet.
+  useEffect(() => {
+    if (docs) return;
+    const id = hash.replace(/^#/, "");
+    if (!id) return;
+    const target = document.getElementById(id);
+    // Instant, not smooth: arriving on a shared link should land on the section,
+    // not animate the reader past three thousand pixels of a page they did not
+    // ask for. Clicking an anchor still glides, through CSS scroll-behavior.
+    if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: "instant" }));
+  }, [hash, docs]);
+
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 border-b bg-background/85 backdrop-blur">

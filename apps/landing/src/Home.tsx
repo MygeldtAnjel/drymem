@@ -35,14 +35,14 @@ function Screens() {
         src="/shots/memories-light.png"
         alt="The drymem console listing a project's memories, each with its kind, author and whether it is shared."
         width={2880}
-        height={1800}
+        height={1760}
         className="block w-full dark:hidden"
       />
       <img
         src="/shots/memories-dark.png"
         alt=""
         width={2880}
-        height={1800}
+        height={1760}
         className="hidden w-full dark:block"
       />
     </figure>
