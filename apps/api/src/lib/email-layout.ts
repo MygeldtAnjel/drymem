@@ -15,8 +15,11 @@
  *
  * That last one decides the cat. The product's mark is a drawn SVG (the black
  * head with the amber almond eyes in `apps/web/src/components/Logo.tsx`), and
- * Gmail strips inline SVG to nothing — so the band carries the emoji instead.
- * It is the one cat that renders in every client without asking permission.
+ * Gmail strips inline SVG to nothing — so the band carries an emoji instead.
+ * It is the black cat, U+1F408 U+200D U+2B1B, because ours is a black cat and
+ * the plain cat face renders ginger on every platform that draws it. That one
+ * is a whole cat in profile rather than a face, so it is set larger than the
+ * wordmark — at text size the detail collapses into a smudge.
  *
  * The palette is the app's own (`apps/web/src/index.css`) warmed a shade for
  * paper: light by default, with the app's dark values behind a media query.
@@ -24,39 +27,51 @@
  * dark mode mangle a light design predictably and a dark one unpredictably.
  */
 
-/** Light: the app's `:root`, on a warmer ground. Contrast is against the card. */
+/**
+ * The app's own tokens, not a warmer cousin of them (`apps/web/src/index.css`).
+ *
+ * Two rules from the console hold here, and both were broken once already:
+ * amber is the *mark*, never a button fill, and the primary action is the
+ * ground inverted — near-black on light, near-white on dark.
+ *
+ * The band is the one exception, and it is not one: the mark's own strip is
+ * exactly the place the brand colour belongs. It keeps the same burnt amber in
+ * both schemes so the black cat standing on it stays legible either way.
+ */
+const BAND = "#b45309";
+
+/** Light: the app's `:root`. Contrast is against the card. */
 const light = {
-  page: "#f7f5f2",
-  card: "#ffffff",
-  border: "#ece6de",
-  /* Amber is the mark, so the mark's own band is the one place it fills. */
-  band: "#b45309",
-  bandText: "#ffffff",
-  heading: "#0a0a0a", // 19.80:1
+  page: "#fafafa", // --background
+  card: "#ffffff", // --card
+  border: "#e5e5e5", // --border
+  band: BAND,
+  bandText: "#ffffff", // 5.02:1 on the band
+  heading: "#0a0a0a", // --foreground, 19.80:1
   /* Body sits between foreground and muted-foreground: 15px of prose in
      near-black reads heavy, and in muted-foreground it reads faint. */
   text: "#454545", // 9.17:1
-  meta: "#6b6560", // 5.31:1
-  button: "#b45309", // white on it: 5.02:1
-  buttonText: "#ffffff",
-  brand: "#b45309",
-  panel: "#faf8f5",
+  meta: "#666666", // --muted-foreground, 5.74:1
+  button: "#0a0a0a", // --primary
+  buttonText: "#ffffff", // --primary-foreground, 19.80:1
+  brand: BAND, // --brand
+  panel: "#f5f5f5", // --muted
 };
 
-/** Dark: the app's `.dark`. The band drops to brand-subtle so it does not glare. */
+/** Dark: the app's `.dark`. The primary action inverts rather than staying black. */
 const dark = {
   page: "#0a0a0a",
   card: "#0f0f0f",
   border: "#232323",
-  band: "#3a2a0c",
-  bandText: "#f2a93b",
+  band: BAND,
+  bandText: "#ffffff",
   heading: "#ededed", // 16.37:1
   text: "#c9c9c9", // 11.0:1
   meta: "#a1a1a1", // 7.42:1
-  button: "#f2a93b", // 9.60:1
-  buttonText: "#1a1305",
-  brand: "#f2a93b",
-  panel: "#141414",
+  button: "#ededed", // --primary
+  buttonText: "#0a0a0a", // 16.91:1
+  brand: "#f2a93b", // --brand
+  panel: "#171717", // --muted
 };
 
 const FONT =
@@ -215,8 +230,6 @@ export function render({ title, preheader, rows, footnote }: Layout): string {
   @media (prefers-color-scheme: dark) {
     .dm-page    { background: ${dark.page} !important; }
     .dm-card    { background: ${dark.card} !important; border-color: ${dark.border} !important; }
-    .dm-band    { background: ${dark.band} !important; }
-    .dm-band-t  { color: ${dark.bandText} !important; }
     .dm-panel   { background: ${dark.panel} !important; border-color: ${dark.border} !important; }
     .dm-code    { background: ${dark.panel} !important; border-color: ${dark.border} !important; color: ${dark.heading} !important; }
     .dm-rule    { border-color: ${dark.border} !important; }
@@ -251,7 +264,7 @@ ${preheaderOf(preheader)}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
           <tr><td class="dm-band" bgcolor="${light.band}" align="center" style="background:${light.band};border-radius:13px 13px 0 0;padding:22px 20px">
-            <span style="font-family:${FONT};font-size:19px;line-height:1;vertical-align:middle">&#128049;</span>
+            <span style="font-family:${FONT};font-size:26px;line-height:1;vertical-align:middle">&#128008;&#8205;&#11035;</span>
             <span class="dm-band-t" style="font-family:${FONT};font-size:17px;font-weight:700;letter-spacing:-0.01em;line-height:1;color:${light.bandText};vertical-align:middle;padding-left:7px">drymem</span>
           </td></tr>
 

@@ -142,18 +142,23 @@ export interface WelcomeOpts {
 }
 
 export function welcomeLetter(opts: WelcomeOpts): Letter {
-  const run = ["npx drymem login", "npx drymem setup"];
+  // One command, not two: `setup` signs the machine in through the browser when
+  // it has no token yet (apps/cli/src/setup.ts), so telling people to `login`
+  // first sends them through a step they have already done. Nothing is
+  // installed globally either — the hooks it writes call `npx drymem` too, so
+  // the package has to be runnable that way regardless (PLAN.md D11).
+  const run = "npx drymem@latest setup";
   const opening = opts.owner
     ? `You created <b>${esc(opts.orgName)}</b> on drymem and you own it.`
     : `Your account at <b>${esc(opts.orgName)}</b> is ready.`;
   const getting = [
     {
-      title: "Connect this machine",
-      body: `Run ${code(run[0]!)} and confirm the code it prints. Once per machine.`,
+      title: "Open a repository you work in",
+      body: `Any project with a git remote. That remote is what decides which memory this is.`,
     },
     {
-      title: "Set it up in a repository",
-      body: `Run ${code(run[1]!)} where you work. It installs the hooks and the MCP server, and pulls the skills this project uses.`,
+      title: "Run one command",
+      body: `${code(run)} — it signs this machine in through your browser, installs the session hooks and the MCP server, and pulls the skills this project uses. Nothing to install first.`,
     },
     {
       title: "Carry on as normal",
@@ -191,12 +196,14 @@ export function welcomeLetter(opts: WelcomeOpts): Letter {
         ? `You created ${opts.orgName} on drymem and you own it.`
         : `Your account at ${opts.orgName} on drymem is ready.`,
       ``,
-      `Signing in to the web app is half of it — the memory only reaches your`,
-      `coding agent once this machine is connected. In a repository you work in:`,
+      `Signing in here is half of it — the memory only reaches your coding agent`,
+      `once this machine is connected. In a repository you work in, run:`,
       ``,
-      ...run.map((line) => `  ${line}`),
+      `  ${run}`,
       ``,
-      `login once per machine, setup once per repository.`,
+      `That signs this machine in through your browser, installs the session`,
+      `hooks and the MCP server, and pulls the skills this project uses.`,
+      `Nothing to install first.`,
       ``,
       `Open drymem: ${opts.appUrl}`,
     ]),

@@ -68,7 +68,7 @@ describe("what every letter owes the reader", () => {
     for (const letter of [welcome(false), invite(), reset(), changed()]) {
       // The product's mark is a drawn SVG and Gmail strips SVG to nothing, so
       // the band carries the cat as an emoji entity instead.
-      expect(letter.html).toContain("&#128049;");
+      expect(letter.html).toContain("&#128008;&#8205;&#11035;");
       expect(letter.html).toContain("drymem");
     }
   });
@@ -166,14 +166,20 @@ describe("the password-changed notice", () => {
 });
 
 describe("the welcome", () => {
-  it("carries the two commands that connect a machine, in both halves", () => {
+  it("names the one command that connects a machine, in both halves", () => {
     for (const owner of [true, false]) {
       const { html, text } = welcome(owner);
-      expect(html).toContain("npx drymem login");
-      expect(html).toContain("npx drymem setup");
-      expect(text).toContain("npx drymem login");
-      expect(text).toContain("npx drymem setup");
+      expect(html).toContain("npx drymem@latest setup");
+      expect(text).toContain("npx drymem@latest setup");
     }
+  });
+
+  it("does not send people through a login they have already done", () => {
+    // `setup` signs the machine in when it has no token, so a separate
+    // `drymem login` step is a command that does nothing the second time.
+    const { html, text } = welcome(false);
+    expect(html).not.toContain("drymem login");
+    expect(text).not.toContain("drymem login");
   });
 
   it("leaves a prompt character out, so the line can be copied whole", () => {
