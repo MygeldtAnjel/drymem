@@ -1,6 +1,14 @@
 # One command per task, so two package managers never become two workflows.
 SERVER := apps/server
 
+# The databases take their credentials from .env, and so must anything that
+# talks to them directly — the test harness makes its scratch databases on the
+# same Postgres `make db-up` started.
+ifneq (,$(wildcard .env))
+-include .env
+export
+endif
+
 .PHONY: help dev test types build eval fmt migrate up db-up db-down
 help:
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'

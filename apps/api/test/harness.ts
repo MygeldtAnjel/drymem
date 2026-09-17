@@ -11,6 +11,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 
@@ -19,7 +20,34 @@ import { vi } from "vitest";
 
 const run = promisify(execFile);
 
-const ADMIN_URL = "postgres://drymem:drymem_pass@localhost:5432/postgres";
+/*
+ * The scratch databases are made on whichever Postgres `make db-up` started, so
+ * the credentials have to be the ones the compose file used — and those are
+ * generated per install now.
+ *
+ * Read from the environment first, then from the repository's `.env`, then a
+ * known development fallback for a fresh clone. Reading `.env` here rather than
+ * relying on the caller is what keeps `vitest` working when it is run directly
+ * instead of through `make`.
+ */
+function fromEnvFile(key: string): string | undefined {
+  try {
+    const file = readFileSync(new URL("../../../.env", import.meta.url), "utf8");
+    const line = file
+      .split("\n")
+      .find((l) => l.trimStart().startsWith(`${key}=`));
+    return line?.slice(line.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "") || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const setting = (key: string, fallback: string) =>
+  process.env[key] ?? fromEnvFile(key) ?? fallback;
+
+const PG_PASSWORD = setting("POSTGRES_PASSWORD", "drymem_dev_only");
+const PG_PORT = setting("POSTGRES_PORT", "5432");
+const ADMIN_URL = `postgres://drymem:${PG_PASSWORD}@localhost:${PG_PORT}/postgres`;
 const SERVER_DIR = new URL("../../server", import.meta.url).pathname;
 
 export interface Scratch {
@@ -33,7 +61,7 @@ export async function scratchDatabase(): Promise<Scratch> {
   await admin.unsafe(`CREATE DATABASE "${name}"`);
   await admin.end();
 
-  const url = `postgres://drymem:drymem_pass@localhost:5432/${name}`;
+  const url = `postgres://drymem:${PG_PASSWORD}@localhost:${PG_PORT}/${name}`;
   await run(`${SERVER_DIR}/.venv/bin/alembic`, ["upgrade", "head"], {
     cwd: SERVER_DIR,
     env: {

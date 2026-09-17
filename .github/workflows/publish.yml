@@ -1,0 +1,58 @@
+# Publish the CLI to npm when a tag is pushed.
+#
+# Tag-driven rather than push-driven: publishing is irreversible per version,
+# and `main` moving should not consume a version number. The tag is the
+# decision, and the version in the tag has to match the one in package.json —
+# a mismatch means somebody tagged without bumping, and that is a mistake worth
+# stopping rather than guessing at.
+#
+# Needs an NPM_TOKEN secret with publish rights. Until that exists this workflow
+# never runs, because nothing else pushes a v* tag.
+
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm provenance, so the package links back to this workflow
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: The tag and the manifest must agree
+        run: |
+          tagged="${GITHUB_REF_NAME#v}"
+          declared=$(node -p "require('./apps/cli/package.json').version")
+          if [ "$tagged" != "$declared" ]; then
+            echo "Tag says $tagged, apps/cli/package.json says $declared." >&2
+            exit 1
+          fi
+
+      # Never publish something that does not pass its own tests.
+      - run: pnpm --filter drymem run typecheck
+      - run: pnpm --filter drymem run test
+      - run: pnpm --filter drymem run build
+
+      - name: Publish
+        run: pnpm --filter drymem publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

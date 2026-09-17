@@ -1,0 +1,107 @@
+# Every suite, on every push and pull request.
+#
+# The control-plane tests build a scratch Postgres database per file and migrate
+# it with Alembic — the schema authority is Python even though the code under
+# test is TypeScript — so this job needs both toolchains and a real Postgres.
+# Neo4j is not here on purpose: the tests that need one are marked and skipped,
+# and standing a graph database up on every push buys minutes, not confidence.
+
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: drymem
+          POSTGRES_PASSWORD: drymem_dev_only
+          POSTGRES_DB: drymem
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U drymem"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      POSTGRES_PASSWORD: drymem_dev_only
+      POSTGRES_PORT: "5432"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --directory apps/server
+
+      - name: Memory engine
+        run: uv --directory apps/server run pytest -q
+
+      - name: Control plane
+        run: pnpm --filter @drymem/api run test
+
+      - name: CLI
+        run: pnpm --filter drymem run test
+
+      - name: Console
+        run: pnpm --filter @drymem/web run test
+
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Types
+        run: |
+          pnpm --filter @drymem/api run typecheck
+          pnpm --filter drymem run typecheck
+          pnpm --filter @drymem/landing run typecheck
+
+      - name: Everything builds
+        run: |
+          pnpm --filter drymem run build
+          pnpm --filter @drymem/api run build
+          pnpm --filter @drymem/web run build
+          pnpm --filter @drymem/landing run build
