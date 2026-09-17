@@ -20,7 +20,7 @@ const GITHUB = "https://github.com/mygeldtanjel/drymem";
  * seeded demo organisation, never from anybody's actual memories: a customer's
  * decisions are exactly the thing this product promises not to publish.
  */
-function Screens() {
+function Screens({ shot, alt }: { shot: string; alt: string }) {
   return (
     <figure className="overflow-hidden rounded-2xl border bg-card">
       <div className="flex items-center gap-2 border-b bg-muted/60 px-4 py-3">
@@ -32,14 +32,16 @@ function Screens() {
         </span>
       </div>
       <img
-        src="/shots/memories-light.png"
-        alt="The drymem console listing a project's memories, each with its kind, author and whether it is shared."
+        src={`/shots/${shot}-light.png`}
+        alt={alt}
         width={2880}
         height={1760}
         className="block w-full dark:hidden"
       />
+      {/* The dark copy carries no alt: it is the same picture, and a screen
+          reader announcing it twice is a bug the sighted reader cannot see. */}
       <img
-        src="/shots/memories-dark.png"
+        src={`/shots/${shot}-dark.png`}
         alt=""
         width={2880}
         height={1760}
@@ -78,6 +80,22 @@ const STEPS = [
     title: "What you keep re-explaining becomes a skill",
     body: "drymem notices the subjects that come up again and again with nothing written for them, and drafts a skill from your own memory. You approve it; every agent on the project installs it.",
   },
+];
+
+/**
+ * The agents, and honestly what works on each.
+ *
+ * Skills are platform-neutral — a folder with a SKILL.md — so they install
+ * wherever that agent reads them. Memory is a different matter: capturing it
+ * without anyone asking needs session hooks, and only Claude Code has them.
+ * Saying "works with four agents" without that distinction would be a sentence
+ * somebody discovers is untrue on their second day.
+ */
+const AGENTS = [
+  { name: "Claude Code", where: ".claude/skills/", memory: "Automatic" },
+  { name: "OpenCode", where: ".opencode/skill/", memory: "Via MCP" },
+  { name: "Codex", where: ".codex/skills/", memory: "Via MCP" },
+  { name: "Cursor", where: ".cursor/rules/", memory: "Via MCP" },
 ];
 
 const FACTS = [
@@ -125,7 +143,7 @@ const FAQ = [
   },
   {
     q: "Which agents does it work with?",
-    a: "Claude Code today, through session hooks and an MCP server — that is where automatic capture and context injection actually work. The client is a thin HTTP shim, so anything that speaks MCP can read and write the same memory.",
+    a: "Skills install for Claude Code, OpenCode, Codex and Cursor — each in the directory that agent actually reads, and only for the ones present on that machine. Memory is automatic in Claude Code, where session hooks capture and inject it without anyone typing a command; every other agent reads and writes the same memory through the MCP server.",
   },
   {
     q: "Is everything I save visible to my team?",
@@ -176,7 +194,10 @@ export function Home() {
 
       {/* ---- the product, before any more words ------------------------------- */}
       <Section className="pb-14">
-        <Screens />
+        <Screens
+          shot="memories"
+          alt="The drymem console listing a project's memories, each with its kind, author and whether it is shared."
+        />
         <p className="mt-5 text-sm leading-6 text-muted-foreground">
           Everything the team's agents have written down, with who wrote it and whether it is
           theirs alone or the team's.
@@ -224,6 +245,25 @@ export function Home() {
         </div>
       </Section>
 
+      {/* ---- skills, shown rather than described ------------------------------- */}
+      <Section id="skills" className="py-14">
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          The third thing is the one nobody else does
+        </h2>
+        <p className="mt-4 max-w-2xl text-[0.9375rem] leading-7 text-muted-foreground">
+          drymem watches for the subjects that keep coming back with nothing written for them, and
+          drafts a skill out of your own memory. A lead approves it, picks which projects run it,
+          and every agent on those projects has it at its next session. Scanned for credentials
+          before any of that happens.
+        </p>
+        <div className="mt-9">
+          <Screens
+            shot="skills"
+            alt="The drymem skills catalogue, showing which skills a project runs, their tags and how often they have been read."
+          />
+        </div>
+      </Section>
+
       {/* ---- what you get ----------------------------------------------------- */}
       <Section id="what" className="py-14">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -237,6 +277,46 @@ export function Home() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* ---- the agents -------------------------------------------------------- */}
+      <Section id="agents" className="py-14">
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Works with the agent you already use
+        </h2>
+        <p className="mt-4 max-w-2xl text-[0.9375rem] leading-7 text-muted-foreground">
+          A skill is a folder with a <code className="font-mono text-[0.875em]">SKILL.md</code> in
+          it, so it installs wherever your agent reads them — and only for the ones actually on
+          that machine. Nothing is written into a directory drymem did not create.
+        </p>
+        <div className="mt-9 overflow-hidden rounded-2xl border bg-card">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40">
+                <th className="px-5 py-3 font-semibold">Agent</th>
+                <th className="px-5 py-3 font-semibold">Skills land in</th>
+                <th className="px-5 py-3 font-semibold">Memory</th>
+              </tr>
+            </thead>
+            <tbody>
+              {AGENTS.map((agent) => (
+                <tr key={agent.name} className="border-b last:border-0">
+                  <td className="px-5 py-3 font-medium">{agent.name}</td>
+                  <td className="px-5 py-3 font-mono text-[0.8125rem] text-muted-foreground">
+                    {agent.where}
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">{agent.memory}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">
+          <span className="font-medium text-foreground">Automatic</span> means the memory is
+          captured and injected by session hooks, with nobody typing a command.{" "}
+          <span className="font-medium text-foreground">Via MCP</span> means the same memory,
+          through the tools your agent already knows how to call.
+        </p>
       </Section>
 
       {/* ---- questions --------------------------------------------------------- */}
