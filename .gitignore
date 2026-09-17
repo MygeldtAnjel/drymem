@@ -13,6 +13,8 @@ apps/server/.venv/
 node_modules/
 apps/cli/dist/
 apps/api/dist/
+apps/landing/dist/
+*.tsbuildinfo
 
 # Working files. The lockfile is a cache, not a record: the server decides which
 # skills a project uses, because that is what the web UI edits. A copy in git is
