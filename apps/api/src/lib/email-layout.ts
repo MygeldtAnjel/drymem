@@ -9,9 +9,12 @@
  * - **Inline styles.** Many clients strip a style block, so every rule that
  *   must survive is inlined. The one in the head carries only what cannot be
  *   inlined — media queries — and everything in it is a progressive extra.
- * - **No images.** Clients block them by default, and a mark that resolves to a
- *   broken icon is worse than no mark. Nothing here loads a URL, so there is no
- *   tracking pixel either, and nothing to consent to.
+ * - **One image, and only one.** Clients may block them, so nothing that has to
+ *   be read is an image. The single exception is the mark (see below); it is
+ *   served from the same origin as the links and carries an empty `alt`, so a
+ *   client that refuses it loses decoration and nothing else. Being the only
+ *   request the email makes, it is also the only thing that can report an open
+ *   — worth knowing before anyone claims these emails track nothing.
  *
  * That last one decides the cat. The product's mark is a drawn SVG (the black
  * head with the amber almond eyes in `apps/web/src/components/Logo.tsx`), and
@@ -37,12 +40,16 @@
  * neither a band, a button, nor a link. An email that arrives in colours the
  * product does not use is a letter from somebody else.
  *
- * The mark is the one thing that cannot follow suit. `CatMark` is drawn and
- * takes `currentColor`; an emoji has a fixed palette and cannot be recoloured
- * (Gmail strips CSS filters). There is no black cat *face* in Unicode — the
- * black cat is whole-body only — so the strip goes near-black and carries the
- * cat face on it, which is how the favicon reads: a dark tile, a lit mark.
+ * The mark is the one exception to "no images", and it earns it. `CatMark` is
+ * drawn and takes `currentColor`; Gmail strips inline SVG, an emoji cannot be
+ * recoloured, and Unicode has no black cat *face* at all — the black cat is
+ * whole-body only. So the real mark is served as a PNG by the API and the strip
+ * goes near-black behind it, which is how the favicon already reads: a dark
+ * tile, a lit cat. Its `alt` is deliberately empty — the wordmark sits beside
+ * it in text, so a client that blocks it loses nothing and repeats nothing.
  */
+
+import { env } from "../env.js";
 
 /** Light: the app's `:root`. Contrast is against the card. */
 const light = {
@@ -90,6 +97,15 @@ const MONO = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace";
  * trusted at each call site. An org called `Ben & Co <ops>` should read as
  * itself, not disappear into a broken tag.
  */
+/**
+ * Where the mark is served from. The same origin as every link in the email, so
+ * an install that can be reached to accept an invitation can be reached for
+ * this too — and one that cannot reaches nobody by email anyway.
+ */
+export function markUrl(): string {
+  return `${env.PUBLIC_URL.replace(/\/+$/, "")}/email/mark.png`;
+}
+
 export function esc(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -272,10 +288,10 @@ ${preheaderOf(preheader)}
       <tr><td class="dm-card" style="background:${light.card};border:1px solid ${light.border};border-radius:14px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
-          <tr><td class="dm-pad-t" bgcolor="${HEADER}" style="background:${HEADER};border-radius:13px 13px 0 0;padding:20px 30px">
+          <tr><td class="dm-pad-t" bgcolor="${HEADER}" style="background:${HEADER};border-radius:13px 13px 0 0;padding:18px 30px">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-              <td style="vertical-align:middle;font-family:${FONT};font-size:23px;line-height:1">&#128049;</td>
-              <td style="padding-left:9px;vertical-align:middle"><span style="font-family:${FONT};font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#ffffff">drymem</span></td>
+              <td style="vertical-align:middle;line-height:0"><img src="${markUrl()}" width="28" height="28" alt="" style="display:block;width:28px;height:28px;border:0;outline:none"></td>
+              <td style="padding-left:10px;vertical-align:middle"><span style="font-family:${FONT};font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#ffffff">drymem</span></td>
             </tr></table>
           </td></tr>
 

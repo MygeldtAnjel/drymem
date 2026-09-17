@@ -42,6 +42,8 @@ ENV NODE_ENV=production
 COPY --from=api /api/node_modules ./node_modules
 COPY --from=api /api/dist ./dist
 COPY --from=api /api/package.json ./package.json
+# The cat, for the emails. `dist/index.js` resolves it as `../assets`.
+COPY --from=api /api/assets ./assets
 COPY --from=web /web-dist ./web
 # The base catalogue every new organisation is seeded with, at the first path
 # `baseSkillsDir()` looks in.

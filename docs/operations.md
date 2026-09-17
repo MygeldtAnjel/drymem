@@ -88,7 +88,13 @@ teammate. Before anyone else is invited, verify a domain at
 A refusal is never fatal — it is logged, the flow continues, and the link is
 still there to paste — but nobody receives anything.
 
-To see what the three look like before changing them:
+The letterhead loads one image: the cat, from `PUBLIC_URL/email/mark.png` on
+this same server. On an install whose `PUBLIC_URL` nobody else can reach, it
+quietly does not render and the wordmark stands alone — which is the same
+condition under which the email reaches nobody anyway. It is also the only
+request these emails make, so it is the only thing that can report an open.
+
+To see what the four look like before changing them:
 
 ```bash
 pnpm --filter @drymem/api run email:preview /tmp/mail          # writes HTML + text

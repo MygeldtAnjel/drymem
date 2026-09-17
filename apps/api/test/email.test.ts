@@ -8,6 +8,8 @@
  * the letters are built and inspected directly.
  */
 
+import { existsSync } from "node:fs";
+
 import { beforeAll, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 
@@ -64,14 +66,22 @@ describe("what every letter owes the reader", () => {
     }
   });
 
-  it("wears the mark: the cat and the wordmark, in the band", () => {
+  it("wears the real mark, served from the same origin as its links", () => {
     for (const letter of [welcome(false), invite(), reset(), changed()]) {
-      // The product's mark is a drawn SVG and Gmail strips SVG to nothing, so
-      // the strip carries the cat as an emoji entity instead. It is the face:
-      // Unicode has no black cat face, and the black cat is whole-body only.
-      expect(letter.html).toContain("&#128049;");
+      // Not an emoji: Gmail strips inline SVG, emoji cannot be recoloured, and
+      // Unicode has no black cat face at all. The drawn mark arrives as a PNG.
+      expect(letter.html).toContain('src="http://127.0.0.1:8080/email/mark.png"');
+      // Empty alt: the wordmark is beside it in text, so a client that blocks
+      // the image loses nothing and a screen reader does not say it twice.
+      expect(letter.html).toContain('alt=""');
       expect(letter.html).toContain("drymem");
     }
+  });
+
+  it("ships the mark the route serves", () => {
+    // `src/index.ts` resolves it as `../assets/mark.png`, which is this path
+    // from here. If it moves, the strip silently loses its cat.
+    expect(existsSync(new URL("../assets/mark.png", import.meta.url))).toBe(true);
   });
 
   it("carries a plain-text half that names the same link", () => {
@@ -91,8 +101,9 @@ describe("values a person chose", () => {
   it("escapes an organisation's name instead of running it as markup", () => {
     const { html, subject } = invite({ orgName: `Ben & Co <img src=x onerror="alert(1)">` });
     // The words survive as text; what must not survive is a tag, or a quote
-    // that could close an attribute and start a new one.
-    expect(html).not.toContain("<img");
+    // that could close an attribute and start a new one. The letterhead has an
+    // `<img>` of its own, so the check is for *this* tag, not for any.
+    expect(html).not.toContain("<img src=x");
     expect(html).not.toContain('onerror="');
     expect(html).toContain("&lt;img");
     expect(html).toContain("Ben &amp; Co");
