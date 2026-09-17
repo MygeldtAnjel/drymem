@@ -1,7 +1,7 @@
 /**
  * `drymem skills import owner/repo@skill` — bringing in a public skill.
  *
- * skills.sh already has the catalogue, the installer and the adoption (D29), so
+ * skills.sh already has the catalogue, the installer and the adoption, so
  * this does not compete with it: it fetches, then hands the result to our own
  * publish path. That is the whole point. A skill from the internet lands in the
  * org catalogue the same way a hand-written one does — scanned, versioned,

@@ -5,7 +5,7 @@
  * feature: `subscriptions` says what is *metered*, not what works, and an org
  * with no row is on the free tier rather than broken. Wiring Stripe to numbers
  * nobody has looked at is how a product bills the wrong thing on day one, so
- * the numbers ship first and the charging comes after the pilot (PLAN.md §7).
+ * the numbers ship first and the charging comes after the pilot.
  *
  * Seats is the one worth thinking about: it counts people who have actually
  * signed in, not people who were invited. Charging for an invitation nobody

@@ -100,7 +100,7 @@ async def _with_local(prompt: str) -> str:
         ],
         # The local model is a thinking model. Without this it spends the whole
         # budget reasoning and returns an empty `content` — the same failure
-        # that made Ask look like it knew nothing (PLAN.md D50).
+        # that made Ask look like it knew nothing.
         extra_body={"reasoning_effort": "none"},
     )
     return response.choices[0].message.content or ""

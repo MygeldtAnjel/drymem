@@ -44,7 +44,7 @@ ORG_OWNER = "owner"
 ORG_ADMIN = "admin"
 ORG_MEMBER = "member"
 
-# What happens at the end of an agent session — see PLAN.md D38.
+# What happens at the end of an agent session — see.
 CAPTURE_AUTOMATIC = "automatic"
 CAPTURE_ASK = "ask"
 CAPTURE_MANUAL = "manual"

@@ -16,7 +16,6 @@
  * across the line, and then two histories have to be replayed in an order
  * neither of them records. One authority costs a round-trip through a Python
  * file when this service needs a column, and buys a single ordered history.
- * PLAN.md D41.
  */
 
 import { randomUUID } from "node:crypto";
@@ -327,7 +326,7 @@ export const projectSkills = pgTable(
  * The difference between "we have forty skills" and "these six are the ones
  * anyone uses" — and what shows a lead that the skill they enabled never fired.
  * It records *that* a skill was read, never what the agent then did with it;
- * the latter would be a transcript (PLAN.md D35).
+ * the latter would be a transcript.
  */
 export const skillUses = pgTable(
   "skill_uses",

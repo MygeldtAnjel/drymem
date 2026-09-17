@@ -23,7 +23,7 @@ exists for: *who changed the payment component last?* Fourteen of this project's
 twenty-one memories name a path. The seven that do not are notes about a deploy,
 which are not about a component and should not pretend to be.
 
-**Supersession is read, never guessed** (D45). A decision is drawn as replaced
+**Supersession is read, never guessed**. A decision is drawn as replaced
 only when an edge says so. Inferring it from similar text would put invented
 history in front of someone making a decision from it.
 """

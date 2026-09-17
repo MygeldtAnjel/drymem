@@ -193,8 +193,7 @@ drymem/
 │   └── skills/            base agent skill set, bundled into the CLI
 ├── deploy/                docker-compose · Caddyfile                      (step 4)
 ├── docs/                  architecture.md · specs/
-└── PLAN.md                what we are building and in what order
 ```
 
-See [PLAN.md](PLAN.md) for the roadmap and [docs/architecture.md](docs/architecture.md)
+See [docs/architecture.md](docs/architecture.md)
 for how the pieces fit.

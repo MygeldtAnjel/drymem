@@ -9,7 +9,7 @@ The rule that makes it usable rather than dangerous: **every claim points at a
 memory, or it is not made.** The model is given the retrieved memories and told
 it may summarise them and nothing else. When retrieval finds nothing, the answer
 is "nothing in this project's memory mentions that" — not a guess that reads
-exactly like a fact (PLAN.md D39).
+exactly like a fact.
 
 The same readable-group restriction as everywhere else applies, so an answer can
 only ever be built out of what the asker was already allowed to read.

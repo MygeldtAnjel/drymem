@@ -16,7 +16,7 @@
  * not from elevation — which is why nothing in this app has a drop shadow
  * except the things that genuinely float (dialogs, menus).
  *
- * Both themes exist, switched by a `.dark` class on the root (D46). Light is the
+ * Both themes exist, switched by a `.dark` class on the root. Light is the
  * default and the one the design was drawn against; dark inverts the ground and
  * the primary fill — a near-white button on black, the way the reference does
  * it — rather than restating every token.

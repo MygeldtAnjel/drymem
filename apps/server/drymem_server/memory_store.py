@@ -202,7 +202,7 @@ class GraphitiMemoryStore:
     async def link_supersedes(self, *, newer: str, older: list[str]) -> int:
         """Record that one memory replaced others.
 
-        Written, never inferred (D45). The decision tree draws a memory as
+        Written, never inferred. The decision tree draws a memory as
         replaced only when this edge exists, so guessing it from similar text
         would put invented history in front of someone deciding from it.
         """

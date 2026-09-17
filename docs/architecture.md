@@ -67,7 +67,7 @@ lockfile under `.drymem/` is a gitignored cache.
 ## 2. One save
 
 `mem_finalize_session` is the hot path. The summary is written by the agent
-inside the session; drymem never summarises a transcript (PLAN.md D6).
+inside the session; drymem never summarises a transcript.
 Picture: [02-save-memory](diagrams/html/02-save-memory.html).
 
 ```mermaid
@@ -98,7 +98,7 @@ sequenceDiagram
 
 Two rules the arrows encode. **Scrub first**: a stored secret is searchable,
 shared on promotion and fed back into prompts. **Commit before reply**: the
-teardown-commit lag made sharing a coin flip until it was moved (D81).
+teardown-commit lag made sharing a coin flip until it was moved.
 If extraction fails the episode is still saved and the reply says `degraded`.
 
 ---
@@ -125,7 +125,7 @@ rule.
 ## 4. Isolation model
 
 One Neo4j `group_id` per visibility bucket. Group ids carry the organisation, so
-two companies tracking the same git remote never share a group (D79):
+two companies tracking the same git remote never share a group:
 
 ```
 <org8>/<project_key>/team           shared: every project member reads it

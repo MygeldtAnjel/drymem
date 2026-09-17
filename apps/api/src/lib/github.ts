@@ -1,7 +1,7 @@
 /**
  * Signing in with GitHub.
  *
- * A second door, never the only one (D26). Every user of this product is a
+ * A second door, never the only one. Every user of this product is a
  * developer with a GitHub account, and removing a password from their life is
  * worth a button — but a self-hosted install on a laptop cannot register an
  * OAuth app, so password login has to work with this switched off.

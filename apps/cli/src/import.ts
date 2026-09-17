@@ -7,8 +7,8 @@
  *
  * **Transcripts are deliberately not a source.** Turning a raw session log into
  * a memory needs a model to summarise it, and two of our own decisions say no:
- * the summary is written by the agent inside the session (D4), and drymem
- * stores summaries only, never transcripts (D6). Every source here is something
+ * the summary is written by the agent inside the session, and drymem
+ * stores summaries only, never transcripts. Every source here is something
  * a human wrote on purpose — a memory file, a commit body, another tool's
  * memory store — so nothing is inferred and nothing is surveilled.
  */

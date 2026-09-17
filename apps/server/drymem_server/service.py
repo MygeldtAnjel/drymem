@@ -97,7 +97,7 @@ class Forbidden(Exception):
     """The caller is who they say they are and still may not do this.
 
     Raised from the service, not checked in the UI: a hidden button is not a
-    permission (PLAN.md D31).
+    permission.
     """
 
 
@@ -241,7 +241,7 @@ class MemoryService:
 
         A refused save rolls this session back, which would take the record of
         the refusal with it — and the refusals are the rows an admin most wants
-        to see (D30). So this one gets its own session and its own commit, and
+        to see. So this one gets its own session and its own commit, and
         swallows its errors: an unwritten log line must never turn a clear 422
         into a 500.
 
@@ -283,7 +283,7 @@ class MemoryService:
             cleaned = scrub(body, denylist())
         except PrivateKeyFound:
             # The rule that fired, never the value. "Has anyone pasted a
-            # credential this month?" is the question this answers (D30).
+            # credential this month?" is the question this answers.
             await self.audit_now("memory.rejected", f"{project_key}:private-key")
             raise
         if not cleaned.clean:
@@ -1181,7 +1181,7 @@ class MemoryService:
         return summary, memories
 
     async def capture_mode(self, *, project_key: str) -> str:
-        """How this project wants sessions captured. See PLAN.md D38."""
+        """How this project wants sessions captured. See."""
         from drymem_server.db.models import CAPTURE_AUTOMATIC
 
         project = await project_for(self.session, self.principal, project_key)

@@ -60,7 +60,7 @@ or transmit a password.
 Four messages leave drymem: a welcome, an invitation, a password reset, and a
 notice that a password was changed. All of them are best-effort — the invitation
 and reset links are also returned to the admin or written to the server log, so
-a server with no mail configured is fully usable (D42).
+a server with no mail configured is fully usable.
 
 **There is no activation email, deliberately.** An invitation link is already
 proof that somebody holds the mailbox, and the one signup a server ever accepts
@@ -105,7 +105,7 @@ with Word, so the `--send` half is the one that counts.
 
 ## Upgrading
 
-Alembic owns the schema (PLAN.md D41); the engine runs `alembic upgrade head` on
+Alembic owns the schema; the engine runs `alembic upgrade head` on
 start, so a normal `docker compose up -d --build` migrates.
 
 One migration must be run by hand, once, on any deployment that predates it:
@@ -115,6 +115,6 @@ drymem-admin migrate-orgs
 ```
 
 Memory group ids used to be built from the project key alone, so two
-organisations tracking the same git remote shared one group (PLAN.md D79). The
+organisations tracking the same git remote shared one group. The
 new ids include the organisation, which orphans everything already stored until
 this has run. It is idempotent.

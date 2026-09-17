@@ -130,7 +130,7 @@ async def update_memory(
         # Replacing used to delete what came before. It now records what it
         # replaced instead: "we changed our mind, and here is what we changed it
         # from" is the most useful thing a decision tree can show, and deleting
-        # it is the one way to make that unanswerable (D45).
+        # it is the one way to make that unanswerable.
         await service.supersede(newer=saved.episode_uuid, older=[e.uuid for e in matching])
 
     return _saved_response(saved, body.project_key, service.principal.email, name)
@@ -604,7 +604,7 @@ async def ask_question(body: AskRequest, service: ServiceDep) -> AskResponse:
 
 @router.get("/v1/capture-mode", response_model=CaptureModeResponse, tags=["memories"])
 async def capture_mode(service: ServiceDep, project_key: str = Query(...)) -> CaptureModeResponse:
-    """What the hooks should do at the end of a session. See PLAN.md D38."""
+    """What the hooks should do at the end of a session. See."""
     return CaptureModeResponse(
         project_key=project_key,
         capture_mode=await service.capture_mode(project_key=project_key),

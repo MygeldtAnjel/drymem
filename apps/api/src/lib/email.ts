@@ -167,7 +167,7 @@ export function welcomeLetter(opts: WelcomeOpts): Letter {
   // it has no token yet (apps/cli/src/setup.ts), so telling people to `login`
   // first sends them through a step they have already done. Nothing is
   // installed globally either — the hooks it writes call `npx drymem` too, so
-  // the package has to be runnable that way regardless (PLAN.md D11).
+  // the package has to be runnable that way regardless.
   const run = "npx drymem@latest setup";
   const opening = opts.owner
     ? `You created <b>${esc(opts.orgName)}</b> on drymem and you own it.`

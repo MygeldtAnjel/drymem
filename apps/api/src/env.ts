@@ -52,7 +52,7 @@ const schema = z.object({
   /**
    * GitHub sign-in. Both absent means the feature is off and no button appears
    * — a self-hosted install on a laptop cannot register an OAuth app, and
-   * password login has to keep working without one (D26).
+   * password login has to keep working without one.
    */
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),

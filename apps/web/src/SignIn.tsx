@@ -169,7 +169,7 @@ export function SignIn({ onDone }: { onDone: (session: Session) => void }) {
               </button>
             )}
 
-            {/* A second door, never the only one (D26). Absent entirely unless
+            {/* A second door, never the only one. Absent entirely unless
                 the server has an OAuth app — a laptop install cannot register
                 one, and an inert button is worse than no button. */}
             {!creating && state?.github_enabled && (

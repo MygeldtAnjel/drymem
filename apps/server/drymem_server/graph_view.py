@@ -10,7 +10,7 @@ Two rules the queries never bend:
 
 * **Only the caller's groups.** Every clause filters on `group_id`, so a third
   person's private memory cannot become a node on someone else's canvas. This is
-  the same rule as search (PLAN.md D18) and it is enforced the same way — by
+  the same rule as search and it is enforced the same way — by
   asking for the right groups, not by filtering afterwards.
 * **A cap, always.** A canvas with four thousand nodes is not a view of
   anything, and the query that builds it is the one that takes the database

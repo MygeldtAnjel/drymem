@@ -278,7 +278,7 @@ class TestUpdating:
     async def test_replacing_records_what_it_replaced_instead_of_deleting(self, client, store):
         # It used to delete. "We changed our mind, and here is what from" is the
         # most useful thing the decision tree shows, and deleting the old
-        # episode is the one way to make that unanswerable (D45).
+        # episode is the one way to make that unanswerable.
         first = (await save(client, topic_key="payments/provider")).json()
 
         r = await client.patch(

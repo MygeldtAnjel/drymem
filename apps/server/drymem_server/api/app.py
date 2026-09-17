@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(router)
 
-    # Raised from the service layer, where permissions actually live (D31).
+    # Raised from the service layer, where permissions actually live.
     @app.exception_handler(Forbidden)
     async def forbidden(_: Request, exc: Forbidden) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=403)

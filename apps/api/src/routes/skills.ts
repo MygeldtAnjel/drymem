@@ -358,7 +358,7 @@ skillRouter.post("/", async (req, res) => {
 
   if (body.source === "imported" && !isAdmin(principal)) {
     // An imported skill runs on every laptop on the project; that is an
-    // organisation decision, not a project one (PLAN.md §8).
+    // organisation decision, not a project one.
     throw forbidden("Only an organisation admin can import a skill from outside.");
   }
 
