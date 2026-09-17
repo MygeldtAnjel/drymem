@@ -64,6 +64,15 @@ describe("what every letter owes the reader", () => {
     }
   });
 
+  it("wears the mark: the cat and the wordmark, in the band", () => {
+    for (const letter of [welcome(false), invite(), reset(), changed()]) {
+      // The product's mark is a drawn SVG and Gmail strips SVG to nothing, so
+      // the band carries the cat as an emoji entity instead.
+      expect(letter.html).toContain("&#128049;");
+      expect(letter.html).toContain("drymem");
+    }
+  });
+
   it("carries a plain-text half that names the same link", () => {
     expect(invite().text).toContain("http://127.0.0.1:8080/#/invite/abc123");
     expect(reset().text).toContain("http://127.0.0.1:8080/#/reset/tok");

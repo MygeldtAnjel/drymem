@@ -19,7 +19,7 @@ import { Resend } from "resend";
 import { emailEnabled, env } from "../env.js";
 import {
   button,
-  commands,
+  code,
   esc,
   fallback,
   heading,
@@ -27,6 +27,7 @@ import {
   panel,
   paragraph,
   render,
+  steps,
   text,
 } from "./email-layout.js";
 
@@ -145,6 +146,20 @@ export function welcomeLetter(opts: WelcomeOpts): Letter {
   const opening = opts.owner
     ? `You created <b>${esc(opts.orgName)}</b> on drymem and you own it.`
     : `Your account at <b>${esc(opts.orgName)}</b> is ready.`;
+  const getting = [
+    {
+      title: "Connect this machine",
+      body: `Run ${code(run[0]!)} and confirm the code it prints. Once per machine.`,
+    },
+    {
+      title: "Set it up in a repository",
+      body: `Run ${code(run[1]!)} where you work. It installs the hooks and the MCP server, and pulls the skills this project uses.`,
+    },
+    {
+      title: "Carry on as normal",
+      body: "From then on every session starts with what the team already knows, and ends by writing back what it worked out. Nothing to remember.",
+    },
+  ];
 
   return {
     subject: opts.owner
@@ -156,17 +171,15 @@ export function welcomeLetter(opts: WelcomeOpts): Letter {
       rows: [
         heading(opts.owner ? `${opts.orgName} is set up` : `Welcome to ${opts.orgName}`),
         paragraph(
-          `${opening} Signing in to the web app is half of it — the memory only reaches your coding agent once this machine is connected. In a repository you work in, run:`,
+          `${opening} Signing in here is half of it — the memory only reaches your coding agent once this machine is connected.`,
         ),
-        commands(run),
-        paragraph(
-          "<b>login</b> once per machine, <b>setup</b> once per repository. From then on every session reads the team's memory at startup, and writes back what it worked out.",
-        ),
+        paragraph("<b>Three things to start:</b>"),
+        steps(getting),
         button(opts.appUrl, "Open drymem"),
         note(
           opts.owner
             ? "Invite the rest of the team from Members, and pick which skills each project runs."
-            : "Nothing else to do — what you save is private to you until you share it.",
+            : "What you save is private to you until you share it with the team.",
         ),
       ].join(""),
       footnote: opts.owner

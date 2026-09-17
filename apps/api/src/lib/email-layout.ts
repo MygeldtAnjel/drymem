@@ -5,48 +5,57 @@
  * is the reason for something that would otherwise look like a mistake:
  *
  * - **Tables, not layout.** Outlook renders HTML with Word. Flexbox, grid and
- *   `div` layout collapse; nested `<table role="presentation">` does not.
- * - **Inline styles.** Many clients strip `<style>` blocks, so every rule that
- *   must survive is inlined. The `<style>` block carries only what cannot be
+ *   div layout collapse; nested tables with role="presentation" do not.
+ * - **Inline styles.** Many clients strip a style block, so every rule that
+ *   must survive is inlined. The one in the head carries only what cannot be
  *   inlined — media queries — and everything in it is a progressive extra.
- * - **No images.** Clients block them by default, and a logo that resolves to a
- *   broken icon is worse than a wordmark in text. Nothing here loads a URL, so
- *   there is no tracking pixel either — nothing to consent to.
+ * - **No images.** Clients block them by default, and a mark that resolves to a
+ *   broken icon is worse than no mark. Nothing here loads a URL, so there is no
+ *   tracking pixel either, and nothing to consent to.
  *
- * The palette is the app's own (`apps/web/src/index.css`), light by default
- * with the app's dark values behind `prefers-color-scheme`. Light-first is the
- * safer half of that pair: clients that force their own dark mode mangle a
- * light design predictably and a dark one unpredictably.
+ * That last one decides the cat. The product's mark is a drawn SVG (the black
+ * head with the amber almond eyes in `apps/web/src/components/Logo.tsx`), and
+ * Gmail strips inline SVG to nothing — so the band carries the emoji instead.
+ * It is the one cat that renders in every client without asking permission.
+ *
+ * The palette is the app's own (`apps/web/src/index.css`) warmed a shade for
+ * paper: light by default, with the app's dark values behind a media query.
+ * Light-first is the safer half of that pair — clients that force their own
+ * dark mode mangle a light design predictably and a dark one unpredictably.
  */
 
-/** Light: the app's `:root`. Dark: the app's `.dark`. Contrast is against the card. */
+/** Light: the app's `:root`, on a warmer ground. Contrast is against the card. */
 const light = {
-  page: "#fafafa",
+  page: "#f7f5f2",
   card: "#ffffff",
-  border: "#e5e5e5",
+  border: "#ece6de",
+  /* Amber is the mark, so the mark's own band is the one place it fills. */
+  band: "#b45309",
+  bandText: "#ffffff",
   heading: "#0a0a0a", // 19.80:1
   /* Body sits between foreground and muted-foreground: 15px of prose in
      near-black reads heavy, and in muted-foreground it reads faint. */
   text: "#454545", // 9.17:1
-  meta: "#666666", // 5.74:1 — the app's muted-foreground
-  button: "#0a0a0a",
+  meta: "#6b6560", // 5.31:1
+  button: "#b45309", // white on it: 5.02:1
   buttonText: "#ffffff",
-  brand: "#b45309", // 5.02:1
-  panel: "#fafafa",
+  brand: "#b45309",
+  panel: "#faf8f5",
 };
 
+/** Dark: the app's `.dark`. The band drops to brand-subtle so it does not glare. */
 const dark = {
   page: "#0a0a0a",
   card: "#0f0f0f",
   border: "#232323",
+  band: "#3a2a0c",
+  bandText: "#f2a93b",
   heading: "#ededed", // 16.37:1
   text: "#c9c9c9", // 11.0:1
   meta: "#a1a1a1", // 7.42:1
-  /* The primary action inverts rather than staying black — a near-black button
-     on a near-black ground is a rectangle you cannot find (index.css). */
-  button: "#ededed",
-  buttonText: "#0a0a0a",
-  brand: "#f2a93b", // 9.60:1
+  button: "#f2a93b", // 9.60:1
+  buttonText: "#1a1305",
+  brand: "#f2a93b",
   panel: "#141414",
 };
 
@@ -85,16 +94,22 @@ export const heading = (text: string) => `
         text,
       )}</td></tr>`;
 
-/** Body copy. The only place that takes HTML, for the `<b>` a sentence needs. */
+/** Body copy. The only place that takes HTML, for the emphasis a sentence needs. */
 export const paragraph = (html: string) => `
       <tr><td class="dm-text" style="font-family:${FONT};font-size:15px;line-height:1.65;color:${light.text};padding:0 0 18px">${html}</td></tr>`;
+
+/** A command or a filename, inline in a sentence. */
+export const code = (value: string) =>
+  `<span class="dm-code" style="font-family:${MONO};font-size:13px;color:${light.heading};background:${light.panel};border:1px solid ${light.border};border-radius:5px;padding:2px 6px;white-space:nowrap">${esc(
+    value,
+  )}</span>`;
 
 /**
  * The action.
  *
- * A table with `bgcolor` rather than VML: `<v:roundrect>` buys rounded corners
- * in Outlook 2016 at the price of a second copy of every colour, which then has
- * to be kept in step with the dark-mode block. Square corners in one desktop
+ * A table with bgcolor rather than VML: a roundrect buys rounded corners in
+ * Outlook 2016 at the price of a second copy of every colour, which then has to
+ * be kept in step with the dark-mode block. Square corners in one desktop
  * client is the cheaper miss.
  */
 export const button = (href: string, label: string) => `
@@ -108,6 +123,32 @@ export const button = (href: string, label: string) => `
         </tr></table>
       </td></tr>`;
 
+/**
+ * What to do, in order.
+ *
+ * Numbered rather than bulleted because these are steps with a sequence, and a
+ * reader who has done the first one needs to find the second at a glance. The
+ * numeral carries the accent; the title carries the weight.
+ */
+export const steps = (items: Array<{ title: string; body: string }>) => `
+      <tr><td style="padding:0 0 6px">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${items
+          .map(
+            (item, i) => `
+          <tr>
+            <td valign="top" class="dm-brand" style="font-family:${FONT};font-size:13px;font-weight:700;line-height:1.5;color:${light.brand};padding:0 12px 16px 0;width:18px">${i + 1}</td>
+            <td valign="top" style="padding:0 0 16px">
+              <div class="dm-strong" style="font-family:${FONT};font-size:15px;font-weight:600;line-height:1.5;color:${light.heading};padding-bottom:3px">${esc(
+                item.title,
+              )}</div>
+              <div class="dm-text" style="font-family:${FONT};font-size:14px;line-height:1.6;color:${light.text}">${item.body}</div>
+            </td>
+          </tr>`,
+          )
+          .join("")}
+        </table>
+      </td></tr>`;
+
 /** Facts worth setting apart from the prose: who invited you, which project. */
 export const panel = (rows: Array<[string, string]>) => `
       <tr><td style="padding:0 0 20px">
@@ -118,27 +159,12 @@ export const panel = (rows: Array<[string, string]>) => `
                 ([key, value], i) => `
               <tr>
                 <td class="dm-meta" style="font-family:${FONT};font-size:13px;line-height:1.5;color:${light.meta};padding:${i ? "6px" : "0"} 12px 0 0;white-space:nowrap">${esc(key)}</td>
-                <td class="dm-text" style="font-family:${FONT};font-size:13px;line-height:1.5;font-weight:600;color:${light.heading};padding:${i ? "6px" : "0"} 0 0;text-align:right">${esc(value)}</td>
+                <td class="dm-strong" style="font-family:${FONT};font-size:13px;line-height:1.5;font-weight:600;color:${light.heading};padding:${i ? "6px" : "0"} 0 0;text-align:right">${esc(value)}</td>
               </tr>`,
               )
               .join("")}
             </table>
           </td></tr>
-        </table>
-      </td></tr>`;
-
-/**
- * Commands to run, in a box you can copy out of.
- *
- * No `$` prefix: people copy the whole line, and a prompt character pasted into
- * a shell is an error message instead of a working machine.
- */
-export const commands = (lines: string[]) => `
-      <tr><td style="padding:0 0 20px">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="dm-panel" style="background:${light.panel};border:1px solid ${light.border};border-radius:10px">
-          <tr><td class="dm-h1" style="padding:14px 16px;font-family:${MONO};font-size:13px;line-height:1.9;color:${light.heading}">${lines
-            .map((line) => esc(line))
-            .join("<br>")}</td></tr>
         </table>
       </td></tr>`;
 
@@ -167,9 +193,9 @@ export interface Layout {
   title: string;
   /** The line beside the subject in the inbox list. */
   preheader: string;
-  /** `heading`/`paragraph`/`button`/… rows, in order. */
+  /** `heading`/`paragraph`/`steps`/`button`/… rows, in order. */
   rows: string;
-  /** The last word, under the rule: what to do if this was not you. */
+  /** The last word, under the card: what to do if this was not you. */
   footnote: string;
 }
 
@@ -189,9 +215,12 @@ export function render({ title, preheader, rows, footnote }: Layout): string {
   @media (prefers-color-scheme: dark) {
     .dm-page    { background: ${dark.page} !important; }
     .dm-card    { background: ${dark.card} !important; border-color: ${dark.border} !important; }
+    .dm-band    { background: ${dark.band} !important; }
+    .dm-band-t  { color: ${dark.bandText} !important; }
     .dm-panel   { background: ${dark.panel} !important; border-color: ${dark.border} !important; }
+    .dm-code    { background: ${dark.panel} !important; border-color: ${dark.border} !important; color: ${dark.heading} !important; }
     .dm-rule    { border-color: ${dark.border} !important; }
-    .dm-h1      { color: ${dark.heading} !important; }
+    .dm-h1, .dm-strong { color: ${dark.heading} !important; }
     .dm-text    { color: ${dark.text} !important; }
     .dm-text b, .dm-text strong { color: ${dark.heading} !important; }
     .dm-meta    { color: ${dark.meta} !important; }
@@ -218,13 +247,14 @@ ${preheaderOf(preheader)}
   <tr><td align="center" style="padding:32px 12px 40px">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:540px;margin:0 auto">
 
-      <tr><td style="padding:0 4px 16px">
-        <span class="dm-brand" style="font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:-0.01em;color:${light.brand}">&#9670;</span>
-        <span class="dm-h1" style="font-family:${FONT};font-size:15px;font-weight:600;letter-spacing:-0.01em;color:${light.heading}">drymem</span>
-      </td></tr>
-
       <tr><td class="dm-card" style="background:${light.card};border:1px solid ${light.border};border-radius:14px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+          <tr><td class="dm-band" bgcolor="${light.band}" align="center" style="background:${light.band};border-radius:13px 13px 0 0;padding:22px 20px">
+            <span style="font-family:${FONT};font-size:19px;line-height:1;vertical-align:middle">&#128049;</span>
+            <span class="dm-band-t" style="font-family:${FONT};font-size:17px;font-weight:700;letter-spacing:-0.01em;line-height:1;color:${light.bandText};vertical-align:middle;padding-left:7px">drymem</span>
+          </td></tr>
+
           <tr><td class="dm-pad" style="padding:30px 30px 26px">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}
             </table>
