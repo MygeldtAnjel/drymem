@@ -86,8 +86,8 @@ const FACTS = [
     body: "What you save is yours until you share it. Sharing copies it into the team's memory and says who vouched for it, and when.",
   },
   {
-    title: "It runs on your model",
-    body: "Point it at an Ollama on your own hardware. No transcript, no memory and no source ever reaches a third party.",
+    title: "Your repository never leaves",
+    body: "drymem stores what your agent concluded — a decision, a bugfix, a convention — not your code. No source, no diffs, no transcripts are sent anywhere, on any tier.",
   },
   {
     title: "Secrets never land",
@@ -102,8 +102,8 @@ const FACTS = [
     body: "Claude Code through hooks and MCP, plus a console for reading, searching and deciding what the team shares.",
   },
   {
-    title: "Yours to run",
-    body: "One docker compose on your own box. Postgres and a knowledge graph, the API the only published port.",
+    title: "Hosted, or yours to run",
+    body: "We run it, so a trial takes a day rather than a sprint. If your rules say it lives on your hardware, the same docker compose runs on your box against your own model.",
   },
 ];
 
@@ -117,7 +117,7 @@ const FACTS = [
 const FAQ = [
   {
     q: "Does my code leave the building?",
-    a: "No. drymem stores what your agent writes down about the work — decisions, bugfixes, conventions — not the repository. It runs on your own hardware and talks to a model you point it at, usually an Ollama on the same network. Nothing is sent to us.",
+    a: "Your repository does not — no source, no diffs, no transcripts. What drymem keeps is the short summary your agent writes about the work. On the hosted service that summary is sent to Anthropic's API to pull out the entities and to answer questions about it; API inputs are not used to train their models. If even a summary must stay inside, self-host and point drymem at your own model.",
   },
   {
     q: "What if somebody pastes a secret into a memory?",
@@ -133,7 +133,7 @@ const FAQ = [
   },
   {
     q: "Can I self-host it?",
-    a: "That is the only way it runs today: one docker compose, Postgres and a knowledge graph, with the API as the sole published port. A trial gets you the images, the docs and a hand with the first setup.",
+    a: "Yes, and it is the same product, not a cut-down build: one docker compose, Postgres and a knowledge graph, the API as the sole published port, and whatever model you point it at. Most teams should start on the hosted trial anyway — it is the same software, and you find out whether the idea works before you run anything.",
   },
   {
     q: "Why can I not just sign up?",
@@ -218,7 +218,8 @@ export function Home() {
           </pre>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             Signs this machine in through your browser, installs the session hooks and the MCP
-            server, and pulls the skills the project uses. Once per repository.
+            server, and pulls the skills the project uses. Once per repository, against whichever
+            drymem server your team was given — ours, or your own.
           </p>
         </div>
       </Section>
