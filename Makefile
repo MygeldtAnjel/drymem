@@ -24,6 +24,10 @@ test-e2e:           ## The suites that need real Neo4j and Ollama, not the doubl
 	@DRYMEM_E2E=1 uv --directory $(SERVER) run pytest -m e2e
 
 rehearsal:          ## A team using drymem on a throwaway stack, start to finish
+# Torn down first as well as last: the script's opening check is that the first
+# signup creates the organisation, which a stack left running from a previous
+# run fails with a 409 that looks like a product bug and is not.
+	@docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v 2>/dev/null || true
 	@docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml up -d --build
 	@uv --directory $(SERVER) run python scripts/rehearsal.py; status=$$?; \
 	  docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v; \
