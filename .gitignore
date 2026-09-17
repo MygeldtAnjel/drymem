@@ -35,3 +35,8 @@ backups/
 
 # Working notes from the design tooling, not part of the product.
 .impeccable/
+
+# Planning and strategy: kept locally, deliberately not published.
+PLAN.md
+docs/specs/
+docs/PLAN-v1.md
