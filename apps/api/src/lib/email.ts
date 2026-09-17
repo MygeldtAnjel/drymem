@@ -1,5 +1,5 @@
 /**
- * Email, through Resend.
+ * The three emails drymem sends, and the one way it sends them.
  *
  * Sending is best-effort by design. Every flow that sends also returns the link
  * to the caller when there is no key configured, because drymem runs on
@@ -9,11 +9,25 @@
  *
  * `sent` in the result is the honest answer to "did we email them?", and every
  * screen that calls this uses it to decide what to tell the person.
+ *
+ * How they look lives in `email-layout.ts`. Nothing here writes a `<table>`,
+ * and nothing there knows what an invitation is.
  */
 
 import { Resend } from "resend";
 
 import { emailEnabled, env } from "../env.js";
+import {
+  button,
+  esc,
+  fallback,
+  heading,
+  note,
+  panel,
+  paragraph,
+  render,
+  text,
+} from "./email-layout.js";
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
@@ -22,33 +36,30 @@ export interface Sent {
   reason?: string;
 }
 
-const shell = (title: string, body: string, action: { href: string; label: string }) => `
-<!doctype html>
-<html><body style="margin:0;background:#0b0d10;font-family:ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#111419;border:1px solid #232932;border-radius:12px;padding:32px">
-        <tr><td style="padding-bottom:20px">
-          <span style="font-size:18px;font-weight:600;color:#e8eaed">drymem</span>
-        </td></tr>
-        <tr><td style="font-size:18px;font-weight:600;color:#e8eaed;padding-bottom:12px">${title}</td></tr>
-        <tr><td style="font-size:14px;line-height:1.6;color:#98a1ad;padding-bottom:24px">${body}</td></tr>
-        <tr><td>
-          <a href="${action.href}" style="display:inline-block;background:#f2a93b;color:#1a1305;font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px">${action.label}</a>
-        </td></tr>
-        <tr><td style="font-size:12px;line-height:1.6;color:#7d8794;padding-top:24px;border-top:1px solid #232932;margin-top:24px">
-          If the button does not work, paste this into your browser:<br>
-          <span style="color:#98a1ad;word-break:break-all">${action.href}</span>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`;
+/**
+ * One email, built but not yet sent.
+ *
+ * Building is separated from sending so both halves can be looked at without a
+ * key and without a network: `scripts/email-preview.mjs` renders them into a
+ * browser, and the tests assert on them. A template nobody can see before it
+ * reaches somebody's inbox is a template nobody checks.
+ */
+export interface Letter {
+  subject: string;
+  html: string;
+  text: string;
+}
 
-async function send(to: string, subject: string, html: string, text: string): Promise<Sent> {
+async function send(to: string, letter: Letter): Promise<Sent> {
   if (!resend) return { sent: false, reason: "No RESEND_API_KEY is configured." };
   try {
-    const { error } = await resend.emails.send({ from: env.EMAIL_FROM, to, subject, html, text });
+    const { error } = await resend.emails.send({
+      from: env.EMAIL_FROM,
+      to,
+      subject: letter.subject,
+      html: letter.html,
+      text: letter.text,
+    });
     if (error) {
       console.warn(`email to ${to} refused: ${error.message}`);
       return { sent: false, reason: error.message };
@@ -65,40 +76,200 @@ export function link(path: string): string {
   return `${env.PUBLIC_URL.replace(/\/+$/, "")}/#/${path.replace(/^\/+/, "")}`;
 }
 
-export function sendInvite(opts: {
+/** Unambiguous on purpose: a security email read in another country still says when. */
+const when = (at: Date) =>
+  `${at.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  })} at ${at.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  })} UTC`;
+
+/** A user agent is for recognising your own browser, not for parsing. */
+const device = (agent: string | null | undefined): string => {
+  const ua = (agent ?? "").trim();
+  if (!ua) return "an unrecognised browser";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\/|Opera/.test(ua)
+      ? "Opera"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Chrome\//.test(ua)
+          ? "Chrome"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : "a browser";
+  const os = /Android/.test(ua)
+    ? "Android"
+    : /iPhone|iPad/.test(ua)
+      ? "iOS"
+      : /Mac OS X|Macintosh/.test(ua)
+        ? "macOS"
+        : /Windows/.test(ua)
+          ? "Windows"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : "";
+  return os ? `${browser} on ${os}` : browser;
+};
+
+export interface InviteOpts {
   to: string;
   orgName: string;
   invitedBy: string | null;
   projectKey: string | null;
+  role: string;
+  days: number;
   url: string;
-}): Promise<Sent> {
-  const who = opts.invitedBy ? `${opts.invitedBy} has invited you` : "You have been invited";
-  const where = opts.projectKey
-    ? ` and added you to <b style="color:#e8eaed">${opts.projectKey}</b>`
-    : "";
-  return send(
-    opts.to,
-    `Join ${opts.orgName} on drymem`,
-    shell(
-      `Join ${opts.orgName}`,
-      `${who} to ${opts.orgName}'s shared memory on drymem${where}. Choose a password and you are in. This link works once and expires in a week.`,
-      { href: opts.url, label: "Accept the invitation" },
-    ),
-    `${who} to ${opts.orgName} on drymem.\n\nAccept: ${opts.url}\n\nThis link works once and expires in a week.`,
-  );
 }
 
-export function sendReset(opts: { to: string; url: string; minutes: number }): Promise<Sent> {
-  return send(
-    opts.to,
-    "Reset your drymem password",
-    shell(
-      "Reset your password",
-      `Somebody asked to reset the password for this address. If that was not you, nothing has changed and you can ignore this. The link expires in ${opts.minutes} minutes and works once.`,
-      { href: opts.url, label: "Choose a new password" },
-    ),
-    `Reset your drymem password: ${opts.url}\n\nExpires in ${opts.minutes} minutes. If this was not you, ignore it — nothing has changed.`,
-  );
+export function inviteLetter(opts: InviteOpts): Letter {
+  const who = opts.invitedBy ?? "Someone";
+  const rows: Array<[string, string]> = [["Organisation", opts.orgName]];
+  if (opts.invitedBy) rows.push(["Invited by", opts.invitedBy]);
+  if (opts.projectKey) rows.push(["Project", opts.projectKey]);
+  rows.push(["Role", opts.role === "admin" ? "Admin" : "Member"]);
+
+  return {
+    subject: `Join ${opts.orgName} on drymem`,
+    html: render({
+      title: `Join ${opts.orgName} on drymem`,
+      preheader: `${who} invited you to ${opts.orgName}. The link works once and expires in ${opts.days} days.`,
+      rows: [
+        heading(`Join ${opts.orgName} on drymem`),
+        paragraph(
+          `<b>${esc(who)}</b> invited you to <b>${esc(
+            opts.orgName,
+          )}</b> on drymem — where the team's coding agents keep what they learn, and read it back. Choose a password and you are in.`,
+        ),
+        panel(rows),
+        button(opts.url, "Accept the invitation"),
+        note(`This link works once and expires in ${opts.days} days.`),
+        fallback(opts.url),
+      ].join(""),
+      footnote: `You got this because somebody at ${esc(
+        opts.orgName,
+      )} invited this address. Nothing is created until you accept.`,
+    }),
+    text: text([
+      `${who} invited you to ${opts.orgName} on drymem.`,
+      ``,
+      `Organisation: ${opts.orgName}`,
+      ...(opts.projectKey ? [`Project: ${opts.projectKey}`] : []),
+      `Role: ${opts.role === "admin" ? "Admin" : "Member"}`,
+      ``,
+      `Accept the invitation:`,
+      opts.url,
+      ``,
+      `This link works once and expires in ${opts.days} days. Nothing is created until you accept.`,
+    ]),
+  };
 }
+
+export const sendInvite = (opts: InviteOpts): Promise<Sent> => send(opts.to, inviteLetter(opts));
+
+export interface ResetOpts {
+  to: string;
+  url: string;
+  minutes: number;
+}
+
+export function resetLetter(opts: ResetOpts): Letter {
+  return {
+    subject: "Reset your drymem password",
+    html: render({
+      title: "Reset your drymem password",
+      preheader: `The link works once and expires in ${opts.minutes} minutes.`,
+      rows: [
+        heading("Reset your password"),
+        paragraph(
+          `Somebody asked to reset the password for <b>${esc(
+            opts.to,
+          )}</b>. Choose a new one and you will be signed straight in.`,
+        ),
+        button(opts.url, "Choose a new password"),
+        note(`This link works once and expires in ${opts.minutes} minutes.`),
+        fallback(opts.url),
+      ].join(""),
+      footnote:
+        "If this was not you, ignore this email — nothing has changed and the link expires on its own.",
+    }),
+    text: text([
+      `Reset your drymem password.`,
+      ``,
+      `Somebody asked to reset the password for ${opts.to}.`,
+      ``,
+      `Choose a new password:`,
+      opts.url,
+      ``,
+      `This link works once and expires in ${opts.minutes} minutes.`,
+      `If this was not you, ignore this email — nothing has changed.`,
+    ]),
+  };
+}
+
+export const sendReset = (opts: ResetOpts): Promise<Sent> => send(opts.to, resetLetter(opts));
+
+/**
+ * The one email nobody asks for.
+ *
+ * A password changing is the moment an account is taken, and the owner's only
+ * warning is a message they did not expect. It goes to the address, not to the
+ * session, precisely because whoever is holding the session may not be them.
+ */
+export interface PasswordChangedOpts {
+  to: string;
+  at: Date;
+  userAgent: string | null | undefined;
+  resetUrl: string;
+}
+
+export function passwordChangedLetter(opts: PasswordChangedOpts): Letter {
+  return {
+    subject: "Your drymem password was changed",
+    html: render({
+      title: "Your drymem password was changed",
+      preheader: "If that was you, there is nothing to do. If it was not, act now.",
+      rows: [
+        heading("Your password was changed"),
+        paragraph(
+          `The password for <b>${esc(
+            opts.to,
+          )}</b> has just been changed. Every other signed-in browser was signed out.`,
+        ),
+        panel([
+          ["When", when(opts.at)],
+          ["Where", device(opts.userAgent)],
+        ]),
+        paragraph("If that was you, there is nothing to do."),
+        button(opts.resetUrl, "It was not me — reset it"),
+        fallback(opts.resetUrl),
+      ].join(""),
+      footnote:
+        "If you did not change this password, reset it now and tell whoever owns your drymem organisation.",
+    }),
+    text: text([
+      `Your drymem password was changed.`,
+      ``,
+      `Account: ${opts.to}`,
+      `When: ${when(opts.at)}`,
+      `Where: ${device(opts.userAgent)}`,
+      ``,
+      `Every other signed-in browser was signed out.`,
+      `If that was you, there is nothing to do.`,
+      ``,
+      `If it was not you, reset the password now:`,
+      opts.resetUrl,
+    ]),
+  };
+}
+
+export const sendPasswordChanged = (opts: PasswordChangedOpts): Promise<Sent> =>
+  send(opts.to, passwordChangedLetter(opts));
 
 export { emailEnabled };

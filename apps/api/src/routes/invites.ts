@@ -81,11 +81,20 @@ inviteRouter.post("/", requireUser, requireAdmin, async (req, res) => {
     .from(schema.orgs)
     .where(eq(schema.orgs.id, principal.orgId))
     .limit(1);
+  // A name, not an address: "Miguel invited you" is a sentence, and
+  // "a.long.address@example.com invited you" is a puzzle (PLAN.md D62).
+  const [inviter] = await db
+    .select({ name: schema.users.name })
+    .from(schema.users)
+    .where(eq(schema.users.id, principal.userId))
+    .limit(1);
   const delivery = await sendInvite({
     to: email,
     orgName: org?.name ?? "your team",
-    invitedBy: principal.email,
+    invitedBy: inviter?.name?.trim() || principal.email,
     projectKey: project?.projectKey ?? null,
+    role: body.role,
+    days: env.INVITE_DAYS,
     url,
   });
 

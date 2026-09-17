@@ -17,7 +17,7 @@ import { record } from "../lib/audit.js";
 import { seedCatalogue } from "../lib/seed.js";
 import { hashPassword, hashToken, randomToken, verifyPassword, WeakPassword } from "../lib/crypto.js";
 import { badRequest, conflict, limiter, notFound, unauthorized } from "../lib/errors.js";
-import { link, sendReset } from "../lib/email.js";
+import { link, sendPasswordChanged, sendReset } from "../lib/email.js";
 import { authorizeUrl, githubEnabled, GithubError, identify } from "../lib/github.js";
 import { endAllSessions, endSession, startSession } from "../lib/sessions.js";
 import { param } from "../lib/params.js";
@@ -275,6 +275,14 @@ authRouter.post("/password", requireUser, async (req, res) => {
   await endAllSessions(user.id);
   await startSession(user.id, req.get("user-agent"), res);
   await record(principal, "user.password_change", user.email);
+  // Told to the address, not to the session: if this was not them, the session
+  // is exactly the thing that cannot be trusted to say so.
+  void sendPasswordChanged({
+    to: user.email,
+    at: new Date(),
+    userAgent: req.get("user-agent"),
+    resetUrl: link("forgot"),
+  });
   res.status(204).end();
 });
 
@@ -388,6 +396,12 @@ authRouter.post("/reset/:token", async (req, res) => {
     "user.password_reset",
     row.user.email,
   );
+  void sendPasswordChanged({
+    to: row.user.email,
+    at: new Date(),
+    userAgent: req.get("user-agent"),
+    resetUrl: link("forgot"),
+  });
   res.json(await sessionBody(row.user.id));
 });
 

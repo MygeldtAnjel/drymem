@@ -55,6 +55,41 @@ The owner is created **without a password** and sets their own through *Forgot
 password* on the sign-in page. Nobody provisioning an account should choose, see
 or transmit a password.
 
+## Email
+
+Three messages leave drymem: an invitation, a password reset, and a notice that
+a password was changed. All three are best-effort — the invitation and reset
+links are also returned to the admin or written to the server log, so a server
+with no mail configured is fully usable (D42).
+
+Set `RESEND_API_KEY` and `EMAIL_FROM` to turn sending on.
+
+**The sender is the part that catches people out.** The default,
+`onboarding@resend.dev`, is Resend's shared test address, and it delivers only
+to the address that owns the Resend account:
+
+```
+email to someone@acme.test refused: You can only send testing emails to your
+own email address (...). To send emails to other recipients, please verify a
+domain at resend.com/domains
+```
+
+That is enough to check your own reset email and no use at all for inviting a
+teammate. Before anyone else is invited, verify a domain at
+[resend.com/domains](https://resend.com/domains) and point `EMAIL_FROM` at it.
+A refusal is never fatal — it is logged, the flow continues, and the link is
+still there to paste — but nobody receives anything.
+
+To see what the three look like before changing them:
+
+```bash
+pnpm --filter @drymem/api run email:preview /tmp/mail          # writes HTML + text
+RESEND_API_KEY=… pnpm --filter @drymem/api run email:preview -- --send you@example.com
+```
+
+A browser is not an inbox: Gmail rewrites the markup and Outlook lays it out
+with Word, so the `--send` half is the one that counts.
+
 ## Upgrading
 
 Alembic owns the schema (PLAN.md D41); the engine runs `alembic upgrade head` on

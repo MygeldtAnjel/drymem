@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "email:preview": "tsx scripts/email-preview.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
