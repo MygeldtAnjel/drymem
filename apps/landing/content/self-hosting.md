@@ -3,6 +3,46 @@
 drymem is the same software whether we run it or you do. If your rules say the
 memory lives on your hardware, this is what that takes.
 
+## Installing it
+
+```bash
+git clone https://github.com/MygeldtAnjel/drymem.git
+cd drymem
+./scripts/install.sh
+```
+
+It asks who will use it, which model to call, and which ports to take — checking
+each port is actually free rather than letting Docker discover it later — then
+writes a `.env`, generates the secret that signs sessions, and offers to start
+everything.
+
+If you would rather write the config by hand, copy `.env.example` to `.env` and
+fill it in; every setting is documented there.
+
+## What it needs
+
+drymem is four containers and, usually, a model. The model is the part that
+decides the numbers.
+
+| | Without a local model | With a local model |
+|---|---|---|
+| RAM | 4 GB | 24 GB, or a GPU with 16 GB+ |
+| CPU | 2 cores | 4 cores, more is better |
+| Disk | 10 GB to start | 10 GB, plus the model |
+
+**Without a local model** means embeddings run locally — those are small — and
+the reasoning goes to an API. That fits comfortably on the cheapest VPS worth
+buying, and on any laptop.
+
+**With a local model** means an Ollama on the same machine. The default
+(`qwen3.6:35b-a3b`) wants around 24 GB; a smaller model runs in far less and is
+worth trying first. On a machine with a GPU, use it — extraction runs on every
+save, and on CPU alone each one takes a noticeable while.
+
+Disk grows with how much the team writes. A year of a busy team's memory is
+measured in hundreds of megabytes, not gigabytes — drymem stores summaries, not
+transcripts.
+
 ## What you are running
 
 Four things, from one `docker compose`:

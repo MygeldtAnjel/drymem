@@ -4,7 +4,9 @@ drymem gives your team one memory their coding agents read and write. Your agent
 writes down what it worked out; the next session — yours or a teammate's —
 starts already knowing it.
 
-You need Node 20 or newer, a coding agent, and an invitation to a drymem server.
+You need Node 20 or newer, a coding agent, and a drymem server to point at —
+either one your team already runs, or [your own](#/docs/self-hosting), which
+takes one command.
 
 ## Connect a repository
 

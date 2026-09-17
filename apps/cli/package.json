@@ -2,6 +2,13 @@
   "name": "drymem",
   "version": "2.1.0",
   "description": "Shared long-term memory for AI coding agents",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MygeldtAnjel/drymem.git",
+    "directory": "apps/cli"
+  },
+  "homepage": "https://github.com/MygeldtAnjel/drymem#readme",
   "type": "module",
   "bin": {
     "drymem": "./dist/cli.js"
