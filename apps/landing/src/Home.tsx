@@ -12,6 +12,43 @@ import { RequestAccess } from "@/RequestAccess";
 
 const GITHUB = "https://github.com/mygeldtanjel/drymem";
 
+/**
+ * The console, in a window.
+ *
+ * A real screenshot of the real product, in the reader's own theme — two files
+ * swapped by CSS rather than one that is wrong half the time. They come from a
+ * seeded demo organisation, never from anybody's actual memories: a customer's
+ * decisions are exactly the thing this product promises not to publish.
+ */
+function Screens() {
+  return (
+    <figure className="overflow-hidden rounded-2xl border bg-card">
+      <div className="flex items-center gap-2 border-b bg-muted/60 px-4 py-3">
+        <span className="size-2.5 rounded-full bg-border" />
+        <span className="size-2.5 rounded-full bg-border" />
+        <span className="size-2.5 rounded-full bg-border" />
+        <span className="ml-3 truncate rounded-md bg-background px-2.5 py-1 font-mono text-xs text-muted-foreground">
+          drymem.your-company.com
+        </span>
+      </div>
+      <img
+        src="/shots/memories-light.png"
+        alt="The drymem console listing a project's memories, each with its kind, author and whether it is shared."
+        width={2880}
+        height={1800}
+        className="block w-full dark:hidden"
+      />
+      <img
+        src="/shots/memories-dark.png"
+        alt=""
+        width={2880}
+        height={1800}
+        className="hidden w-full dark:block"
+      />
+    </figure>
+  );
+}
+
 function Section({
   id,
   children,
@@ -70,6 +107,40 @@ const FACTS = [
   },
 ];
 
+/**
+ * The questions a buyer actually asks, answered without hedging.
+ *
+ * Every one of these came up in a real conversation about the product, and the
+ * two that are refusals — no self-serve, no hosted model — are here precisely
+ * because finding them out on the pricing page after signing up is worse.
+ */
+const FAQ = [
+  {
+    q: "Does my code leave the building?",
+    a: "No. drymem stores what your agent writes down about the work — decisions, bugfixes, conventions — not the repository. It runs on your own hardware and talks to a model you point it at, usually an Ollama on the same network. Nothing is sent to us.",
+  },
+  {
+    q: "What if somebody pastes a secret into a memory?",
+    a: "Everything passes a scrubber before it is stored. Keys and tokens are redacted and the redaction is recorded; a private key block fails the save loudly, because a leaked key needs a human to know about it rather than a quiet substitution.",
+  },
+  {
+    q: "Which agents does it work with?",
+    a: "Claude Code today, through session hooks and an MCP server — that is where automatic capture and context injection actually work. The client is a thin HTTP shim, so anything that speaks MCP can read and write the same memory.",
+  },
+  {
+    q: "Is everything I save visible to my team?",
+    a: "No. Every memory starts private to whoever wrote it. Sharing is a deliberate act that copies it into the team's memory and records who vouched for it and when. Nothing is shared by default.",
+  },
+  {
+    q: "Can I self-host it?",
+    a: "That is the only way it runs today: one docker compose, Postgres and a knowledge graph, with the API as the sole published port. A trial gets you the images, the docs and a hand with the first setup.",
+  },
+  {
+    q: "Why can I not just sign up?",
+    a: "Because a memory product is worthless until it has a week of memory in it, and the first week is where that goes wrong. Every organisation is opened by hand so somebody watches yours land. It also means we answer your email.",
+  },
+];
+
 export function Home() {
   return (
     <main className="pb-24">
@@ -101,6 +172,15 @@ export function Home() {
             Read the docs
           </a>
         </div>
+      </Section>
+
+      {/* ---- the product, before any more words ------------------------------- */}
+      <Section className="pb-14">
+        <Screens />
+        <p className="mt-5 text-sm leading-6 text-muted-foreground">
+          Everything the team's agents have written down, with who wrote it and whether it is
+          theirs alone or the team's.
+        </p>
       </Section>
 
       {/* ---- the problem, concretely ------------------------------------------ */}
@@ -156,6 +236,21 @@ export function Home() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* ---- questions --------------------------------------------------------- */}
+      <Section id="faq" className="py-14">
+        <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          Questions we get asked
+        </h2>
+        <dl className="mt-10 grid gap-x-12 gap-y-9 sm:grid-cols-2">
+          {FAQ.map((item) => (
+            <div key={item.q}>
+              <dt className="text-base font-semibold">{item.q}</dt>
+              <dd className="mt-2 text-[0.9375rem] leading-7 text-muted-foreground">{item.a}</dd>
+            </div>
+          ))}
+        </dl>
       </Section>
 
       {/* ---- request ---------------------------------------------------------- */}

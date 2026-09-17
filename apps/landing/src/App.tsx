@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { Docs } from "@/Docs";
+import { Moon, Sun } from "@/Icons";
 import { Footer, Home } from "@/Home";
 import { Mark } from "@/Mark";
 
@@ -82,10 +83,11 @@ export function App() {
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={dark ? "Switch to light" : "Switch to dark"}
-              className="rounded-lg border px-2.5 py-2 text-sm transition hover:border-foreground"
+              aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+              title={dark ? "Switch to light theme" : "Switch to dark theme"}
+              className="grid size-9 place-items-center rounded-lg border text-muted-foreground transition hover:border-foreground hover:text-foreground"
             >
-              {dark ? "☀" : "☾"}
+              {dark ? <Sun /> : <Moon />}
             </button>
             <a
               href="#/#request"
