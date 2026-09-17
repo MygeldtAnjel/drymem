@@ -12,6 +12,22 @@ import { DrymemClient } from "./client.js";
 import { loadConfig } from "./config.js";
 import { resolveProjectKey } from "./identity.js";
 
+/**
+ * What rule 3 says, which is the whole point of a project's capture mode.
+ *
+ * The setting existed, was stored, was audited and had three buttons in the
+ * console — and nothing read it. A project set to "manual only" saved exactly
+ * as much as one set to "automatic", which is worse than not offering the
+ * choice: somebody turned it off and was told it was off.
+ */
+const SAVING_RULE: Record<string, string> = {
+  automatic:
+    "RULE 3 — PROACTIVE SAVING: Call mem_finalize_session silently after completing meaningful work (bug fixed, feature added, decision made). Do NOT wait for the user to ask. Do NOT announce that you are saving.",
+  ask: "RULE 3 — SAVING, ON CONFIRMATION: After completing meaningful work, tell the user in one line what you would write down and ask whether to save it. Call mem_finalize_session only if they say yes. Never save without asking on this project.",
+  manual:
+    "RULE 3 — DO NOT SAVE: This project saves manually. Do NOT call mem_finalize_session unless the user asks you to in this session. Everything else below still applies — reading memory is unaffected.",
+};
+
 const MEMORY_PROTOCOL = `<drymem-memory-protocol>
 You have access to drymem MCP tools for persistent memory. Follow these rules:
 
@@ -92,7 +108,32 @@ export async function sessionStart(payload: HookPayload): Promise<void> {
   // Two independent jobs, and neither may take the other down with it. The
   // context is what the agent reads; the skills are what it can do. A hook
   // that throws stops the session it runs in, so both are wrapped.
-  await Promise.allSettled([injectContext(payload, MEMORY_PROTOCOL), syncSkills(payload)]);
+  const protocol = await protocolFor(payload);
+  await Promise.allSettled([injectContext(payload, protocol), syncSkills(payload)]);
+}
+
+/**
+ * The protocol, with rule 3 set to what this project actually wants.
+ *
+ * A server that cannot be reached falls back to the automatic wording — the
+ * same text this has always injected. Being unable to ask is not a reason to
+ * change the agent's behaviour behind the user's back.
+ */
+async function protocolFor(payload: HookPayload): Promise<string> {
+  const mode = await captureModeOf(payload);
+  const rule = SAVING_RULE[mode] ?? SAVING_RULE.automatic!;
+  return MEMORY_PROTOCOL.replace(SAVING_RULE.automatic!, rule);
+}
+
+async function captureModeOf(payload: HookPayload): Promise<string> {
+  try {
+    const config = loadConfig();
+    if (!config) return "automatic";
+    const key = resolveProjectKey(payload.cwd ?? process.cwd());
+    return await new DrymemClient(config).captureMode(key);
+  } catch {
+    return "automatic";
+  }
 }
 
 /**
@@ -138,6 +179,14 @@ export async function postCompaction(payload: HookPayload): Promise<void> {
 export async function sessionStop(payload: HookPayload): Promise<void> {
   const config = loadConfig();
   if (!config) return;
+
+  // The fallback save is the one the project's setting is really about: the
+  // agent can be told not to save, but this runs whatever the agent decided.
+  const mode = await captureModeOf(payload);
+  if (mode !== "automatic") {
+    console.error(`drymem: capture is ${mode} on this project, not autosaving`);
+    return;
+  }
 
   const alreadySaved = await agentSaved(payload.transcript_path);
   if (alreadySaved) {
