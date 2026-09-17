@@ -14,6 +14,8 @@
  * and nothing there knows what an invitation is.
  */
 
+import { readFileSync } from "node:fs";
+
 import { Resend } from "resend";
 
 import { emailEnabled, env } from "../env.js";
@@ -23,6 +25,7 @@ import {
   esc,
   fallback,
   heading,
+  MARK_CID,
   note,
   panel,
   paragraph,
@@ -32,6 +35,23 @@ import {
 } from "./email-layout.js";
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+
+/**
+ * The mark, read once and sent with every letter.
+ *
+ * Two kilobytes on each message, against a letterhead that cannot break: see
+ * `MARK_CID`. Read at import so a missing asset is one line in the log at boot
+ * rather than a surprise inside a send.
+ */
+export const mark = (() => {
+  try {
+    const content = readFileSync(new URL("../../assets/mark.png", import.meta.url));
+    return { filename: "mark.png", content, contentId: MARK_CID, contentType: "image/png" };
+  } catch (error) {
+    console.warn(`email mark missing, letters will go out without it: ${String(error)}`);
+    return null;
+  }
+})();
 
 export interface Sent {
   sent: boolean;
@@ -61,6 +81,7 @@ async function send(to: string, letter: Letter): Promise<Sent> {
       subject: letter.subject,
       html: letter.html,
       text: letter.text,
+      ...(mark ? { attachments: [mark] } : {}),
     });
     if (error) {
       console.warn(`email to ${to} refused: ${error.message}`);

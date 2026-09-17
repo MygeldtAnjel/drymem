@@ -41,17 +41,6 @@ export function createApp() {
   app.use(cookieParser());
   app.use(resolvePrincipal);
 
-  // The mark, for the emails. It is a real request from a mail client, so it
-  // sits outside the session middleware and ahead of the web app's catch-all,
-  // and it is the reason drymem's emails are the only ones that load anything:
-  // an emoji cannot be recoloured and Gmail strips inline SVG, so the drawn cat
-  // has to arrive as an image or not at all.
-  app.get("/email/mark.png", (_req, res) => {
-    res.type("image/png");
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    createReadStream(new URL("../assets/mark.png", import.meta.url)).pipe(res);
-  });
-
   app.use(healthRouter);
   app.use("/auth", authRouter);
   app.use("/auth/invites", inviteRouter);

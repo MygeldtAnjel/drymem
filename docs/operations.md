@@ -88,11 +88,10 @@ teammate. Before anyone else is invited, verify a domain at
 A refusal is never fatal — it is logged, the flow continues, and the link is
 still there to paste — but nobody receives anything.
 
-The letterhead loads one image: the cat, from `PUBLIC_URL/email/mark.png` on
-this same server. On an install whose `PUBLIC_URL` nobody else can reach, it
-quietly does not render and the wordmark stands alone — which is the same
-condition under which the email reaches nobody anyway. It is also the only
-request these emails make, so it is the only thing that can report an open.
+The letterhead carries the drymem mark as an inline attachment, about two
+kilobytes per message. Nothing is fetched: these emails make no request at all,
+so there is no image to block, nothing to break on an install nobody outside can
+reach, and no way for anyone to learn that a message was opened.
 
 To see what the four look like before changing them:
 

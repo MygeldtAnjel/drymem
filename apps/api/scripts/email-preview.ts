@@ -15,7 +15,7 @@
  * happens where people actually read them.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 // Rendering an email needs no secrets, but it imports the module that validates
@@ -23,7 +23,7 @@ import { join, resolve } from "node:path";
 // server — nothing here opens a socket.
 process.env.SERVICE_SECRET ??= "email-preview-not-a-real-secret";
 
-const { inviteLetter, passwordChangedLetter, resetLetter, welcomeLetter } = await import(
+const { inviteLetter, mark, passwordChangedLetter, resetLetter, welcomeLetter } = await import(
   "../src/lib/email.js"
 );
 type Letter = Awaited<ReturnType<typeof resetLetter>>;
@@ -97,8 +97,14 @@ const letters: Array<[string, Letter]> = [
 ];
 
 mkdirSync(out, { recursive: true });
+
+// A browser has no idea what `cid:` means, so the written copies point at the
+// mark sitting beside them. What goes in the post still carries the attachment.
+copyFileSync(new URL("../assets/mark.png", import.meta.url), join(out, "mark.png"));
+const forBrowser = (html: string) => html.replace(/cid:drymem-mark/g, "mark.png");
+
 for (const [name, letter] of letters) {
-  writeFileSync(join(out, `${name}.html`), letter.html);
+  writeFileSync(join(out, `${name}.html`), forBrowser(letter.html));
   writeFileSync(join(out, `${name}.txt`), `Subject: ${letter.subject}\n\n${letter.text}`);
   console.log(`${name}  ${letter.subject}`);
 }
@@ -122,6 +128,7 @@ if (sendTo) {
       subject: `[preview] ${letter.subject}`,
       html: letter.html,
       text: letter.text,
+      ...(mark ? { attachments: [mark] } : {}),
     });
     console.log(error ? `  ${name}: refused — ${error.message}` : `  ${name}: sent ${data?.id}`);
   }

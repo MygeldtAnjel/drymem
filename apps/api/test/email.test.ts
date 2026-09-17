@@ -66,11 +66,13 @@ describe("what every letter owes the reader", () => {
     }
   });
 
-  it("wears the real mark, served from the same origin as its links", () => {
+  it("wears the real mark, carried with the message rather than fetched", () => {
     for (const letter of [welcome(false), invite(), reset(), changed()]) {
       // Not an emoji: Gmail strips inline SVG, emoji cannot be recoloured, and
-      // Unicode has no black cat face at all. The drawn mark arrives as a PNG.
-      expect(letter.html).toContain('src="http://127.0.0.1:8080/email/mark.png"');
+      // Unicode has no black cat face at all. Not a URL either: on an install
+      // nobody outside can reach, that draws a broken icon in the letterhead.
+      expect(letter.html).toContain('src="cid:drymem-mark"');
+      expect(letter.html).not.toContain("http://127.0.0.1:8080/email/mark.png");
       // Empty alt: the wordmark is beside it in text, so a client that blocks
       // the image loses nothing and a screen reader does not say it twice.
       expect(letter.html).toContain('alt=""');
@@ -78,10 +80,12 @@ describe("what every letter owes the reader", () => {
     }
   });
 
-  it("ships the mark the route serves", () => {
-    // `src/index.ts` resolves it as `../assets/mark.png`, which is this path
-    // from here. If it moves, the strip silently loses its cat.
+  it("has the mark to attach, under the name the sender reads", () => {
+    // `lib/email.ts` resolves it as `../../assets/mark.png`, which is this path
+    // from here. If it moves, every letter goes out with a hole in it.
     expect(existsSync(new URL("../assets/mark.png", import.meta.url))).toBe(true);
+    expect(email.mark?.contentId).toBe("drymem-mark");
+    expect(email.mark?.content.byteLength).toBeGreaterThan(500);
   });
 
   it("carries a plain-text half that names the same link", () => {
