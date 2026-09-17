@@ -379,9 +379,8 @@ export function SkillsPage({
             <CardHeader className="border-b p-4">
               <CardTitle className="text-sm">Installed on every machine on this project</CardTitle>
               <CardDescription>
-                A teammate gets these by running <code className="font-mono text-xs">git pull</code>
-                . The lockfile at <code className="font-mono text-xs">.drymem/skills.lock</code> is
-                what carries them.
+                Everyone on this project gets these the next time their agent starts a session
+                — nothing to commit, and nothing for them to run.
               </CardDescription>
             </CardHeader>
             {skills.length === 0 ? (

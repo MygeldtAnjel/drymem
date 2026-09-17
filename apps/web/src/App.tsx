@@ -608,14 +608,14 @@ function Workspace({
     act("Enabling", async () => {
       const enabled = await api.enableSkill(name, active, version);
       await refreshSkills();
-      return `${enabled.name}@${enabled.version} is on this project — commit .drymem/skills.lock`;
+      return `${enabled.name}@${enabled.version} is on this project. Your team gets it at their next agent session.`;
     });
 
   const disableSkill = (name: string) =>
     act("Removing", async () => {
       await api.disableSkill(name, active);
       await refreshSkills();
-      return `${name} removed — commit .drymem/skills.lock`;
+      return `${name} removed. It goes from your team's machines at their next session.`;
     });
 
   const approveSkill = (name: string) =>

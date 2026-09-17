@@ -352,7 +352,7 @@ def main() -> int:
         f"found {[str(p.relative_to(checkout)) for p in landed]}",
     )
     lock = checkout / ".drymem" / "skills.lock"
-    check("and the lockfile records it, so a teammate gets the same", lock.exists())
+    check("and the cache records what the server said", lock.exists())
     if lock.exists():
         check("by name and digest", "payments-testing" in lock.read_text())
 

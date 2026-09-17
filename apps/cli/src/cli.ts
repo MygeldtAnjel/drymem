@@ -318,7 +318,7 @@ async function main(argv: string[]): Promise<number> {
         console.log(`Enabled ${enabled.name}@${enabled.version} for this project.`);
         const after = await pullSkills(client, projectKey, root, rest);
         for (const line of describePull(after.results)) console.log(line);
-        console.log(`\n  Commit .drymem/skills.lock so your team gets it on \`git pull\`.`);
+        console.log("\n  Your team gets it when their agent next starts a session.");
         return 0;
       }
 
@@ -329,7 +329,7 @@ async function main(argv: string[]): Promise<number> {
         console.log(`Disabled ${name} for this project.`);
         const after = await pullSkills(client, projectKey, root, rest);
         for (const line of describePull(after.results)) console.log(line);
-        console.log(`\n  Commit .drymem/skills.lock.`);
+        console.log("\n  It goes from your team's machines at their next session.");
         return 0;
       }
 

@@ -1,8 +1,12 @@
 /**
  * `drymem skills` — the commands a tech lead and a teammate each run once.
  *
- * The lead:  `drymem skills add payments-retry` → the lockfile changes → commit.
- * Everyone:  `git pull` → the session hook runs `pull` → it is installed.
+ * The lead:  `drymem skills add payments-retry`, or Add on the web — either
+ *            way, what changed is the server.
+ * Everyone:  their next agent session → the hook runs `pull` → it is installed.
+ *
+ * Nothing to commit and nothing to remember: both paths a lead might take end
+ * in the same place, and a teammate never has to know which one was used.
  *
  * `pull` is the one that has to be boring. It runs on every session start, on
  * machines with different agents installed, sometimes with no network — so it

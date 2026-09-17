@@ -1,5 +1,11 @@
 /**
- * `.drymem/skills.lock` — the enabled set, committed with the code.
+ * `.drymem/skills.lock` — the enabled set, cached on disk.
+ *
+ * Not committed. The server decides which skills a project uses, because that
+ * is what the web UI edits; a copy in git is a second source of truth that is
+ * wrong the moment an admin clicks Add, and that rewrites itself in everyone's
+ * working tree at their next session. What the cache is for is the offline
+ * case: an agent starting with no network can still say what it is missing.
  *
  * The server is the source of truth; this is a generated cache with hashes. It
  * exists for three reasons: the project's skills are visible in git history,
