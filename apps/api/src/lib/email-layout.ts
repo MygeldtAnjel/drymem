@@ -15,7 +15,7 @@
  *
  * That last one decides the cat. The product's mark is a drawn SVG (the black
  * head with the amber almond eyes in `apps/web/src/components/Logo.tsx`), and
- * Gmail strips inline SVG to nothing — so the band carries an emoji instead.
+ * Gmail strips inline SVG to nothing — so the letterhead carries an emoji.
  * It is the black cat, U+1F408 U+200D U+2B1B, because ours is a black cat and
  * the plain cat face renders ginger on every platform that draws it. That one
  * is a whole cat in profile rather than a face, so it is set larger than the
@@ -28,25 +28,26 @@
  */
 
 /**
- * The app's own tokens, not a warmer cousin of them (`apps/web/src/index.css`).
+ * The app's own tokens (`apps/web/src/index.css`), and nothing invented.
  *
- * Two rules from the console hold here, and both were broken once already:
- * amber is the *mark*, never a button fill, and the primary action is the
- * ground inverted — near-black on light, near-white on dark.
+ * The console is greyscale: an off-white ground, hairline rules, near-black for
+ * anything that matters, and the primary action is the ground inverted. Amber
+ * is `--brand`, but the CSS is explicit that it is for "the logo, the active
+ * nav rail and nothing that has to be read at 12px" — so it appears here in
+ * neither a band, a button, nor a link. An email that arrives in colours the
+ * product does not use is a letter from somebody else.
  *
- * The band is the one exception, and it is not one: the mark's own strip is
- * exactly the place the brand colour belongs. It keeps the same burnt amber in
- * both schemes so the black cat standing on it stays legible either way.
+ * The mark is the one thing that cannot follow suit. `CatMark` is drawn and
+ * takes `currentColor`, so it is black on light and white on dark; an emoji has
+ * a fixed palette. The black cat therefore sits on a small white tile, which
+ * disappears into the card on light and reads as a logo on dark.
  */
-const BAND = "#b45309";
 
 /** Light: the app's `:root`. Contrast is against the card. */
 const light = {
   page: "#fafafa", // --background
   card: "#ffffff", // --card
   border: "#e5e5e5", // --border
-  band: BAND,
-  bandText: "#ffffff", // 5.02:1 on the band
   heading: "#0a0a0a", // --foreground, 19.80:1
   /* Body sits between foreground and muted-foreground: 15px of prose in
      near-black reads heavy, and in muted-foreground it reads faint. */
@@ -54,7 +55,6 @@ const light = {
   meta: "#666666", // --muted-foreground, 5.74:1
   button: "#0a0a0a", // --primary
   buttonText: "#ffffff", // --primary-foreground, 19.80:1
-  brand: BAND, // --brand
   panel: "#f5f5f5", // --muted
 };
 
@@ -63,16 +63,16 @@ const dark = {
   page: "#0a0a0a",
   card: "#0f0f0f",
   border: "#232323",
-  band: BAND,
-  bandText: "#ffffff",
   heading: "#ededed", // 16.37:1
   text: "#c9c9c9", // 11.0:1
   meta: "#a1a1a1", // 7.42:1
   button: "#ededed", // --primary
   buttonText: "#0a0a0a", // 16.91:1
-  brand: "#f2a93b", // --brand
   panel: "#171717", // --muted
 };
+
+/** The tile behind the mark stays white in both schemes, so the cat is visible. */
+const TILE = "#ffffff";
 
 const FONT =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji'";
@@ -151,7 +151,7 @@ export const steps = (items: Array<{ title: string; body: string }>) => `
           .map(
             (item, i) => `
           <tr>
-            <td valign="top" class="dm-brand" style="font-family:${FONT};font-size:13px;font-weight:700;line-height:1.5;color:${light.brand};padding:0 12px 16px 0;width:18px">${i + 1}</td>
+            <td valign="top" class="dm-strong" style="font-family:${FONT};font-size:13px;font-weight:700;line-height:1.5;color:${light.heading};padding:0 12px 16px 0;width:18px">${i + 1}</td>
             <td valign="top" style="padding:0 0 16px">
               <div class="dm-strong" style="font-family:${FONT};font-size:15px;font-weight:600;line-height:1.5;color:${light.heading};padding-bottom:3px">${esc(
                 item.title,
@@ -198,7 +198,7 @@ export const note = (text: string) => `
 export const fallback = (href: string) => `
       <tr><td class="dm-rule" style="border-top:1px solid ${light.border};padding:18px 0 0">
         <div class="dm-meta" style="font-family:${FONT};font-size:12px;line-height:1.6;color:${light.meta}">If the button does not work, paste this into your browser:</div>
-        <div style="font-family:${MONO};font-size:12px;line-height:1.6;word-break:break-all"><a class="dm-link" href="${href}" style="color:${light.brand};text-decoration:underline">${esc(
+        <div style="font-family:${MONO};font-size:12px;line-height:1.6;word-break:break-all"><a class="dm-link" href="${href}" style="color:${light.heading};text-decoration:underline">${esc(
           href,
         )}</a></div>
       </td></tr>`;
@@ -237,13 +237,13 @@ export function render({ title, preheader, rows, footnote }: Layout): string {
     .dm-text    { color: ${dark.text} !important; }
     .dm-text b, .dm-text strong { color: ${dark.heading} !important; }
     .dm-meta    { color: ${dark.meta} !important; }
-    .dm-brand   { color: ${dark.brand} !important; }
-    .dm-link    { color: ${dark.brand} !important; }
+    .dm-link    { color: ${dark.heading} !important; }
     .dm-btn     { background: ${dark.button} !important; border-color: ${dark.button} !important; }
     .dm-btn-a   { color: ${dark.buttonText} !important; }
   }
   @media only screen and (max-width: 480px) {
     .dm-pad     { padding: 26px 22px !important; }
+    .dm-pad-t   { padding: 22px 22px 16px !important; }
     .dm-h1      { font-size: 20px !important; }
     /* A thumb is a blunt instrument: the action goes full width. The anchor
        turns into a block and keeps an automatic width — a block already fills
@@ -263,9 +263,11 @@ ${preheaderOf(preheader)}
       <tr><td class="dm-card" style="background:${light.card};border:1px solid ${light.border};border-radius:14px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
-          <tr><td class="dm-band" bgcolor="${light.band}" align="center" style="background:${light.band};border-radius:13px 13px 0 0;padding:22px 20px">
-            <span style="font-family:${FONT};font-size:26px;line-height:1;vertical-align:middle">&#128008;&#8205;&#11035;</span>
-            <span class="dm-band-t" style="font-family:${FONT};font-size:17px;font-weight:700;letter-spacing:-0.01em;line-height:1;color:${light.bandText};vertical-align:middle;padding-left:7px">drymem</span>
+          <tr><td class="dm-rule dm-pad-t" style="padding:24px 30px 18px;border-bottom:1px solid ${light.border}">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+              <td width="34" bgcolor="${TILE}" style="background:${TILE};border:1px solid ${light.border};border-radius:8px;width:34px;height:34px;text-align:center;vertical-align:middle;font-family:${FONT};font-size:20px;line-height:34px">&#128008;&#8205;&#11035;</td>
+              <td style="padding-left:10px;vertical-align:middle"><span class="dm-h1" style="font-family:${FONT};font-size:16px;font-weight:600;letter-spacing:-0.01em;color:${light.heading}">drymem</span></td>
+            </tr></table>
           </td></tr>
 
           <tr><td class="dm-pad" style="padding:30px 30px 26px">
