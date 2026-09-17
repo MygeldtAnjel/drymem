@@ -67,8 +67,9 @@ describe("what every letter owes the reader", () => {
   it("wears the mark: the cat and the wordmark, in the band", () => {
     for (const letter of [welcome(false), invite(), reset(), changed()]) {
       // The product's mark is a drawn SVG and Gmail strips SVG to nothing, so
-      // the band carries the cat as an emoji entity instead.
-      expect(letter.html).toContain("&#128008;&#8205;&#11035;");
+      // the strip carries the cat as an emoji entity instead. It is the face:
+      // Unicode has no black cat face, and the black cat is whole-body only.
+      expect(letter.html).toContain("&#128049;");
       expect(letter.html).toContain("drymem");
     }
   });

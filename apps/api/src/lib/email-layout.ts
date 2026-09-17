@@ -38,9 +38,10 @@
  * product does not use is a letter from somebody else.
  *
  * The mark is the one thing that cannot follow suit. `CatMark` is drawn and
- * takes `currentColor`, so it is black on light and white on dark; an emoji has
- * a fixed palette. The black cat therefore sits on a small white tile, which
- * disappears into the card on light and reads as a logo on dark.
+ * takes `currentColor`; an emoji has a fixed palette and cannot be recoloured
+ * (Gmail strips CSS filters). There is no black cat *face* in Unicode — the
+ * black cat is whole-body only — so the strip goes near-black and carries the
+ * cat face on it, which is how the favicon reads: a dark tile, a lit mark.
  */
 
 /** Light: the app's `:root`. Contrast is against the card. */
@@ -71,8 +72,13 @@ const dark = {
   panel: "#171717", // --muted
 };
 
-/** The tile behind the mark stays white in both schemes, so the cat is visible. */
-const TILE = "#ffffff";
+/**
+ * The mark's strip: near-black in both schemes, like the favicon's own tile
+ * (a `#0b0d10` rounded square with the cat lit on it). Greyscale, so it stays
+ * inside the console's palette, and dark enough that the wordmark beside the
+ * cat can be white in a light email and a dark one alike.
+ */
+const HEADER = "#0a0a0a";
 
 const FONT =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji'";
@@ -238,12 +244,15 @@ export function render({ title, preheader, rows, footnote }: Layout): string {
     .dm-text b, .dm-text strong { color: ${dark.heading} !important; }
     .dm-meta    { color: ${dark.meta} !important; }
     .dm-link    { color: ${dark.heading} !important; }
+    /* On dark the strip and the page are the same near-black, so the card
+       needs a line to start somewhere. */
+    .dm-pad-t   { border-bottom: 1px solid ${dark.border} !important; }
     .dm-btn     { background: ${dark.button} !important; border-color: ${dark.button} !important; }
     .dm-btn-a   { color: ${dark.buttonText} !important; }
   }
   @media only screen and (max-width: 480px) {
     .dm-pad     { padding: 26px 22px !important; }
-    .dm-pad-t   { padding: 22px 22px 16px !important; }
+    .dm-pad-t   { padding: 18px 22px !important; }
     .dm-h1      { font-size: 20px !important; }
     /* A thumb is a blunt instrument: the action goes full width. The anchor
        turns into a block and keeps an automatic width — a block already fills
@@ -263,10 +272,10 @@ ${preheaderOf(preheader)}
       <tr><td class="dm-card" style="background:${light.card};border:1px solid ${light.border};border-radius:14px">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
-          <tr><td class="dm-rule dm-pad-t" style="padding:24px 30px 18px;border-bottom:1px solid ${light.border}">
+          <tr><td class="dm-pad-t" bgcolor="${HEADER}" style="background:${HEADER};border-radius:13px 13px 0 0;padding:20px 30px">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-              <td width="34" bgcolor="${TILE}" style="background:${TILE};border:1px solid ${light.border};border-radius:8px;width:34px;height:34px;text-align:center;vertical-align:middle;font-family:${FONT};font-size:20px;line-height:34px">&#128008;&#8205;&#11035;</td>
-              <td style="padding-left:10px;vertical-align:middle"><span class="dm-h1" style="font-family:${FONT};font-size:16px;font-weight:600;letter-spacing:-0.01em;color:${light.heading}">drymem</span></td>
+              <td style="vertical-align:middle;font-family:${FONT};font-size:23px;line-height:1">&#128049;</td>
+              <td style="padding-left:9px;vertical-align:middle"><span style="font-family:${FONT};font-size:16px;font-weight:600;letter-spacing:-0.01em;color:#ffffff">drymem</span></td>
             </tr></table>
           </td></tr>
 
