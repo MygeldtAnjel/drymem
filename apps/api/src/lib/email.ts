@@ -233,6 +233,73 @@ export function welcomeLetter(opts: WelcomeOpts): Letter {
 
 export const sendWelcome = (opts: WelcomeOpts): Promise<Sent> => send(opts.to, welcomeLetter(opts));
 
+/**
+ * Somebody asked for an account.
+ *
+ * The only letter that goes to the operator rather than to a user, and the only
+ * one whose job is to be read within a day: the landing page promises an answer
+ * from a person, and nothing else in the product will mention that a request is
+ * sitting there. It carries the whole request so a decision can be made from
+ * the phone, without opening the queue.
+ */
+export interface AccessRequestedOpts {
+  email: string;
+  name: string | null;
+  company: string | null;
+  about: string | null;
+  teamSize: string | null;
+}
+
+export function accessRequestedLetter(opts: AccessRequestedOpts): Letter {
+  const who = opts.name?.trim() || opts.email;
+  const rows: Array<[string, string]> = [["Email", opts.email]];
+  if (opts.name) rows.push(["Name", opts.name]);
+  if (opts.company) rows.push(["Company", opts.company]);
+  if (opts.teamSize) rows.push(["Team size", opts.teamSize]);
+
+  return {
+    subject: `drymem access request: ${who}`,
+    html: render({
+      title: "Someone asked for access to drymem",
+      preheader: `${who}${opts.company ? ` at ${opts.company}` : ""} asked for an account.`,
+      rows: [
+        heading("Someone asked for access"),
+        panel(rows),
+        ...(opts.about
+          ? [paragraph(`<b>What they want it for</b><br>${esc(opts.about)}`)]
+          : []),
+        paragraph(
+          `To let them in, provision the organisation and they will set their own password from the sign-in page:`,
+        ),
+        paragraph(
+          code(`drymem-admin org-create "Their Company" --owner ${opts.email}`),
+        ),
+      ].join(""),
+      footnote: "You got this because you run this drymem server.",
+    }),
+    text: text([
+      `Someone asked for access to drymem.`,
+      ``,
+      `Email: ${opts.email}`,
+      ...(opts.name ? [`Name: ${opts.name}`] : []),
+      ...(opts.company ? [`Company: ${opts.company}`] : []),
+      ...(opts.teamSize ? [`Team size: ${opts.teamSize}`] : []),
+      ...(opts.about ? [``, `What they want it for:`, opts.about] : []),
+      ``,
+      `To let them in:`,
+      `  drymem-admin org-create "Their Company" --owner ${opts.email}`,
+    ]),
+  };
+}
+
+/**
+ * The operator's copy. `to` is decided by the caller, which knows who owns this
+ * server; `ACCESS_REQUESTS_TO` overrides it when the person who runs the box is
+ * not the person who reads the requests.
+ */
+export const sendAccessRequested = (to: string, opts: AccessRequestedOpts): Promise<Sent> =>
+  send(env.ACCESS_REQUESTS_TO?.trim() || to, accessRequestedLetter(opts));
+
 export interface InviteOpts {
   to: string;
   orgName: string;

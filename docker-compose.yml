@@ -86,6 +86,10 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # The marketing site's origin, when it is deployed apart from this server.
+      # Its request-access form is the only cross-origin call in the product.
+      LANDING_ORIGIN: ${LANDING_ORIGIN:-}
+      ACCESS_REQUESTS_TO: ${ACCESS_REQUESTS_TO:-}
       EMAIL_FROM: ${EMAIL_FROM:-drymem <onboarding@resend.dev>}
       # Both empty means no GitHub button, which is the right default for a
       # laptop that cannot register an OAuth app.

@@ -37,6 +37,15 @@ const schema = z.object({
   INVITE_DAYS: z.coerce.number().default(7),
   RESET_MINUTES: z.coerce.number().default(60),
 
+  /**
+   * The landing site's origin, e.g. `https://drymem.dev`. Set only when the
+   * marketing page is deployed somewhere other than this server, which is the
+   * one thing in the product that talks to it cross-origin.
+   */
+  LANDING_ORIGIN: z.string().optional(),
+
+  /** Where "somebody asked for access" goes. Defaults to the sender's address. */
+  ACCESS_REQUESTS_TO: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("drymem <onboarding@resend.dev>"),
 

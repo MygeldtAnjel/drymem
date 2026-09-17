@@ -38,7 +38,11 @@ export type Action =
   | "skill.disable"
   | "skill.approve"
   | "skill.deprecate"
-  | "skill.import";
+  | "skill.import"
+  // Who was let into the product, and who let them in.
+  | "access.approved"
+  | "access.declined"
+  | "access.pending";
 
 export async function record(
   principal: Pick<Principal, "orgId" | "userId"> | { orgId: string; userId: string | null },

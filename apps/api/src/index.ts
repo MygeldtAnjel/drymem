@@ -20,6 +20,7 @@ import { ZodError } from "zod";
 import { env } from "./env.js";
 import { badRequest, handleErrors } from "./lib/errors.js";
 import { resolvePrincipal } from "./middleware/auth.js";
+import { accessRouter } from "./routes/access.js";
 import { auditRouter } from "./routes/audit.js";
 import { authRouter } from "./routes/auth.js";
 import { chatRouter } from "./routes/chats.js";
@@ -42,6 +43,9 @@ export function createApp() {
   app.use(resolvePrincipal);
 
   app.use(healthRouter);
+  // The one route a stranger may write to. Mounted beside `/auth` rather than
+  // under `/v1`, because it belongs to nobody's session.
+  app.use("/access-requests", accessRouter);
   app.use("/auth", authRouter);
   app.use("/auth/invites", inviteRouter);
   app.use("/auth/device", deviceRouter);

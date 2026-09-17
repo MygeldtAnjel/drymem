@@ -103,6 +103,30 @@ export const invites = pgTable("invites", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * The queue behind the landing page's form.
+ *
+ * drymem is not self-serve: signup succeeds once per server, so a new team
+ * arrives by asking and being provisioned. The decision stays on the row after
+ * it is made — who asked, when, and who let them in is the only record of how
+ * an organisation came to exist.
+ */
+export const accessRequests = pgTable("access_requests", {
+  id: uuid("id").primaryKey().$defaultFn(randomUUID),
+  email: varchar("email", { length: 320 }).notNull(),
+  name: varchar("name", { length: 200 }),
+  company: varchar("company", { length: 200 }),
+  about: varchar("about", { length: 2000 }),
+  teamSize: varchar("team_size", { length: 40 }),
+  /** pending | approved | declined */
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  note: varchar("note", { length: 2000 }),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  sourceIp: varchar("source_ip", { length: 64 }),
+});
+
 export const deviceCodes = pgTable("device_codes", {
   id: uuid("id").primaryKey().$defaultFn(randomUUID),
   deviceHash: varchar("device_hash", { length: 64 }).notNull().unique(),

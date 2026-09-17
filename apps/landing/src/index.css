@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource/jetbrains-mono/400.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * drymem — the public page.
+ *
+ * The same world as the console, on the same tokens: an off-white ground,
+ * hairline rules instead of shadows, near-black for anything that matters, and
+ * amber reserved for the mark. A marketing page that invents its own palette is
+ * a promise the product then breaks on first sign-in.
+ *
+ * What is different is the air. The console is dense because it is a tool used
+ * all day; this is read once, top to bottom, by somebody deciding whether to
+ * care — so the type is larger and the space between things is wider.
+ */
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+}
+
+:root {
+  --background: #fafafa;
+  --foreground: #0a0a0a; /* 18.97:1 */
+  --card: #ffffff;
+  --muted: #f5f5f5;
+  --muted-foreground: #666666; /* 5.74:1 on card */
+  --border: #e5e5e5;
+  --primary: #0a0a0a;
+  --primary-foreground: #ffffff;
+  --brand: #b45309; /* 5.02:1 — the mark, never a button fill */
+  --success: #067a4e;
+  --destructive: #c81e2b;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed; /* 16.91:1 */
+  --card: #0f0f0f;
+  --muted: #171717;
+  --muted-foreground: #a1a1a1; /* 7.42:1 */
+  --border: #232323;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --brand: #f2a93b; /* 9.60:1 */
+  --success: #3fce8f;
+  --destructive: #ff6169;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Anchored headings in the docs must not hide under the sticky bar. */
+  :target {
+    scroll-margin-top: 6rem;
+  }
+}
