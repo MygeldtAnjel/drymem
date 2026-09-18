@@ -1,0 +1,10 @@
+drymem
+Copyright 2026 drymem contributors
+
+This product includes software developed as part of mattpocock/skills
+(https://github.com/mattpocock/skills), Copyright (c) 2026 Matt Pocock,
+licensed under the MIT Licence.
+
+Seventeen of the skills under packages/skills/general/ are forked from that
+project and remain under its licence, reproduced at packages/skills/LICENSE.
+What was changed, and why, is recorded in packages/skills/ATTRIBUTION.md.

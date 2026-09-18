@@ -2,7 +2,7 @@
 
 17 of the skills under `general/` are forked from
 [mattpocock/skills](https://github.com/mattpocock/skills), MIT licensed,
-Copyright (c) 2026 Matt Pocock. Forked at commit `HEAD` on 2026-09-10.
+Copyright (c) 2026 Matt Pocock. Forked on 2026-09-10.
 
 We kept his structure — small model-invoked primitives, thin user-invoked
 orchestrators that compose them — because it is the right shape for Claude Code

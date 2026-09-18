@@ -16,6 +16,7 @@ import {
   LOCK_PATH,
   SKILLS_DIR,
   availableSkills,
+  bundledSkillsDir,
   hashSkill,
   readLock,
   gaps,
@@ -287,5 +288,39 @@ describe("writeDraft", () => {
   it("ends the file with a newline", () => {
     const path = writeDraft(project, "x", "no trailing newline");
     expect(readFileSync(path, "utf8").endsWith("\n")).toBe(true);
+  });
+});
+
+describe("bundledSkillsDir", () => {
+  /**
+   * The published package and the monorepo put the skills in different places,
+   * and the only moment the published layout exists is inside a tarball nobody
+   * runs before publishing. So it is asserted here instead: a wrong answer is
+   * a CLI that installs no skills and says nothing.
+   */
+  it("finds them in the published layout: dist/../skills/general", () => {
+    const pkg = mkdtempSync(join(tmpdir(), "drymem-pkg-"));
+    mkdirSync(join(pkg, "dist"), { recursive: true });
+    makeSkill(join(pkg, "skills", "general"), "tdd");
+
+    expect(bundledSkillsDir(join(pkg, "dist", "cli.js"))).toBe(
+      join(pkg, "dist", "..", "skills", "general"),
+    );
+  });
+
+  it("finds them in the monorepo: packages/skills/general", () => {
+    const repo = mkdtempSync(join(tmpdir(), "drymem-repo-"));
+    const dist = join(repo, "apps", "cli", "dist");
+    mkdirSync(dist, { recursive: true });
+    makeSkill(join(repo, "packages", "skills", "general"), "tdd");
+
+    expect(bundledSkillsDir(join(dist, "cli.js"))).toBe(
+      join(dist, "..", "..", "..", "packages", "skills", "general"),
+    );
+  });
+
+  it("is null when there are none, rather than a path that does not exist", () => {
+    const empty = mkdtempSync(join(tmpdir(), "drymem-empty-"));
+    expect(bundledSkillsDir(join(empty, "dist", "cli.js"))).toBe(null);
   });
 });

@@ -67,3 +67,16 @@ Every skill is scanned first. A skill runs on every teammate's agent, so:
 - A credential in the content is **refused outright** — nothing is stored.
 - Anything else the scanner flags is **held until an admin approves it**.
 - Publishing the same bytes twice changes nothing and adds no version.
+
+## The ones you start with
+
+drymem ships with a starting set so a new project is not an empty catalogue —
+TDD, code review, domain modelling, turning a conversation into a spec, and a
+dozen more. Seventeen of them are forked from
+[mattpocock/skills](https://github.com/mattpocock/skills), MIT licensed,
+Copyright (c) 2026 Matt Pocock, and they keep that licence. We changed four of
+them to drop his issue-tracker coupling and to hand off through drymem instead
+of a file in `/tmp`; the rest are his words, unedited.
+
+They are a starting point, not a house style. Turn off the ones you do not
+want.

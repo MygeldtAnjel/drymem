@@ -144,3 +144,8 @@ covers the engine, the control plane, the CLI and the console.
 ## Licence
 
 [Apache 2.0](LICENSE).
+
+Seventeen of the skills drymem ships with are forked from
+[mattpocock/skills](https://github.com/mattpocock/skills), MIT licensed,
+Copyright (c) 2026 Matt Pocock. They keep that licence, and what we changed and
+why is written down in [packages/skills/ATTRIBUTION.md](packages/skills/ATTRIBUTION.md).

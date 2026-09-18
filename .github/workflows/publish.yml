@@ -52,6 +52,25 @@ jobs:
       - run: pnpm --filter drymem run test
       - run: pnpm --filter drymem run build
 
+      # The bundled skills are assembled by prepack, so the only place their
+      # layout is real is inside the tarball. Getting it wrong ships a CLI that
+      # installs no skills and says nothing, and Matt Pocock's MIT notice has to
+      # travel with his files — see packages/skills/ATTRIBUTION.md.
+      - name: The tarball carries the skills, and their licence
+        run: |
+          cd apps/cli
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e '
+            const files = require("/tmp/pack.json")[0].files.map((f) => f.path);
+            const want = ["skills/LICENSE", "skills/ATTRIBUTION.md"];
+            const missing = want.filter((w) => !files.includes(w));
+            if (!files.some((f) => f.startsWith("skills/general/"))) missing.push("skills/general/**");
+            if (missing.length) {
+              console.error("Missing from the tarball: " + missing.join(", "));
+              process.exit(1);
+            }
+          '
+
       - name: Publish
         run: pnpm --filter drymem publish --access public --no-git-checks --provenance
         env:

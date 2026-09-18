@@ -45,3 +45,6 @@ docs/PLAN-v1.md
 # means every `vite build` leaves a dirty tree and every review carries a
 # minified diff nobody reads.
 apps/server/drymem_server/web/
+
+# Built by the CLI's prepack from packages/skills — never edited here.
+apps/cli/skills/
