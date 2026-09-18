@@ -42,7 +42,9 @@ export type Action =
   // Who was let into the product, and who let them in.
   | "access.approved"
   | "access.declined"
-  | "access.pending";
+  | "access.pending"
+  // Which settings were changed, never their values.
+  | "server.settings";
 
 export async function record(
   principal: Pick<Principal, "orgId" | "userId"> | { orgId: string; userId: string | null },

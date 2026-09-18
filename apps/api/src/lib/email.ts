@@ -18,7 +18,8 @@ import { readFileSync } from "node:fs";
 
 import { Resend } from "resend";
 
-import { emailEnabled, env } from "../env.js";
+import { env } from "../env.js";
+import { serverSettings } from "./settings.js";
 import {
   button,
   code,
@@ -34,7 +35,22 @@ import {
   text,
 } from "./email-layout.js";
 
-const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+/**
+ * A client per key, built when first needed.
+ *
+ * This used to be one client made at import from the environment, which meant a
+ * key set from the console did nothing until the process restarted — a setting
+ * that appears to save and has no effect is worse than one that is not offered.
+ */
+const clients = new Map<string, Resend>();
+function clientFor(key: string): Resend {
+  let client = clients.get(key);
+  if (!client) {
+    client = new Resend(key);
+    clients.set(key, client);
+  }
+  return client;
+}
 
 /**
  * The mark, read once and sent with every letter.
@@ -73,10 +89,13 @@ export interface Letter {
 }
 
 async function send(to: string, letter: Letter): Promise<Sent> {
-  if (!resend) return { sent: false, reason: "No RESEND_API_KEY is configured." };
+  const config = await serverSettings();
+  if (!config.resendApiKey) {
+    return { sent: false, reason: "No Resend API key is configured." };
+  }
   try {
-    const { error } = await resend.emails.send({
-      from: env.EMAIL_FROM,
+    const { error } = await clientFor(config.resendApiKey).emails.send({
+      from: config.emailFrom,
       to,
       subject: letter.subject,
       html: letter.html,
@@ -300,6 +319,11 @@ export function accessRequestedLetter(opts: AccessRequestedOpts): Letter {
 export const sendAccessRequested = (to: string, opts: AccessRequestedOpts): Promise<Sent> =>
   send(env.ACCESS_REQUESTS_TO?.trim() || to, accessRequestedLetter(opts));
 
+/** Whether anything would actually be sent, asked of the live configuration. */
+export async function emailWorks(): Promise<boolean> {
+  return Boolean((await serverSettings()).resendApiKey);
+}
+
 export interface InviteOpts {
   to: string;
   orgName: string;
@@ -454,4 +478,3 @@ export function passwordChangedLetter(opts: PasswordChangedOpts): Letter {
 export const sendPasswordChanged = (opts: PasswordChangedOpts): Promise<Sent> =>
   send(opts.to, passwordChangedLetter(opts));
 
-export { emailEnabled };

@@ -745,6 +745,15 @@ export const api = {
       body: JSON.stringify({ display_name: displayName }),
     }),
 
+  /** Settings an admin can change without a shell. Secrets go in, never out. */
+  serverSettings: () => request<ServerSettings>("/v1/server-settings"),
+
+  saveServerSettings: (changes: ServerSettingsPatch) =>
+    request<{ changed: string[] }>("/v1/server-settings", {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    }),
+
   setCaptureMode: (projectKey: string, mode: string) =>
     request<Project>(`/v1/projects/${projectKey}`, {
       method: "PATCH",
@@ -878,3 +887,34 @@ export const api = {
       body: JSON.stringify({ project_key: projectKey, topic }),
     }),
 };
+
+/**
+ * What the settings screen is told. No secret is ever in here — a key is
+ * reported as configured, with its last four characters so you can recognise
+ * the one you set.
+ */
+export interface ServerSettings {
+  email: {
+    configured: boolean;
+    api_key_hint: string | null;
+    /** The value in force came from the server's environment, not this screen. */
+    from_environment: boolean;
+    from_address: string;
+  };
+  model: {
+    extractor: string;
+    local_llm_model: string | null;
+    anthropic_key_configured: boolean;
+    anthropic_key_hint: string | null;
+  };
+  updated_at: string | null;
+}
+
+/** `null` clears a setting back to the environment; omitting a key leaves it. */
+export interface ServerSettingsPatch {
+  resend_api_key?: string | null;
+  email_from?: string | null;
+  extractor?: string | null;
+  local_llm_model?: string | null;
+  anthropic_api_key?: string | null;
+}

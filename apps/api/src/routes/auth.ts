@@ -12,12 +12,12 @@ import { and, count, desc, eq, isNull, sql as raw } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "../db/client.js";
-import { emailEnabled, env } from "../env.js";
+import { env } from "../env.js";
 import { record } from "../lib/audit.js";
 import { seedCatalogue } from "../lib/seed.js";
 import { hashPassword, hashToken, randomToken, verifyPassword, WeakPassword } from "../lib/crypto.js";
 import { badRequest, conflict, limiter, notFound, unauthorized } from "../lib/errors.js";
-import { link, sendPasswordChanged, sendReset, sendWelcome } from "../lib/email.js";
+import { emailWorks, link, sendPasswordChanged, sendReset, sendWelcome } from "../lib/email.js";
 import { authorizeUrl, githubEnabled, GithubError, identify } from "../lib/github.js";
 import { endAllSessions, endSession, startSession } from "../lib/sessions.js";
 import { param } from "../lib/params.js";
@@ -63,7 +63,7 @@ authRouter.get("/bootstrap", async (_req, res) => {
   res.json({
     needs_setup: empty,
     org_name: org?.name ?? null,
-    smtp_enabled: emailEnabled,
+    smtp_enabled: await emailWorks(),
     github_enabled: githubEnabled(),
   });
 });
@@ -335,11 +335,12 @@ authRouter.post("/forgot", async (req, res) => {
     }
   }
 
+  const configured = await emailWorks();
   res.json({
     // Deliberately not "we sent you an email" — we may not have.
     detail: "If that address has an account, a reset link is on its way.",
-    email_configured: emailEnabled,
-    ...(emailEnabled || !devLink ? {} : { server_log_hint: true }),
+    email_configured: configured,
+    ...(configured || !devLink ? {} : { server_log_hint: true }),
   });
 });
 

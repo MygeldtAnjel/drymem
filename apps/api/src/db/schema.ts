@@ -126,6 +126,28 @@ export const accessRequests = pgTable("access_requests", {
   sourceIp: varchar("source_ip", { length: 64 }),
 });
 
+/**
+ * Settings an owner can change without a shell, in one row.
+ *
+ * Null means "not set here", and the environment is used instead — so an
+ * install configured by hand keeps working and nothing has to be migrated into
+ * the database to upgrade.
+ *
+ * The database URLs are deliberately not here. A setting that decides where the
+ * data lives should need shell access, and a wrong one typed into a browser
+ * takes away the browser you would fix it with.
+ */
+export const serverSettings = pgTable("server_settings", {
+  id: integer("id").primaryKey(),
+  resendApiKey: varchar("resend_api_key", { length: 200 }),
+  emailFrom: varchar("email_from", { length: 320 }),
+  extractor: varchar("extractor", { length: 20 }),
+  localLlmModel: varchar("local_llm_model", { length: 200 }),
+  anthropicApiKey: varchar("anthropic_api_key", { length: 200 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+});
+
 export const deviceCodes = pgTable("device_codes", {
   id: uuid("id").primaryKey().$defaultFn(randomUUID),
   deviceHash: varchar("device_hash", { length: 64 }).notNull().unique(),

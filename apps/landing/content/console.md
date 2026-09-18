@@ -83,3 +83,20 @@ saves the scrubber refused. Admins only — a member cannot read it.
 
 Your own name and password, the machines signed in as you, this project's
 capture mode, and the token the CLI uses.
+
+Under **Server**, an admin can also change two things without opening a shell:
+the Resend API key and sending address, and which model does extraction. Both
+are optional — drymem works with neither. Without an email key, invitation and
+reset links are handed to whoever created them instead of being sent; without a
+model key it uses the local model the server was pointed at.
+
+A key typed here is written and never shown again; the field displays the last
+four characters of the one in force so you can tell whether it is the one you
+meant. Anything set here takes precedence over the server's `.env`, and clearing
+it falls back there rather than switching the feature off.
+
+Two things are deliberately not on this screen. **The database addresses**,
+because a wrong one typed into a browser would take away the browser you would
+fix it with, and "point drymem at a database I control" should not be reachable
+with a session cookie. **The embedding model**, because changing it makes every
+memory already stored unsearchable, with nothing on screen to explain why.

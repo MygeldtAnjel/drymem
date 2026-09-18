@@ -231,6 +231,8 @@ describe("with no key configured", () => {
       minutes: 60,
     });
     expect(result.sent).toBe(false);
-    expect(result.reason).toMatch(/RESEND_API_KEY/);
+    // The message no longer names the environment variable, because a key set
+    // from the console counts too and "set RESEND_API_KEY" would be wrong advice.
+    expect(result.reason).toMatch(/Resend API key/i);
   });
 });

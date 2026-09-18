@@ -69,4 +69,9 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+/**
+ * Whether the *environment* configures email. Not the whole answer any more —
+ * a key set from the console counts too, and `emailWorks()` in `lib/email.ts`
+ * is the one to ask. Kept because the test harness asserts on it.
+ */
 export const emailEnabled = Boolean(env.RESEND_API_KEY);

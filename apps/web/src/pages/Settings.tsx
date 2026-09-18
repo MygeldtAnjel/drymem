@@ -37,6 +37,8 @@ import {
   type Session,
   type Usage,
   type WebSession,
+  type ServerSettings,
+  type ServerSettingsPatch,
 } from "@/api";
 import { MEMORY_TYPES } from "@/memory";
 import { relative, when } from "@/format";
@@ -320,10 +322,13 @@ export function SettingsPage({
           <CardFooter>
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Server className="size-3.5" />
-              These are set in the server’s environment, not from the browser.
+              Where the data lives is set in the server’s environment on purpose — a wrong value
+              typed here would take away the screen you would fix it with.
             </p>
           </CardFooter>
         </Card>
+
+        <ServerSettingsCard />
         <UsageCard />
       </TabsContent>
     </Tabs>
@@ -649,6 +654,174 @@ function TokensCard({ onCopy }: { onCopy: (text: string, what: string) => void }
           ))}
         </ul>
       </CardContent>
+    </Card>
+  );
+}
+
+
+/**
+ * The settings that can be changed from here, which is deliberately a short list.
+ *
+ * Everything is optional. drymem works with none of it: without an email key
+ * invitation and reset links are handed to the admin who made them, and without
+ * a model key it uses whatever local model the server was pointed at. Nothing
+ * here is required to turn anything on — it is here so that changing your mind
+ * does not mean a shell and a restart.
+ *
+ * A key is written and never read back. The field shows the last four
+ * characters of the one in force so you can tell whether it is the one you
+ * meant, and typing a new one replaces it.
+ */
+function ServerSettingsCard() {
+  const [settings, setSettings] = useState<ServerSettings | null>(null);
+  const [key, setKey] = useState("");
+  const [from, setFrom] = useState("");
+  const [model, setModel] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try {
+      const next = await api.serverSettings();
+      setSettings(next);
+      setFrom(next.email.from_address);
+      setModel(next.model.local_llm_model ?? "");
+    } catch {
+      // A member reaching this screen gets a 403; there is nothing to show and
+      // nothing to say about it.
+      setSettings(null);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  if (!settings) return null;
+
+  const save = async (changes: ServerSettingsPatch) => {
+    setBusy(true);
+    try {
+      await api.saveServerSettings(changes);
+      setKey("");
+      setAnthropicKey("");
+      await load();
+      toast.success("Saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save that");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Email and model</CardTitle>
+        <CardDescription>
+          Optional, both of them. Without an email key, invitations and reset links are handed
+          to whoever created them instead of being sent. Without a model key, extraction uses
+          the local model this server was pointed at.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <FieldGroup className="max-w-2xl">
+          <Field>
+            <FieldLabel htmlFor="resend-key">
+              Resend API key
+              {settings.email.configured && (
+                <Badge className="ml-2 bg-success/15 text-success">
+                  {settings.email.from_environment ? "From the environment" : "Set"}
+                </Badge>
+              )}
+            </FieldLabel>
+            <Input
+              id="resend-key"
+              type="password"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder={settings.email.api_key_hint ?? "Not set — email is not sent"}
+              autoComplete="off"
+            />
+            <FieldDescription>
+              {settings.email.from_environment
+                ? "Set in the server’s environment. Anything you save here takes precedence."
+                : "Written, never shown again. Leave it empty to keep the one in use."}
+            </FieldDescription>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="email-from">From address</FieldLabel>
+            <Input
+              id="email-from"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              placeholder="drymem <hello@your-company.com>"
+            />
+            <FieldDescription>
+              Resend’s shared test address only delivers to the account that owns it. Verify a
+              domain before inviting anybody.
+            </FieldDescription>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="llm-model">Model for memory and chat</FieldLabel>
+            <Input
+              id="llm-model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder={settings.model.local_llm_model ?? "qwen3.6:35b-a3b"}
+            />
+            <FieldDescription>
+              Currently extracting with{" "}
+              <code className="font-mono text-xs">{settings.model.extractor}</code>. The
+              embedding model is not here: changing it would make every memory already stored
+              unsearchable.
+            </FieldDescription>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="anthropic-key">
+              Anthropic API key
+              {settings.model.anthropic_key_configured && (
+                <Badge className="ml-2 bg-success/15 text-success">Set</Badge>
+              )}
+            </FieldLabel>
+            <Input
+              id="anthropic-key"
+              type="password"
+              value={anthropicKey}
+              onChange={(e) => setAnthropicKey(e.target.value)}
+              placeholder={settings.model.anthropic_key_hint ?? "Not set — the local model is used"}
+              autoComplete="off"
+            />
+            <FieldDescription>
+              Only needed to run extraction on Anthropic instead of locally. A memory is a
+              summary your agent wrote, not your code — but it would leave the network.
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+      </CardContent>
+      <CardFooter className="justify-between">
+        <p className="text-xs text-muted-foreground">
+          {settings.updated_at ? `Last changed ${when(settings.updated_at)}.` : "Never changed here."}
+        </p>
+        <Button
+          disabled={busy}
+          onClick={() =>
+            save({
+              ...(key ? { resend_api_key: key } : {}),
+              ...(anthropicKey ? { anthropic_api_key: anthropicKey } : {}),
+              ...(from !== settings.email.from_address ? { email_from: from || null } : {}),
+              ...(model !== (settings.model.local_llm_model ?? "")
+                ? { local_llm_model: model || null }
+                : {}),
+            })
+          }
+        >
+          <Save data-icon="inline-start" /> Save
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
