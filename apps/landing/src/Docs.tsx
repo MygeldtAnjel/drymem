@@ -105,7 +105,7 @@ export function Docs({ slug, anchor }: { slug: string; anchor: string }) {
   }, [slug, anchor]);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-5 py-12 sm:px-8 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-14">
+    <main className="mx-auto w-full max-w-7xl px-5 py-12 sm:px-8 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-14">
       <aside className="mb-10 lg:mb-0">
         <nav className="lg:sticky lg:top-24">
           {GROUPS.map((group) => (
@@ -161,10 +161,10 @@ export function Docs({ slug, anchor }: { slug: string; anchor: string }) {
       </aside>
 
       <article className="min-w-0">
-        <p className="mb-6 text-sm text-muted-foreground">{doc.blurb}</p>
+        <p className="mb-6 max-w-prose text-sm text-muted-foreground">{doc.blurb}</p>
         <div dangerouslySetInnerHTML={{ __html: html }} />
         <hr className="mt-14 border-0 border-t" />
-        <p className="mt-6 text-sm text-muted-foreground">
+        <p className="mt-6 max-w-prose text-sm text-muted-foreground">
           Something wrong or missing here?{" "}
           <a className="underline underline-offset-4" href="#/#request">
             Tell us

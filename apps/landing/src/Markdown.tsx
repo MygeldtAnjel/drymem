@@ -10,7 +10,45 @@
  * renderer unsafe the day it is pointed at something else.
  */
 
-import { DIAGRAMS } from "@/diagrams";
+/**
+ * A diagram, as the two files `make diagrams` produces.
+ *
+ * These come out of Archify: the same drawing the explorable page uses, lifted
+ * into a standalone SVG per theme so a documentation page gets one scalable
+ * picture instead of 800 KB of viewer. Swapped by CSS rather than by script,
+ * so the right one is already painted on first render.
+ *
+ * It sits wider than the prose and keeps a floor on its own width: an Archify
+ * drawing is laid out for about 930px, and squeezed below that its second line
+ * of labels stops being readable. Under the floor the frame scrolls sideways
+ * rather than shrinking the picture into decoration.
+ */
+const frameLink =
+  "shrink-0 text-xs text-muted-foreground underline underline-offset-4 decoration-border hover:text-foreground hover:decoration-foreground";
+
+const diagram = (name: string, caption: string) => {
+  const label = escape(caption);
+  const image = (theme: "light" | "dark", hide: string) =>
+    `<img src="/diagrams/${name}-${theme}.svg" alt="${theme === "light" ? label : ""}"
+          loading="lazy" class="${hide} w-full min-w-[46rem] max-w-none" />`;
+  const open = (theme: "light" | "dark", hide: string) =>
+    `<a class="${hide} ${frameLink}" href="/diagrams/${name}-${theme}.svg"
+        target="_blank" rel="noreferrer">Full size &#8599;</a>`;
+
+  return `<figure class="my-8">
+      <div class="overflow-hidden rounded-xl border bg-card">
+        <div class="flex items-center justify-between gap-4 border-b bg-muted/40 px-4 py-2.5">
+          <figcaption class="truncate text-xs font-medium tracking-wide">${label}</figcaption>
+          ${open("light", "block dark:hidden")}
+          ${open("dark", "hidden dark:block")}
+        </div>
+        <div class="overflow-x-auto">
+          ${image("light", "block dark:hidden")}
+          ${image("dark", "hidden dark:block")}
+        </div>
+      </div>
+    </figure>`;
+};
 
 const escape = (s: string) =>
   s
@@ -22,17 +60,17 @@ const escape = (s: string) =>
 
 const C = {
   h1: "mt-0 mb-4 text-3xl font-semibold tracking-tight",
-  h2: "mt-12 mb-3 scroll-mt-24 text-xl font-semibold tracking-tight",
-  h3: "mt-8 mb-2 scroll-mt-24 text-base font-semibold",
+  h2: "mt-12 mb-3 max-w-prose scroll-mt-24 text-xl font-semibold tracking-tight",
+  h3: "mt-8 mb-2 max-w-prose scroll-mt-24 text-base font-semibold",
   h4: "mt-6 mb-2 text-sm font-semibold text-muted-foreground",
-  p: "my-4 leading-7 text-[0.9375rem]",
-  ul: "my-4 ml-5 flex list-disc flex-col gap-2 marker:text-muted-foreground",
-  ol: "my-4 ml-5 flex list-decimal flex-col gap-2 marker:text-muted-foreground",
+  p: "my-4 max-w-prose leading-7 text-[0.9375rem]",
+  ul: "my-4 ml-5 flex max-w-prose list-disc flex-col gap-2 marker:text-muted-foreground",
+  ol: "my-4 ml-5 flex max-w-prose list-decimal flex-col gap-2 marker:text-muted-foreground",
   li: "pl-1 leading-7 text-[0.9375rem]",
   code: "rounded border bg-muted px-1.5 py-0.5 font-mono text-[0.8125rem] break-words",
-  pre: "my-5 overflow-x-auto rounded-xl border bg-muted/50 p-4",
+  pre: "my-5 max-w-prose overflow-x-auto rounded-xl border bg-muted/50 p-4",
   preCode: "font-mono text-[0.8125rem] leading-6 whitespace-pre",
-  quote: "my-5 border-l-2 border-brand/60 pl-4 text-muted-foreground",
+  quote: "my-5 max-w-prose border-l-2 border-brand/60 pl-4 text-muted-foreground",
   hr: "my-10 border-0 border-t",
   a: "font-medium underline underline-offset-4 decoration-border hover:decoration-foreground",
   table: "my-5 w-full border-collapse text-left text-sm",
@@ -100,11 +138,13 @@ export function renderMarkdown(source: string): { html: string; headings: Headin
       i += 1;
       while (i < lines.length && !lines[i]!.startsWith("```")) body.push(lines[i]!), (i += 1);
       i += 1;
-      const drawn = lang.startsWith("diagram:") ? DIAGRAMS[lang.slice(8)] : undefined;
+      // `diagram:<id> <caption>` — the caption is the figure's label, and the
+      // alt text of the picture that replaces the block's ASCII.
+      const drawing = /^diagram:(\S+)\s*(.*)$/.exec(lang);
+      const drawn = drawing ? diagram(drawing[1]!, drawing[2]!.trim()) : undefined;
       out.push(
-        drawn
-          ? `<figure class="my-7 overflow-x-auto rounded-xl border bg-card p-5 sm:p-6">${drawn}</figure>`
-          : `<pre class="${C.pre}"><code class="${C.preCode}">${escape(body.join("\n"))}</code></pre>`,
+        drawn ??
+          `<pre class="${C.pre}"><code class="${C.preCode}">${escape(body.join("\n"))}</code></pre>`,
       );
       continue;
     }

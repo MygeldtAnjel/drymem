@@ -19,7 +19,7 @@ enable it, which is an organisation's decision rather than a project's.
 
 ## How one reaches a machine
 
-```diagram:skill-flow
+```diagram:04-skill-distribution How a skill reaches every teammate's agent
 ```
 
 Publishing puts a skill in the **organisation's catalogue**. Enabling it turns

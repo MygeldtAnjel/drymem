@@ -146,6 +146,9 @@ transcripts.
 
 Four things, from one `docker compose`:
 
+```diagram:01-system The four services, and what is allowed to talk to what
+```
+
 | Part | What it is |
 |---|---|
 | API | The only published port. Identity, projects, skills, audit, and it serves the console. |

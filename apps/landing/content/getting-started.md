@@ -65,6 +65,9 @@ Once connected, nothing needs remembering:
 Whether that last one happens is a per-project setting. See
 [Automatic, ask, or manual](#automatic-ask-or-manual).
 
+```diagram:09-session-hooks What a session start and a session stop actually do
+```
+
 ## Your first memory
 
 Do a piece of real work and let the session end. Then:
