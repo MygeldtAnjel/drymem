@@ -12,13 +12,31 @@ current directory. Run them inside the repository you mean.
 ### `setup`
 
 ```bash
-npx drymem setup [--global]
+npx drymem setup [--server URL] [--global]
 ```
 
 Configures this repository: signs the machine in through your browser if it has
 no token yet, installs the session hooks, registers the MCP server, and pulls
 the project's skills. Run it once per repository, per machine. `--global`
 configures your agent for every project instead of this one.
+
+**Which server it talks to.** The first time on a machine it asks, defaulting to
+`http://localhost:8080` — right if you are running drymem yourself, and where
+you type your team's address otherwise:
+
+```
+drymem server URL [http://localhost:8080]: https://drymem.acme.com
+```
+
+Pass `--server` to skip the question, which is what you want in a script or in
+instructions you are handing to a teammate:
+
+```bash
+npx drymem@latest setup --server https://drymem.acme.com
+```
+
+After the first time it reuses the answer and never asks again. `drymem login
+--server …` is how you point a machine at a different server later.
 
 ### `login`
 

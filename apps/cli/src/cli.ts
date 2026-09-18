@@ -18,7 +18,8 @@ const USAGE = `drymem — shared long-term memory for AI coding agents
 
 Usage
   npx drymem login [--server URL] Sign in through the browser; stores a token for this machine
-  npx drymem setup [--global]     Configure this repo (signs in if needed, installs hooks + MCP)
+  npx drymem setup [--server URL] [--global]
+                                  Configure this repo (signs in if needed, installs hooks + MCP)
   npx drymem save <summary>       Save a memory for the current project
   npx drymem save-session [--shared] [--type <kind>]
                                   Save deliberately, from a file or stdin

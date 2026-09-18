@@ -16,9 +16,19 @@ In a project you work in:
 npx drymem@latest setup
 ```
 
-That signs this machine in through your browser, installs the session hooks,
-registers the MCP server, and pulls any skills the project uses. Once per
-repository, per machine. Nothing is installed globally.
+The first time on a machine it asks which drymem server to use, defaulting to
+`http://localhost:8080` — correct if you are running one yourself, and where you
+type your team's address otherwise. Hand people the whole thing and there is
+nothing to answer:
+
+```bash
+npx drymem@latest setup --server https://drymem.your-company.com
+```
+
+Either way it signs this machine in through your browser, installs the session
+hooks, registers the MCP server, and pulls any skills the project uses. Once per
+repository, per machine. Nothing is installed globally, and after the first time
+it never asks about the server again.
 
 Check it worked:
 
