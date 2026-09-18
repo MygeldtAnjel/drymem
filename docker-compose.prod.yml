@@ -15,6 +15,12 @@
 # **The model.** `LOCAL_LLM_URL` has to name something reachable from inside the
 # network: another container, or a host running Ollama elsewhere. There is no
 # default that could be right, so the compose refuses to start without it.
+#
+# If the model runs on this same host, two things are needed and the second is
+# the one people miss: `http://host.docker.internal:11434/v1` for the address,
+# and Ollama itself bound to more than loopback (`OLLAMA_HOST=0.0.0.0`). Without
+# the second, saves still succeed — extraction is allowed to fail — but every
+# memory is stored with no entities and nobody notices for a week.
 
 services:
   neo4j:
@@ -31,6 +37,12 @@ services:
   engine:
     network_mode: ""
     networks: [drymem]
+    # So `LOCAL_LLM_URL=http://host.docker.internal:11434/v1` reaches a model
+    # running on the host. On a bridge network the host's loopback is not the
+    # container's, and an Ollama left on its default binding is not reachable
+    # from here at all — see the note below.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DRYMEM_BIND: 0.0.0.0
       DRYMEM_PORT: 8090
@@ -47,6 +59,10 @@ services:
       - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
     environment:
       BIND: 0.0.0.0
+      # Inside the container this is always 8080; `PORT` is the host side of the
+      # mapping above. Without pinning it here, setting PORT to publish on 8443
+      # also moves the listener, and compose forwards to a port nothing is on.
+      PORT: 8080
       DATABASE_URL: postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem
       MEMORY_URL: http://engine:8090
       COOKIE_SECURE: ${COOKIE_SECURE:-true}

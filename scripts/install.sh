@@ -80,17 +80,32 @@ bold "1. Who will use this?"
 dim "A team server has to be reachable by everyone's machine. On your own"
 dim "laptop, the default address is right and nothing else needs deciding."
 echo
+# The two answers are genuinely different deployments, not the same one with a
+# different address. On a laptop the containers share the host's network so the
+# engine can reach an Ollama on loopback; on a server that would publish
+# Postgres and Neo4j on the box's real interfaces, so everything moves to a
+# private bridge and only the API is exposed.
+COMPOSE=(-f docker-compose.yml)
+TEAM=false
+
 if yes_no "Just you, on this machine?" y; then
   PUBLIC_URL="http://127.0.0.1:8080"
   COOKIE_SECURE=false
   dim "  → $PUBLIC_URL"
 else
+  TEAM=true
+  COMPOSE=(-f docker-compose.yml -f docker-compose.prod.yml)
   echo
   dim "The address teammates will type. Use https if there is a TLS terminator"
   dim "in front — session cookies travel in the clear otherwise."
   PUBLIC_URL=$(ask "  Address" "https://drymem.example.com")
   case "$PUBLIC_URL" in https://*) COOKIE_SECURE=true ;; *) COOKIE_SECURE=false ;; esac
-  [ "$COOKIE_SECURE" = false ] && warn "  Not https — cookies will not be marked secure."
+  if [ "$COOKIE_SECURE" = false ]; then
+    warn "  Not https — cookies will not be marked secure. Put a TLS terminator"
+    warn "  in front before anybody signs in over a network."
+  fi
+  dim "  Server layout: only the API is published. The databases stay on a"
+  dim "  private network and are not reachable from outside this machine."
 fi
 echo
 
@@ -109,8 +124,18 @@ EMBEDDING_DIM=768
 ANTHROPIC_API_KEY=""
 
 if yes_no "Run the model locally, with Ollama?" y; then
+  if [ "$TEAM" = true ]; then
+    dim "  On a server the containers are on their own network, so an Ollama on"
+    dim "  this same host is http://host.docker.internal:11434/v1 — and it must"
+    dim "  be listening on more than loopback (OLLAMA_HOST=0.0.0.0) or nothing"
+    dim "  will reach it."
+    LOCAL_LLM_URL="http://host.docker.internal:11434/v1"
+  fi
   LOCAL_LLM_URL=$(ask "  Ollama address" "$LOCAL_LLM_URL")
   base=${LOCAL_LLM_URL%/v1}
+  # The address the engine will use is not always one this shell can reach, so
+  # a failure to connect from here is a warning rather than a verdict.
+  [ "$TEAM" = true ] && base=${base/host.docker.internal/127.0.0.1}
 
   if curl -fsS --max-time 4 "$base/api/tags" >/dev/null 2>&1; then
     dim "  Reached it."
@@ -226,7 +251,7 @@ echo
 
 if yes_no "Start drymem now?" y; then
   echo
-  (cd "$ROOT" && docker compose up -d --build)
+  (cd "$ROOT" && docker compose "${COMPOSE[@]}" up -d --build)
   echo
   dim "Waiting for it to come up…"
   for _ in $(seq 1 60); do
@@ -241,10 +266,10 @@ if yes_no "Start drymem now?" y; then
     sleep 2
   done
   warn "It did not answer on /healthz within two minutes."
-  echo "  docker compose logs -f     # to see why"
+  echo "  docker compose ${COMPOSE[*]} logs -f     # to see why"
   exit 1
 fi
 
 echo
 echo "When you are ready:"
-echo "  docker compose up -d --build"
+echo "  docker compose ${COMPOSE[*]} up -d --build"

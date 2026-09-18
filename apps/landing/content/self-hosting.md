@@ -58,12 +58,54 @@ Plus a model. Point `LOCAL_LLM_URL` at an Ollama on your own network, or set
 `DRYMEM_EXTRACTOR=anthropic` with a key if sending summaries to an API is
 acceptable to you.
 
+On your own machine, `./scripts/install.sh` uses the development layout: the
+containers share the host's network so the engine can reach an Ollama on
+loopback. That is wrong on a server, where it would put Postgres and Neo4j on
+the box's real interfaces — so answering "no" to *just you* deploys a different
+topology instead:
+
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-Put a TLS terminator in front of the API and set `COOKIE_SECURE=true`, or
-session cookies travel in the clear.
+Everything moves onto a private network and **only the API is published**. This
+has been run end to end: sign-up, saving a memory and reading it back all work,
+and `docker compose ps` shows the databases with no host ports at all.
+
+### Reaching a model from a server
+
+This is the step people lose an afternoon to. On a private network the host's
+loopback is not the container's, so a model running on the same box needs both:
+
+```bash
+# in .env
+LOCAL_LLM_URL=http://host.docker.internal:11434/v1
+```
+
+```bash
+# and Ollama itself, listening on more than loopback
+OLLAMA_HOST=0.0.0.0 ollama serve
+```
+
+Miss the second and nothing announces it: saves still succeed, because
+extraction is allowed to fail rather than lose a memory, and every memory is
+stored with no entities until somebody notices search is empty. `docker compose
+logs engine` says `Error in generating LLM response` when this is happening.
+
+### TLS
+
+The API speaks plain HTTP and expects something in front of it. Anything that
+terminates TLS will do — Caddy is the shortest:
+
+```
+drymem.your-company.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Then set `PUBLIC_URL` to the https address and `COOKIE_SECURE=true`. Without
+that second one, session cookies are sent in the clear and the sign-in is worth
+nothing on a network you do not own.
 
 ## The first account
 

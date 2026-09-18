@@ -1,7 +1,7 @@
 services:
   neo4j:
     image: neo4j:5-community
-    container_name: drymem-neo4j
+    container_name: ${COMPOSE_PROJECT_NAME:-drymem}-neo4j
     restart: unless-stopped
     # Bound to this machine, not to every interface: these are the two ports
     # that get a Neo4j owned when somebody publishes them by accident.
@@ -24,7 +24,7 @@ services:
 
   postgres:
     image: postgres:17-alpine
-    container_name: drymem-postgres
+    container_name: ${COMPOSE_PROJECT_NAME:-drymem}-postgres
     restart: unless-stopped
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
@@ -45,7 +45,7 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-    container_name: drymem-engine
+    container_name: ${COMPOSE_PROJECT_NAME:-drymem}-engine
     restart: unless-stopped
     # Host networking so the server can reach Ollama, which listens on the
     # host's 127.0.0.1 only. The alternative is rebinding Ollama to 0.0.0.0,
@@ -78,7 +78,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    container_name: drymem-api
+    container_name: ${COMPOSE_PROJECT_NAME:-drymem}-api
     restart: unless-stopped
     # Host networking to match the engine, which needs it to reach Ollama.
     network_mode: host
