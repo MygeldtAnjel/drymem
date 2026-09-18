@@ -5,6 +5,8 @@
  * Everything heavy lives on the server; this is HTTP plus the local git remote.
  */
 
+import { readFileSync } from "node:fs";
+
 import { DrymemClient, DrymemError } from "./client.js";
 import type { Source } from "./import.js";
 import { requireConfig } from "./config.js";
@@ -40,7 +42,19 @@ Usage
   npx drymem token                Print this machine's token (for the web UI)
   npx drymem mcp                  Run the MCP server over stdio (used by Claude Code)
   npx drymem hook <event>         Run a session hook (used by Claude Code)
+  npx drymem --version            Which drymem this is
 `;
+
+/**
+ * The version in our own package.json.
+ *
+ * Read rather than baked in at build time so it cannot disagree with what npm
+ * installed — the first thing anyone is asked for in a bug report.
+ */
+function version(): string {
+  const manifest = new URL("../package.json", import.meta.url);
+  return String(JSON.parse(readFileSync(manifest, "utf8")).version);
+}
 
 function fail(message: string): never {
   console.error(message);
@@ -56,6 +70,11 @@ async function main(argv: string[]): Promise<number> {
 
   if (!command || command === "help" || command === "--help" || command === "-h") {
     console.log(USAGE);
+    return 0;
+  }
+
+  if (command === "--version" || command === "-v" || command === "version") {
+    console.log(version());
     return 0;
   }
 

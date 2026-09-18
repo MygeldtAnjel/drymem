@@ -62,7 +62,7 @@ jobs:
           npm pack --dry-run --json > /tmp/pack.json
           node -e '
             const files = require("/tmp/pack.json")[0].files.map((f) => f.path);
-            const want = ["skills/LICENSE", "skills/ATTRIBUTION.md"];
+            const want = ["README.md", "LICENSE", "NOTICE", "skills/LICENSE", "skills/ATTRIBUTION.md"];
             const missing = want.filter((w) => !files.includes(w));
             if (!files.some((f) => f.startsWith("skills/general/"))) missing.push("skills/general/**");
             if (missing.length) {

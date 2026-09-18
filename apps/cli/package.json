@@ -15,7 +15,8 @@
   },
   "files": [
     "dist",
-    "skills"
+    "skills",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"
@@ -24,7 +25,7 @@
     "build": "tsup src/cli.ts src/mcp.ts --format esm --clean --target node20",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepack": "rm -rf skills && mkdir -p skills && cp -r ../../packages/skills/general skills/general && cp ../../packages/skills/LICENSE ../../packages/skills/ATTRIBUTION.md skills/"
+    "prepack": "rm -rf skills && mkdir -p skills && cp -r ../../packages/skills/general skills/general && cp ../../packages/skills/LICENSE ../../packages/skills/ATTRIBUTION.md skills/ && cp ../../LICENSE ../../NOTICE ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

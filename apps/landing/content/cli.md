@@ -229,3 +229,12 @@ npx drymem hook <event>
 Runs a session hook. `setup` installs these into your agent's configuration.
 They always exit successfully, even when the server is unreachable — a hook must
 never break the session it runs in.
+
+### `--version`
+
+```bash
+npx drymem --version
+```
+
+Prints the version of the CLI itself, which is the first thing anyone will ask
+you for. `version` and `-v` do the same.
