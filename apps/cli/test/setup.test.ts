@@ -8,7 +8,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { applySettings, buildHooks, mcpEntry, mergeHooks, mergePermissions } from "../src/setup.js";
+import { applySettings, buildHooks, mergeHooks, mergePermissions } from "../src/setup.js";
+import { mcpEntry } from "../src/mcp-config.js";
 
 const theirHook = { type: "command", command: "bash ./scripts/my-own-hook.sh" };
 

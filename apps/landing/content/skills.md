@@ -42,9 +42,9 @@ them where that agent reads them.
 Only agents actually present on that machine get anything written. drymem never
 creates a directory for an agent you do not use.
 
-Skills reach all four. Memory does not: it is automatic in Claude Code alone,
-because that is the one with session hooks. In the other three you register the
-memory tools yourself, as a stdio MCP server running `npx drymem mcp`.
+`setup` also registers the memory server with each of them, in that agent's own
+configuration. Only Claude Code remembers unprompted — it is the one with
+session hooks; the others have the same tools and call them when needed.
 
 ## They are not committed
 

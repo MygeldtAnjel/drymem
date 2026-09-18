@@ -1,10 +1,15 @@
 /**
  * `npx drymem setup` — the whole install.
  *
- * Registers the MCP server and the session hooks in Claude Code's settings, and
- * stores the server URL and token. Everything it writes is merged into existing
- * files: a developer's settings.json is theirs, and clobbering their hooks to
- * install ours would be a good way to never be installed twice.
+ * Registers the MCP server with every agent on this machine, installs Claude
+ * Code's session hooks, and stores the server URL and token. Everything it
+ * writes is merged into existing files: a developer's settings.json is theirs,
+ * and clobbering their hooks to install ours would be a good way to never be
+ * installed twice.
+ *
+ * Only Claude Code gets hooks, because it is the only one that has them. Memory
+ * reaches the others through MCP, which is why registering it everywhere is
+ * what makes "works with four agents" true rather than aspirational.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,6 +20,8 @@ import { dirname, join } from "node:path";
 import { DrymemClient } from "./client.js";
 import { DEFAULT_SERVER, loadConfig, saveConfig, type Config } from "./config.js";
 import { runLogin } from "./login.js";
+import { registerMcp } from "./mcp-config.js";
+import { detected } from "./platforms.js";
 
 const HOOK_EVENTS = ["SessionStart", "Stop", "SubagentStop"] as const;
 
@@ -101,9 +108,6 @@ export function applySettings(settings: Settings): Settings {
   return mergePermissions(withHooks);
 }
 
-export function mcpEntry(): Record<string, unknown> {
-  return { type: "stdio", command: "npx", args: ["--yes", "drymem", "mcp"], env: {} };
-}
 
 async function ask(question: string, fallback: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -157,18 +161,24 @@ export async function runSetup(
   const settingsPath = join(root, ".claude", "settings.json");
   writeJson(settingsPath, applySettings(readJson<Settings>(settingsPath, {})));
 
-  const mcpPath = options.global
-    ? join(homedir(), ".claude.json")
-    : join(process.cwd(), ".mcp.json");
-  const mcpConfig = readJson<{ mcpServers?: Record<string, unknown> }>(mcpPath, {});
-  mcpConfig.mcpServers = { ...(mcpConfig.mcpServers ?? {}), drymem: mcpEntry() };
-  writeJson(mcpPath, mcpConfig);
+  // Every agent found here, not just Claude Code: the others have no hooks, so
+  // MCP is the only way they reach the memory at all. An agent nobody uses gets
+  // nothing written, the same rule skills follow.
+  const agents = detected(process.cwd(), homedir());
+  const targets = agents.length > 0 ? agents : [{ id: "claude-code", label: "Claude Code" }];
+  const registered = targets
+    .map((agent) => registerMcp(agent.id, process.cwd(), homedir(), options.global))
+    .filter((result) => result !== null);
 
   console.log(`\nConfigured.`);
   console.log(`  signed in as this machine -> ${join(homedir(), ".drymem", "config.json")} (0600)`);
   console.log(`  hooks    -> ${settingsPath}`);
-  console.log(`  mcp      -> ${mcpPath}`);
-  console.log(`\nRestart Claude Code to pick this up.`);
+  for (const result of registered) {
+    const note =
+      result.state === "skipped" ? ` (left alone: ${result.reason})` : result.state === "unchanged" ? " (already there)" : "";
+    console.log(`  mcp      -> ${result.path}${note}`);
+  }
+  console.log(`\nRestart your agent to pick this up.`);
   return 0;
 }
 

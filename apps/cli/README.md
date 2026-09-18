@@ -32,7 +32,7 @@ macOS, Linux, Windows and a server.
 
 | | |
 |---|---|
-| **Memory, without asking** | In Claude Code, session hooks save what a session worked out and hand the next one its context. |
+| **Memory, without asking** | In Claude Code, session hooks save what a session worked out and hand the next one its context. Every other agent gets the same memory as MCP tools. |
 | **Answers, not a search box** | `npx drymem ask "why is the retry backoff 4s?"` answers from what the team actually wrote, with the memories it used. |
 | **Skills that travel** | A skill published once is on every teammate's machine at their next session. No git, no copy-paste. |
 | **Scoped to a project** | Memories belong to a project and the people in it. Nothing crosses organisations. |
@@ -41,12 +41,12 @@ Run `npx drymem` for the full command list.
 
 ## Which agents
 
-Claude Code, OpenCode, Codex and Cursor. Skills are installed for all four.
+Claude Code, OpenCode, Codex and Cursor. `setup` installs the skills and
+registers the memory server for all four, each in the file that agent reads.
 
-Memory is automatic in Claude Code only — it is the one with session hooks, and
-`setup` writes them. The other three reach the same memory through the MCP
-server, which you register in that agent's own configuration as a stdio server
-running `npx drymem mcp`.
+What differs is who remembers without being asked. Claude Code has session
+hooks, so it saves and recalls on its own. The other three have the same memory
+tools and use them when the work calls for it.
 
 ## Licence
 

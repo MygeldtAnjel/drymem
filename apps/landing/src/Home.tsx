@@ -93,9 +93,9 @@ const STEPS = [
  */
 const AGENTS = [
   { name: "Claude Code", where: ".claude/skills/", memory: "Automatic" },
-  { name: "OpenCode", where: ".opencode/skill/", memory: "MCP, by hand" },
-  { name: "Codex", where: ".codex/skills/", memory: "MCP, by hand" },
-  { name: "Cursor", where: ".cursor/rules/", memory: "MCP, by hand" },
+  { name: "OpenCode", where: ".opencode/skill/", memory: "Via MCP" },
+  { name: "Codex", where: ".codex/skills/", memory: "Via MCP" },
+  { name: "Cursor", where: ".cursor/rules/", memory: "Via MCP" },
 ];
 
 const FACTS = [
@@ -143,7 +143,7 @@ const FAQ = [
   },
   {
     q: "Which agents does it work with?",
-    a: "Skills install for Claude Code, OpenCode, Codex and Cursor — each in the directory that agent actually reads, and only for the ones present on that machine. Memory is different: it is automatic in Claude Code, where session hooks capture and inject it without anyone typing a command, and setup writes those hooks for you. The other three read the same memory through the MCP server, but you register it in that agent's own configuration yourself — a stdio server running `npx drymem mcp`.",
+    a: "Skills install for Claude Code, OpenCode, Codex and Cursor — each in the directory that agent actually reads, and only for the ones present on that machine. Setup also registers the memory server with each of them, in that agent's own configuration file. What differs is who remembers unprompted: Claude Code has session hooks, so it captures and recalls without anyone typing a command. The others have the same memory tools and call them when the work needs them.",
   },
   {
     q: "Is everything I save visible to my team?",

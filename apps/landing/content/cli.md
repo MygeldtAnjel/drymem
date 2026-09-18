@@ -16,9 +16,14 @@ npx drymem setup [--server URL] [--global]
 ```
 
 Configures this repository: signs the machine in through your browser if it has
-no token yet, installs the session hooks, registers the MCP server, and pulls
-the project's skills. Run it once per repository, per machine. `--global`
-configures your agent for every project instead of this one.
+no token yet, installs Claude Code's session hooks, registers the memory server
+with every agent it finds on this machine, and pulls the project's skills. Run
+it once per repository, per machine. `--global` configures your agents for every
+project instead of this one.
+
+It prints each file it touched. Everything is merged into what was already
+there, and a configuration it cannot parse is left alone and reported rather
+than rewritten.
 
 **Which server it talks to.** The first time on a machine it asks, defaulting to
 `http://localhost:8080` — right if you are running drymem yourself, and where
