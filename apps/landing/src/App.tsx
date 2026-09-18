@@ -104,10 +104,10 @@ export function App() {
               {dark ? <Sun /> : <Moon />}
             </button>
             <a
-              href="#/#request"
+              href="#/docs/self-hosting"
               className="ml-1 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
             >
-              Request access
+              Install
             </a>
           </nav>
         </div>

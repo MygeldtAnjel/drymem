@@ -129,13 +129,13 @@ const FACTS = [
  * The questions a buyer actually asks, answered without hedging.
  *
  * Every one of these came up in a real conversation about the product, and the
- * two that are refusals — no self-serve, no hosted model — are here precisely
- * because finding them out on the pricing page after signing up is worse.
+ * two that are awkward — what it costs, and that nobody hosts it for you — are
+ * here precisely because finding them out later is worse.
  */
 const FAQ = [
   {
     q: "Does my code leave the building?",
-    a: "Your repository does not — no source, no diffs, no transcripts. What drymem keeps is the short summary your agent writes about the work. On the hosted service that summary is sent to Anthropic's API to pull out the entities and to answer questions about it; API inputs are not used to train their models. If even a summary must stay inside, self-host and point drymem at your own model.",
+    a: "Your repository does not — no source, no diffs, no transcripts. What drymem keeps is the short summary your agent writes about the work. Where that summary goes is your choice: point drymem at an Ollama on your own hardware and nothing leaves the network at all, or at an API if you would rather not run a model, in which case the summaries — never your code — reach that provider. There is no drymem service in the middle either way.",
   },
   {
     q: "What if somebody pastes a secret into a memory?",
@@ -150,12 +150,12 @@ const FAQ = [
     a: "No. Every memory starts private to whoever wrote it. Sharing is a deliberate act that copies it into the team's memory and records who vouched for it and when. Nothing is shared by default.",
   },
   {
-    q: "Can I self-host it?",
-    a: "Yes, and it is the same product, not a cut-down build: one docker compose, Postgres and a knowledge graph, the API as the sole published port, and whatever model you point it at. Most teams should start on the hosted trial anyway — it is the same software, and you find out whether the idea works before you run anything.",
+    q: "Do I have to run it myself?",
+    a: "That is the only way it runs, and it is the whole product rather than a cut-down build: one docker compose with Postgres, a knowledge graph, the API as the sole published port, and whatever model you point it at. On a laptop it is one command. On a server it is the same command answering \"no\" to one question, and the databases stop being published at all.",
   },
   {
-    q: "Why can I not just sign up?",
-    a: "Because a memory product is worthless until it has a week of memory in it, and the first week is where that goes wrong. Every organisation is opened by hand so somebody watches yours land. It also means we answer your email.",
+    q: "What does it cost?",
+    a: "Nothing. It is free and the source is on GitHub under Apache 2.0, so you run it, read it and change it. There is no paid tier, no seat count and no trial that ends — what you install is the whole thing. The only bills are the ones you were already paying: a machine to run it on, and a model if you use a hosted one.",
   },
 ];
 
@@ -166,7 +166,7 @@ export function Home() {
       <Section className="pt-16 pb-14 sm:pt-28 sm:pb-20">
         <p className="mb-5 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
           <span className="size-1.5 rounded-full bg-brand" />
-          Free trial, by request
+          Free and open source · Apache 2.0
         </p>
         <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-[3.25rem] sm:leading-[1.08]">
           Your coding agents keep re-learning what your team already decided.
@@ -178,18 +178,23 @@ export function Home() {
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-3">
           <a
-            href="#request"
+            href="#/docs/self-hosting"
             className="rounded-lg bg-primary px-5 py-3 text-[0.9375rem] font-semibold text-primary-foreground transition hover:opacity-90"
           >
-            Request a free trial
+            Install it
           </a>
           <a
-            href="#/docs/getting-started"
+            href={GITHUB}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-lg border bg-card px-5 py-3 text-[0.9375rem] font-medium transition hover:border-foreground"
           >
-            Read the docs
+            View the source
           </a>
         </div>
+        <p className="mt-5 font-mono text-sm text-muted-foreground">
+          git clone · ./scripts/install.sh · one command, on your own machine
+        </p>
       </Section>
 
       {/* ---- the product, before any more words ------------------------------- */}
@@ -338,12 +343,13 @@ export function Home() {
       <Section id="request" className="scroll-mt-24 py-14">
         <div className="mb-8 max-w-2xl">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Ask for a free trial
+            Would you rather not run it?
           </h2>
           <p className="mt-4 text-[0.9375rem] leading-7 text-muted-foreground">
-            There is no self-serve signup yet, on purpose: every organisation is set up by hand so
-            we can watch the first week go well. Tell us what you are trying to fix and we will
-            open one.
+            drymem is free and you can install it yourself today — that is the whole product, not
+            a limited edition of it. We do not host it for anyone yet. If you would use a hosted
+            one, say so and we will tell you when there is something to try; it is the only way we
+            will know whether to build it.
           </p>
         </div>
         <div className="max-w-2xl">
@@ -372,8 +378,8 @@ export function Footer() {
           <a className="hover:text-foreground" href={GITHUB} target="_blank" rel="noopener noreferrer">
             GitHub
           </a>
-          <a className="hover:text-foreground" href="#request">
-            Request access
+          <a className="hover:text-foreground" href="#/docs/self-hosting">
+            Install
           </a>
         </nav>
       </div>

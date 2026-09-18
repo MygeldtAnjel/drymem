@@ -1,13 +1,14 @@
 /**
- * The only way in.
+ * Not the way in — installing it is. This asks whether a hosted one is wanted.
  *
- * drymem is not self-serve: a server's sign-up succeeds exactly once, and every
- * organisation after that is provisioned by hand. So this form is not a
- * marketing device with a "we'll be in touch" that means nothing — it is the
- * actual queue, and somebody reads it.
+ * drymem is free and self-hosted, so nobody needs this form to use the product.
+ * What nobody can tell from the outside is whether teams would rather not run
+ * it themselves, and that is the only thing this is for. It says so plainly,
+ * because a form that implies you are waiting for permission when you are not
+ * would cost more than it collects.
  *
- * Which is why it says so, and why it asks what the team keeps re-explaining:
- * that answer is the one thing that makes a request easy to say yes to.
+ * It still asks what the team keeps re-explaining: that answer is the one worth
+ * reading, hosted or not.
  */
 
 import { useState } from "react";
@@ -56,10 +57,14 @@ export function RequestAccess() {
   if (state === "sent") {
     return (
       <div className="rounded-2xl border bg-card p-8 text-center">
-        <p className="text-lg font-semibold">Thanks — we have it.</p>
+        <p className="text-lg font-semibold">Thanks — noted.</p>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          A person reads these, not a queue. You will hear back at the address you gave, with a
-          link to set your password.
+          A person reads these, not a queue. We will write to the address you gave if a hosted
+          drymem happens. In the meantime it is{" "}
+          <a className="underline underline-offset-4" href="#/docs/self-hosting">
+            one command to install
+          </a>
+          .
         </p>
       </div>
     );
@@ -137,10 +142,11 @@ export function RequestAccess() {
         disabled={state === "sending"}
         className="mt-6 w-full rounded-lg bg-primary px-5 py-3 text-[0.9375rem] font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60 sm:w-auto"
       >
-        {state === "sending" ? "Sending…" : "Request a free trial"}
+        {state === "sending" ? "Sending…" : "Tell us you would use it"}
       </button>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        No card, no automated onboarding. We read every request and reply from a real address.
+        No card and nothing to wait for — the product is free and installs today. This only tells
+        us whether to build a hosted one.
       </p>
     </form>
   );
