@@ -167,22 +167,86 @@ else
   dim "  will be sent to Anthropic's API. Nothing else changes."
   ANTHROPIC_API_KEY=$(ask "  Anthropic API key")
   [ -n "$ANTHROPIC_API_KEY" ] || die "An API key is required when not running a local model."
-  warn "  Embeddings still need Ollama today. Set one up, or keep the default and"
-  warn "  expect search to stay empty until you do."
-  LOCAL_LLM_URL=$(ask "  Ollama address, for embeddings only" "$LOCAL_LLM_URL")
+fi
+echo
+
+# Embeddings are separate, and never optional: everything stored gets one,
+# whether or not anything was extracted from it.
+bold "2b. Embeddings"
+dim "Every memory is embedded so it can be searched, even when extraction is"
+dim "switched off. This can be the same Ollama, or a hosted provider if this"
+dim "machine has no business running a model at all."
+echo
+if yes_no "Use a local model for embeddings?" "$([ "$EXTRACTOR" = ollama ] && echo y || echo n)"; then
+  EMBEDDING_URL=""
+  EMBEDDING_API_KEY=""
+  if [ "$EXTRACTOR" != ollama ]; then
+    LOCAL_LLM_URL=$(ask "  Ollama address, for embeddings" "$LOCAL_LLM_URL")
+    EMBEDDING_MODEL=$(ask "  Embedding model" "$EMBEDDING_MODEL")
+  fi
+else
+  dim "  Any OpenAI-compatible embeddings endpoint."
+  EMBEDDING_URL=$(ask "  Endpoint" "https://api.openai.com/v1")
+  EMBEDDING_API_KEY=$(ask "  API key")
+  EMBEDDING_MODEL=$(ask "  Embedding model" "text-embedding-3-small")
+  EMBEDDING_DIM=$(ask "  Embedding dimensions" "1536")
+  [ -n "$EMBEDDING_API_KEY" ] || die "A hosted embeddings endpoint needs a key."
 fi
 echo
 
 # ---- ports ------------------------------------------------------------------
 
-bold "3. Ports"
+bold "3. Databases"
+dim "drymem keeps two: Postgres for the index — who wrote what, when, and what"
+dim "it was rated — and Neo4j for the memory text itself. Either can run here in"
+dim "a container, or be one you already have."
+echo
+
+PROFILES=()
+DATABASE_URL=""
+API_DATABASE_URL=""
+NEO4J_URI=""
+NEO4J_USER="neo4j"
+BUNDLED_PG=true
+BUNDLED_NEO=true
+
+if yes_no "Run Postgres here, in a container?" y; then
+  PROFILES+=("bundled-postgres")
+else
+  BUNDLED_PG=false
+  dim "  The connection string, e.g. from Neon or RDS."
+  pg=$(ask "  Postgres URL" "postgres://user:password@host:5432/drymem")
+  # Two drivers, one database: the engine speaks asyncpg, the API speaks libpq.
+  API_DATABASE_URL="$pg"
+  DATABASE_URL="postgresql+asyncpg://${pg#*://}"
+  dim "  The engine will use postgresql+asyncpg://…, the API the plain form."
+fi
+
+if yes_no "Run Neo4j here, in a container?" y; then
+  PROFILES+=("bundled-neo4j")
+else
+  BUNDLED_NEO=false
+  dim "  A bolt address, e.g. from Neo4j Aura. Aura uses neo4j+s://."
+  NEO4J_URI=$(ask "  Neo4j URI" "neo4j+s://xxxxxxxx.databases.neo4j.io")
+  NEO4J_USER=$(ask "  Neo4j user" "neo4j")
+  NEO4J_PASSWORD_EXTERNAL=$(ask "  Neo4j password")
+  [ -n "$NEO4J_PASSWORD_EXTERNAL" ] || die "A managed Neo4j needs its password."
+fi
+echo
+
+bold "4. Ports"
 dim "Only the API is published to the world. The databases are bound to this"
 dim "machine so you can inspect them; nothing outside can reach them."
 echo
 API_PORT=$(ask_port "  API (the console and the CLI)" 8080)
-NEO4J_BOLT=$(ask_port "  Neo4j, bolt" 7687)
-NEO4J_HTTP=$(ask_port "  Neo4j, browser" 7474)
-POSTGRES_PORT=$(ask_port "  Postgres" 5432)
+NEO4J_BOLT=7687
+NEO4J_HTTP=7474
+POSTGRES_PORT=5432
+if [ "$BUNDLED_NEO" = true ]; then
+  NEO4J_BOLT=$(ask_port "  Neo4j, bolt" 7687)
+  NEO4J_HTTP=$(ask_port "  Neo4j, browser" 7474)
+fi
+[ "$BUNDLED_PG" = true ] && POSTGRES_PORT=$(ask_port "  Postgres" 5432)
 echo
 
 # ---- write it ---------------------------------------------------------------
@@ -195,6 +259,8 @@ SERVICE_SECRET=$(secret)
 # two listen on loopback for exactly as long as nobody changes that.
 POSTGRES_PASSWORD=$(secret)
 NEO4J_PASSWORD=$(secret)
+# A managed Neo4j has a password already; ours would lock us out of it.
+[ "$BUNDLED_NEO" = false ] && NEO4J_PASSWORD=$NEO4J_PASSWORD_EXTERNAL
 
 cat > "$ENV_FILE" <<ENV
 # Written by scripts/install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ).
@@ -214,13 +280,28 @@ LOCAL_LLM_URL=$LOCAL_LLM_URL
 LOCAL_LLM_MODEL=$LOCAL_LLM_MODEL
 EMBEDDING_MODEL=$EMBEDDING_MODEL
 EMBEDDING_DIM=$EMBEDDING_DIM
+# Empty means embeddings follow LOCAL_LLM_URL with no key, which is an Ollama.
+EMBEDDING_URL=$EMBEDDING_URL
+EMBEDDING_API_KEY=$EMBEDDING_API_KEY
 ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
 
 # ---- the databases ----------------------------------------------------------
-# Generated here, used by the containers and by nothing else. Changing either
-# after the first start orphans the data that was written under the old one.
+# Which of them run here. Leaving a profile out means drymem expects that
+# database to already exist at the URL below.
+COMPOSE_PROFILES=$(IFS=,; echo "${PROFILES[*]}")
+
+# Generated for a database we start ourselves; for a managed one this is the
+# password it already had. Changing either after the first start orphans the
+# data written under the old one.
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 NEO4J_PASSWORD=$NEO4J_PASSWORD
+
+# Empty means "the container started above". Set, they point somewhere else —
+# the engine speaks asyncpg and the API speaks libpq, so Postgres appears twice.
+DATABASE_URL=$DATABASE_URL
+API_DATABASE_URL=$API_DATABASE_URL
+NEO4J_URI=$NEO4J_URI
+NEO4J_USER=$NEO4J_USER
 
 # ---- ports ------------------------------------------------------------------
 PORT=$API_PORT
@@ -251,7 +332,7 @@ echo
 
 if yes_no "Start drymem now?" y; then
   echo
-  (cd "$ROOT" && docker compose "${COMPOSE[@]}" up -d --build)
+  (cd "$ROOT" && COMPOSE_PROFILES="$(IFS=,; echo "${PROFILES[*]}")" docker compose "${COMPOSE[@]}" up -d --build)
   echo
   dim "Waiting for it to come up…"
   for _ in $(seq 1 60); do

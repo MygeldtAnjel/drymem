@@ -131,17 +131,22 @@ def build_llm_client(kind: str | None = None) -> LLMClient:
 
 
 def build_embedder(kind: str | None = None) -> OpenAIEmbedder:
-    """Embeddings always come from the local server; only extraction is switchable.
+    """Where embeddings come from, which need not be where reasoning does.
 
-    Graphiti needs embeddings even when nothing is extracted, and the local
-    embedding model is small enough to run anywhere the server runs.
+    Graphiti needs an embedding for everything it stores, whether or not
+    anything was extracted, so this is the one model that is never optional.
+
+    By default it follows `local_llm_url` with no key — that is an Ollama, and
+    it is small enough to run anywhere the server does. Set `embedding_url` and
+    `embedding_api_key` to use a hosted provider instead, which is what makes a
+    box with no GPU a complete deployment.
     """
     return OpenAIEmbedder(
         config=OpenAIEmbedderConfig(
-            api_key="not-needed",
+            api_key=settings.embedding_api_key or "not-needed",
             embedding_model=settings.embedding_model,
             embedding_dim=settings.embedding_dim,
-            base_url=settings.local_llm_url,
+            base_url=settings.embedding_url or settings.local_llm_url,
         )
     )
 

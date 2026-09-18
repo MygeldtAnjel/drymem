@@ -46,8 +46,8 @@ services:
     environment:
       DRYMEM_BIND: 0.0.0.0
       DRYMEM_PORT: 8090
-      DATABASE_URL: postgresql+asyncpg://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem
-      NEO4J_URI: bolt://neo4j:7687
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem}
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
       LOCAL_LLM_URL: ${LOCAL_LLM_URL:?set LOCAL_LLM_URL to a model this network can reach}
 
   api:
@@ -63,7 +63,7 @@ services:
       # mapping above. Without pinning it here, setting PORT to publish on 8443
       # also moves the listener, and compose forwards to a port nothing is on.
       PORT: 8080
-      DATABASE_URL: postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem
+      DATABASE_URL: ${API_DATABASE_URL:-postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@postgres:5432/drymem}
       MEMORY_URL: http://engine:8090
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL to the address people type}

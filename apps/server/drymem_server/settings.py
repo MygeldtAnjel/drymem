@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     local_llm_model: str = "qwen3.6:35b-a3b"
     embedding_model: str = "nomic-embed-text"
     embedding_dim: int = 768
+    # Embeddings need not come from the same place as the reasoning. A machine
+    # with no GPU can point these at a hosted embedding provider and skip
+    # running a model locally altogether; left unset they follow
+    # `local_llm_url` with no key, which is what an Ollama wants.
+    embedding_url: str | None = None
+    embedding_api_key: str | None = None
 
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-haiku-4-5"

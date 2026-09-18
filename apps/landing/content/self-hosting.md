@@ -19,6 +19,41 @@ everything.
 If you would rather write the config by hand, copy `.env.example` to `.env` and
 fill it in; every setting is documented there.
 
+## Two databases and two models
+
+Worth knowing before you start, because both are pairs and only one of each is
+optional.
+
+**Postgres** holds the index — who wrote what, when, which project, what it was
+rated. **Neo4j** holds the only copy of each memory's text and the graph over
+it. Neither is optional and they are not interchangeable. The installer asks
+about each separately: run it here in a container, or give it the address of one
+you already have (Neon, RDS, Neo4j Aura).
+
+**A reasoning model** does extraction on every save and answers questions in
+chat. This one is switchable: an Ollama on your own hardware, or an API.
+
+**An embedding model** embeds everything stored, whether or not anything was
+extracted from it — so it is the one model that is never optional. By default it
+uses the same Ollama. Point `EMBEDDING_URL` and `EMBEDDING_API_KEY` at a hosted
+provider instead and a machine with no GPU becomes a complete deployment.
+
+Both models are configured once, on the server. People using drymem do not
+choose a model and do not need one on their own machine.
+
+## What everyone on the team still installs
+
+A server on its own connects nothing. Each person runs, once per repository:
+
+```bash
+npx drymem@latest setup
+```
+
+That writes the session hooks and registers the MCP server into *their* agent's
+configuration — something no server can do from the outside. They can read and
+share memory in the browser without it, but their agent will not be connected,
+which is the point of the thing.
+
 ## What it needs
 
 drymem is four containers and, usually, a model. The model is the part that

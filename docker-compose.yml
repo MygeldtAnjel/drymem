@@ -1,5 +1,10 @@
 services:
+  # The two databases are in profiles so they can be left out entirely. A team
+  # pointing at a managed Neo4j or Postgres should not also be running an unused
+  # container beside it. `scripts/install.sh` sets COMPOSE_PROFILES; by hand,
+  # `--profile bundled-neo4j --profile bundled-postgres` is the default pair.
   neo4j:
+    profiles: ["bundled-neo4j"]
     image: neo4j:5-community
     container_name: ${COMPOSE_PROJECT_NAME:-drymem}-neo4j
     restart: unless-stopped
@@ -23,6 +28,7 @@ services:
       - drymem_neo4j_logs:/logs
 
   postgres:
+    profiles: ["bundled-postgres"]
     image: postgres:17-alpine
     container_name: ${COMPOSE_PROJECT_NAME:-drymem}-postgres
     restart: unless-stopped
@@ -56,9 +62,9 @@ services:
       DRYMEM_BIND: 127.0.0.1
       DRYMEM_PORT: 8090
       SERVICE_SECRET: ${SERVICE_SECRET:?set SERVICE_SECRET in .env}
-      DATABASE_URL: postgresql+asyncpg://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@localhost:${POSTGRES_PORT:-5432}/drymem
-      NEO4J_URI: bolt://localhost:${NEO4J_BOLT_PORT:-7687}
-      NEO4J_USER: neo4j
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@localhost:${POSTGRES_PORT:-5432}/drymem}
+      NEO4J_URI: ${NEO4J_URI:-bolt://localhost:${NEO4J_BOLT_PORT:-7687}}
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-drymem_dev_only}
       DRYMEM_EXTRACTOR: ${DRYMEM_EXTRACTOR:-ollama}
       # Ollama runs on the host, not in the compose network.
@@ -66,12 +72,19 @@ services:
       LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen3.6:35b-a3b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
+      EMBEDDING_URL: ${EMBEDDING_URL:-}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SCRUB_DENYLIST: ${SCRUB_DENYLIST:-}
+    # `required: false` is what lets a bundled database be absent: with its
+    # profile off the dependency is skipped rather than failing the stack.
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       neo4j:
         condition: service_started
+        required: false
 
   # The control plane, and the web app. The only thing anyone talks to.
   api:
@@ -85,7 +98,7 @@ services:
     environment:
       BIND: 127.0.0.1
       PORT: ${PORT:-8080}
-      DATABASE_URL: postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@localhost:${POSTGRES_PORT:-5432}/drymem
+      DATABASE_URL: ${API_DATABASE_URL:-postgres://drymem:${POSTGRES_PASSWORD:-drymem_dev_only}@localhost:${POSTGRES_PORT:-5432}/drymem}
       MEMORY_URL: http://127.0.0.1:8090
       SERVICE_SECRET: ${SERVICE_SECRET:?set SERVICE_SECRET in .env}
       PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:8080}
@@ -103,6 +116,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       engine:
         condition: service_healthy
 

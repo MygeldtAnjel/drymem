@@ -76,7 +76,9 @@ up:                 ## Build and run the whole thing in Docker
 	docker compose up -d --build
 
 db-up:              ## Start the local databases
-	docker compose up -d
+# The databases sit in profiles so a deployment can point at managed ones
+# instead; development always wants both here.
+	COMPOSE_PROFILES=bundled-neo4j,bundled-postgres docker compose up -d
 
 db-down:            ## Stop them
 	docker compose down
