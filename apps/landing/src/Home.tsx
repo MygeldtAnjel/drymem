@@ -93,9 +93,9 @@ const STEPS = [
  */
 const AGENTS = [
   { name: "Claude Code", where: ".claude/skills/", memory: "Automatic" },
-  { name: "OpenCode", where: ".opencode/skill/", memory: "Via MCP" },
-  { name: "Codex", where: ".codex/skills/", memory: "Via MCP" },
-  { name: "Cursor", where: ".cursor/rules/", memory: "Via MCP" },
+  { name: "OpenCode", where: ".opencode/skill/", memory: "MCP, by hand" },
+  { name: "Codex", where: ".codex/skills/", memory: "MCP, by hand" },
+  { name: "Cursor", where: ".cursor/rules/", memory: "MCP, by hand" },
 ];
 
 const FACTS = [
@@ -143,7 +143,7 @@ const FAQ = [
   },
   {
     q: "Which agents does it work with?",
-    a: "Skills install for Claude Code, OpenCode, Codex and Cursor — each in the directory that agent actually reads, and only for the ones present on that machine. Memory is automatic in Claude Code, where session hooks capture and inject it without anyone typing a command; every other agent reads and writes the same memory through the MCP server.",
+    a: "Skills install for Claude Code, OpenCode, Codex and Cursor — each in the directory that agent actually reads, and only for the ones present on that machine. Memory is different: it is automatic in Claude Code, where session hooks capture and inject it without anyone typing a command, and setup writes those hooks for you. The other three read the same memory through the MCP server, but you register it in that agent's own configuration yourself — a stdio server running `npx drymem mcp`.",
   },
   {
     q: "Is everything I save visible to my team?",

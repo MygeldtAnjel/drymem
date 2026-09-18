@@ -67,9 +67,15 @@ approves it — installs it on every agent on the project.
 | Agent | Skills land in | Memory |
 |---|---|---|
 | Claude Code | `.claude/skills/` | Automatic, through session hooks |
-| OpenCode | `.opencode/skill/` | Via MCP |
-| Codex | `.codex/skills/` | Via MCP |
-| Cursor | `.cursor/rules/` | Via MCP |
+| OpenCode | `.opencode/skill/` | Through MCP, registered by hand |
+| Codex | `.codex/skills/` | Through MCP, registered by hand |
+| Cursor | `.cursor/rules/` | Through MCP, registered by hand |
+
+Skills are installed for every agent on the machine. Memory is automatic only in
+Claude Code, which is the only one with session hooks — `setup` writes them, and
+registers the MCP server in `.mcp.json`. The other three read their MCP
+configuration from their own files, so add `npx drymem mcp` as a stdio server
+there yourself; the memory tools are then the same.
 
 Only agents actually present on a machine get anything written, and nothing is
 written into a directory drymem did not create.

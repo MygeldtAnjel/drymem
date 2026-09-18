@@ -42,6 +42,10 @@ them where that agent reads them.
 Only agents actually present on that machine get anything written. drymem never
 creates a directory for an agent you do not use.
 
+Skills reach all four. Memory does not: it is automatic in Claude Code alone,
+because that is the one with session hooks. In the other three you register the
+memory tools yourself, as a stdio MCP server running `npx drymem mcp`.
+
 ## They are not committed
 
 Installed skills are generated files, and they are gitignored. `git status` stays
