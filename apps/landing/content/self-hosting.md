@@ -3,6 +3,70 @@
 drymem is the same software whether we run it or you do. If your rules say the
 memory lives on your hardware, this is what that takes.
 
+## Before you start, by operating system
+
+drymem runs as containers, so the only real prerequisite is Docker. What differs
+is how you get one and, on two of the three, how the containers reach a model
+running on the same machine.
+
+### macOS
+
+Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then
+run the installer. `host.docker.internal` works out of the box, so a local
+Ollama is reachable with no extra step.
+
+The installer is written for the bash macOS ships (3.2), so `/bin/bash` is fine
+— you do not need a newer one from Homebrew.
+
+### Linux
+
+Install Docker Engine and the Compose plugin from
+[docs.docker.com](https://docs.docker.com/engine/install/), and add yourself to
+the `docker` group so you are not running the installer with `sudo`:
+
+```bash
+sudo usermod -aG docker "$USER"   # then log out and back in
+```
+
+On a server layout the containers are on their own network, so an Ollama on the
+same box needs `OLLAMA_HOST=0.0.0.0` — its default binding is not reachable from
+a container. See [reaching a model](#reaching-a-model-from-a-server).
+
+### Windows
+
+The installer is a shell script, so run it inside **WSL2** rather than
+PowerShell. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+with the WSL2 backend, open your Linux distribution, and clone and install
+there:
+
+```powershell
+wsl --install            # once, if you have no distribution yet
+```
+
+```bash
+# inside WSL
+git clone https://github.com/MygeldtAnjel/drymem.git
+cd drymem && ./scripts/install.sh
+```
+
+Keep the clone inside the WSL filesystem (`~/drymem`), not under `/mnt/c`.
+Docker bind mounts across that boundary are slow enough to notice.
+
+The agent side — `npx drymem@latest setup` — is plain Node and runs anywhere,
+including native Windows. Only the server needs WSL.
+
+### A server
+
+Any Linux box you can reach. Two cores and 4 GB is enough without a local model.
+Beyond the Docker install above:
+
+- Nothing but your TLS terminator should be able to reach the API's port. The
+  compose binds it to `127.0.0.1` by default; if you set `BIND_ADDRESS` wider,
+  close the port at the firewall.
+- The databases publish nothing at all on the server layout.
+- Give it a domain and a certificate before anyone signs in — see
+  [TLS](#tls).
+
 ## Installing it
 
 ```bash

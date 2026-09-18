@@ -13,6 +13,11 @@
 
 set -euo pipefail
 
+# Written for bash 3.2, which is what macOS still ships as /bin/bash. That
+# mostly means avoiding `${array[*]}` bare under `set -u` — before bash 4.4 an
+# empty array is an unbound variable, and the path where both databases are
+# external leaves one empty.
+
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 ENV_FILE="$ROOT/.env"
 
@@ -288,7 +293,7 @@ ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
 # ---- the databases ----------------------------------------------------------
 # Which of them run here. Leaving a profile out means drymem expects that
 # database to already exist at the URL below.
-COMPOSE_PROFILES=$(IFS=,; echo "${PROFILES[*]}")
+COMPOSE_PROFILES=$(IFS=,; echo "${PROFILES[*]:-}")
 
 # Generated for a database we start ourselves; for a managed one this is the
 # password it already had. Changing either after the first start orphans the
@@ -332,7 +337,7 @@ echo
 
 if yes_no "Start drymem now?" y; then
   echo
-  (cd "$ROOT" && COMPOSE_PROFILES="$(IFS=,; echo "${PROFILES[*]}")" docker compose "${COMPOSE[@]}" up -d --build)
+  (cd "$ROOT" && COMPOSE_PROFILES="$(IFS=,; echo "${PROFILES[*]:-}")" docker compose "${COMPOSE[@]}" up -d --build)
   echo
   dim "Waiting for it to come up…"
   for _ in $(seq 1 60); do
@@ -347,10 +352,10 @@ if yes_no "Start drymem now?" y; then
     sleep 2
   done
   warn "It did not answer on /healthz within two minutes."
-  echo "  docker compose ${COMPOSE[*]} logs -f     # to see why"
+  echo "  docker compose ${COMPOSE[*]:-} logs -f     # to see why"
   exit 1
 fi
 
 echo
 echo "When you are ready:"
-echo "  docker compose ${COMPOSE[*]} up -d --build"
+echo "  docker compose ${COMPOSE[*]:-} up -d --build"

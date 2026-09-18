@@ -8,6 +8,10 @@ You need Node 20 or newer, a coding agent, and a drymem server to point at —
 either one your team already runs, or [your own](#/docs/self-hosting), which
 takes one command.
 
+This page is the same on macOS, Linux and Windows: `npx` is plain Node and needs
+nothing else. Only *running a server yourself* differs by platform, and that is
+covered in [self-hosting](#/docs/self-hosting).
+
 ## Connect a repository
 
 In a project you work in:
