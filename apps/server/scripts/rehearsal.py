@@ -28,6 +28,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 # Built once by `make build`; the rehearsal drives the same bundle a user runs.
@@ -149,21 +150,57 @@ npx --yes drymem@VERSION_TAG context 5 2>&1 || true
 """
 
 
-def clean_machine(token: str) -> tuple[int, str]:
-    """The published package, in a container with nothing of ours in it."""
-    script = (
-        CLEAN_MACHINE.replace("PROJECT_URL", PROJECT).replace("VERSION_TAG", PUBLISHED)
-    )
+# Ana's laptop: she sets it up, then writes a memory from inside her checkout,
+# the way an agent would.
+ANA_MACHINE = r"""
+set -e
+mkdir -p /work && cd /work
+git init -q && git config user.email a@example.com && git config user.name a
+git remote add origin https://PROJECT_URL.git
+mkdir -p .claude
+npx --yes drymem@VERSION_TAG setup >/tmp/setup.log 2>&1 || { echo "ANA-SETUP-FAILED"; cat /tmp/setup.log; exit 1; }
+echo "ANA-TOKEN-STORED:$(test -f "$HOME/.drymem/config.json" && echo yes || echo no)"
+npx --yes drymem@VERSION_TAG save "## Summary
+The webhook retry budget is four attempts over ten minutes." >/tmp/save.log 2>&1 \
+  || { echo "ANA-SAVE-FAILED"; cat /tmp/save.log; exit 1; }
+echo "ANA-SAVED"
+"""
+
+# Luis's laptop: a different person, a different project, a different machine.
+# Nothing of Ana's should reach it.
+LUIS_MACHINE = r"""
+set -e
+mkdir -p /work && cd /work
+git init -q && git config user.email l@example.com && git config user.name l
+git remote add origin https://PROJECT_URL.git
+mkdir -p .claude
+npx --yes drymem@VERSION_TAG setup >/tmp/setup.log 2>&1 || { echo "LUIS-SETUP-FAILED"; cat /tmp/setup.log; exit 1; }
+npx --yes drymem@VERSION_TAG skills pull >/tmp/pull.log 2>&1 || true
+echo "LUIS-SKILLS:$(ls .claude/skills 2>/dev/null | tr '\n' ' ')"
+echo "LUIS-CONTEXT-START"
+npx --yes drymem@VERSION_TAG context 20 2>&1 || true
+"""
+
+
+def machine(name: str, token: str, script: str, project: str = PROJECT) -> tuple[int, str]:
+    """One teammate's laptop: its own container, its own token, its own disk.
+
+    Separate containers rather than separate directories, because the things
+    worth checking across machines — that a token is per-machine, that one
+    person's checkout never sees another's — are exactly the things a shared
+    filesystem would hide.
+    """
+    body = script.replace("PROJECT_URL", project).replace("VERSION_TAG", PUBLISHED)
     done = subprocess.run(
         [
-            "docker", "run", "--rm", "--network", "host",
+            "docker", "run", "--rm", "--network", "host", "--hostname", name,
             "-e", f"DRYMEM_SERVER_URL={BASE}",
             "-e", f"DRYMEM_TOKEN={token}",
-            "node:22", "bash", "-c", script,
+            "node:22", "bash", "-c", body,
         ],
         capture_output=True,
         text=True,
-        timeout=600,
+        timeout=900,
         check=False,
     )
     return done.returncode, done.stdout + done.stderr
@@ -418,7 +455,7 @@ def main() -> int:
     # in a container with no checkout and no node_modules — the only place the
     # published layout is real, and the only place its absence shows up.
     token = must(*ana.post("/auth/tokens", {"label": "clean-machine"}), "minting a token")["token"]
-    code, out = clean_machine(token)
+    code, out = machine("clean-machine", token, CLEAN_MACHINE)
     check("the published package installs and runs", "VERSION:" in out, out.strip()[-300:])
     check("`setup` succeeds without a browser", "SETUP-FAILED" not in out, out.strip()[-300:])
     for agent, path in [
@@ -435,6 +472,50 @@ def main() -> int:
         out.strip()[-300:],
     )
     check("and it reads the team's memories", "Adyen" in out.split("CONTEXT-START")[-1])
+
+    step("13. Two teammates, two machines, at the same time")
+    # Step 12 proved one container works. This is the part a single machine
+    # cannot show: two people, two laptops, two tokens, two checkouts — running
+    # concurrently, because that is how a team actually uses it.
+    ana_token = must(*ana.post("/auth/tokens", {"label": "ana-laptop"}), "Ana's laptop")["token"]
+    luis_token = must(*luis.post("/auth/tokens", {"label": "luis-laptop"}), "Luis's laptop")["token"]
+    check("each machine has its own token", ana_token != luis_token)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        ana_run = pool.submit(machine, "ana-laptop", ana_token, ANA_MACHINE, PROJECT)
+        luis_run = pool.submit(machine, "luis-laptop", luis_token, LUIS_MACHINE, OTHER_PROJECT)
+        _, ana_out = ana_run.result()
+        _, luis_out = luis_run.result()
+
+    check("Ana's laptop configures itself", "ANA-SETUP-FAILED" not in ana_out, ana_out.strip()[-300:])
+    check("and stores its own token on its own disk", "ANA-TOKEN-STORED:yes" in ana_out)
+    check("she writes a memory from her checkout", "ANA-SAVED" in ana_out, ana_out.strip()[-300:])
+
+    check("Luis's laptop configures itself too", "LUIS-SETUP-FAILED" not in luis_out, luis_out.strip()[-300:])
+
+    # The server is the only thing the two machines share, so this is the real
+    # test of the boundary: not two directories, two computers.
+    luis_context = luis_out.split("LUIS-CONTEXT-START")[-1]
+    check(
+        "Luis's machine never sees the other project's memory",
+        "retry budget" not in luis_context and "Adyen" not in luis_context,
+        luis_context.strip()[:300],
+    )
+    check(
+        "nor the skill that was only enabled on the other project",
+        "payments-testing" not in luis_out.split("LUIS-SKILLS:")[-1].splitlines()[0],
+        luis_out.split("LUIS-SKILLS:")[-1].splitlines()[0][:200],
+    )
+
+    # And what Ana wrote on her laptop is on the server, for her project only.
+    check(
+        "what she wrote on her laptop reached the team's server",
+        "retry budget" in titles_visible_to(ana, PROJECT),
+    )
+    check(
+        "and Luis, on the other project, cannot read it",
+        "retry budget" not in titles_visible_to(luis, OTHER_PROJECT),
+    )
 
     print(f"\n{checks['passed']} checks passed, {checks['failed']} failed")
     return 1 if checks["failed"] else 0

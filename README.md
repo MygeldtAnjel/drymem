@@ -152,10 +152,15 @@ A whole team, on a stack built from scratch and thrown away afterwards: the
 first signup creating the organisation, invitations, two projects with
 different people on them, a private memory staying private, a shared one
 crossing to a teammate, a grounded answer, a skill published once and enabled
-per project, and the audit trail. The last step runs `npx drymem@latest` in a
-container with nothing on it, so the package npm serves is checked rather than
-the one in your working tree — which is the only place a packaging mistake
-shows up. `DRYMEM_E2E_VERSION=2.1.0 make rehearsal` pins that to one version.
+per project, and the audit trail.
+
+The last two steps leave the host. One runs `npx drymem@latest` in a container
+with nothing on it, so the package npm serves is checked rather than the one in
+your working tree — the only place a packaging mistake shows up. The other runs
+two containers at once, one per teammate, each with its own token, disk and
+checkout: one writes a memory from her repository, the other must see neither
+it nor a skill enabled on a project she is not on. Two computers, not two
+directories. `DRYMEM_E2E_VERSION=2.1.0 make rehearsal` pins the version.
 
 Tests tell you the code is right; this tells you the product works. Run it
 before a release.
