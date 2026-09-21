@@ -126,6 +126,50 @@ def cli(cwd: Path, env: dict, *args: str) -> tuple[int, str]:
     return done.returncode, done.stdout + done.stderr
 
 
+PUBLISHED = os.environ.get("DRYMEM_E2E_VERSION", "latest")
+
+# What a teammate's machine runs, on a machine that has never seen this repo:
+# no checkout, no build, no pnpm — only node and whatever npm hands it.
+CLEAN_MACHINE = r"""
+set -e
+mkdir -p /work && cd /work
+git init -q && git config user.email t@example.com && git config user.name t
+git remote add origin https://PROJECT_URL.git
+# Three agents "installed", so setup has somewhere to write for each of them.
+mkdir -p .claude .cursor .opencode
+echo "VERSION:$(npx --yes drymem@VERSION_TAG --version)"
+npx --yes drymem@VERSION_TAG setup >/tmp/setup.log 2>&1 || { echo "SETUP-FAILED"; cat /tmp/setup.log; exit 1; }
+for f in .mcp.json .cursor/mcp.json opencode.json .claude/settings.json; do
+  [ -f "$f" ] && echo "WROTE:$f"
+done
+npx --yes drymem@VERSION_TAG skills pull >/tmp/pull.log 2>&1 || { echo "PULL-FAILED"; cat /tmp/pull.log; exit 1; }
+for f in .claude/skills/*/SKILL.md; do [ -f "$f" ] && echo "SKILL:$f"; done
+echo "CONTEXT-START"
+npx --yes drymem@VERSION_TAG context 5 2>&1 || true
+"""
+
+
+def clean_machine(token: str) -> tuple[int, str]:
+    """The published package, in a container with nothing of ours in it."""
+    script = (
+        CLEAN_MACHINE.replace("PROJECT_URL", PROJECT).replace("VERSION_TAG", PUBLISHED)
+    )
+    done = subprocess.run(
+        [
+            "docker", "run", "--rm", "--network", "host",
+            "-e", f"DRYMEM_SERVER_URL={BASE}",
+            "-e", f"DRYMEM_TOKEN={token}",
+            "node:22", "bash", "-c", script,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    return done.returncode, done.stdout + done.stderr
+
+
+
 def check(what: str, condition: bool, detail: str = "") -> None:
     if condition:
         checks["passed"] += 1
@@ -368,6 +412,29 @@ def main() -> int:
     check("and the skill publish", "skill.publish" in actions, str(sorted(actions)))
     _, as_ana = ana.get("/v1/audit")
     check("a member cannot read the audit trail", as_ana.get("events") is None)
+
+    step(f"12. A teammate's machine, with nothing on it but node and npm (drymem@{PUBLISHED})")
+    # Everything above ran the CLI we just built. This runs the one npm serves,
+    # in a container with no checkout and no node_modules — the only place the
+    # published layout is real, and the only place its absence shows up.
+    token = must(*ana.post("/auth/tokens", {"label": "clean-machine"}), "minting a token")["token"]
+    code, out = clean_machine(token)
+    check("the published package installs and runs", "VERSION:" in out, out.strip()[-300:])
+    check("`setup` succeeds without a browser", "SETUP-FAILED" not in out, out.strip()[-300:])
+    for agent, path in [
+        ("Claude Code", ".mcp.json"),
+        ("Cursor", ".cursor/mcp.json"),
+        ("OpenCode", "opencode.json"),
+    ]:
+        check(f"it registers the memory server for {agent}", f"WROTE:{path}" in out)
+    check("and installs Claude Code's hooks", "WROTE:.claude/settings.json" in out)
+    check("`skills pull` works from the published bundle", "PULL-FAILED" not in out, out.strip()[-300:])
+    check(
+        "the team's skill lands on that machine",
+        "payments-testing" in out,
+        out.strip()[-300:],
+    )
+    check("and it reads the team's memories", "Adyen" in out.split("CONTEXT-START")[-1])
 
     print(f"\n{checks['passed']} checks passed, {checks['failed']} failed")
     return 1 if checks["failed"] else 0
