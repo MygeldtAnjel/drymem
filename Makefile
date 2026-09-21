@@ -1,5 +1,6 @@
 # One command per task, so two package managers never become two workflows.
 SERVER := apps/server
+TOUR_DIR ?= $(CURDIR)/tour
 
 # The databases take their credentials from .env, and so must anything that
 # talks to them directly — the test harness makes its scratch databases on the
@@ -9,7 +10,9 @@ ifneq (,$(wildcard .env))
 export
 endif
 
-.PHONY: help dev test types build eval fmt migrate up db-up db-down
+# `tour` writes into a directory called tour/, so without this make decides
+# the target is already built and does nothing.
+.PHONY: help dev test types build eval fmt migrate up db-up db-down rehearsal test-e2e tour backup diagrams
 help:
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
 
@@ -39,6 +42,20 @@ rehearsal:          ## A team using drymem on a throwaway stack, start to finish
 	@docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml up -d --build
 	@uv --directory $(SERVER) run python scripts/rehearsal.py; status=$$?; \
 	  docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v; \
+	  exit $$status
+
+tour:               ## Record a video of the product being used, end to end
+# The rehearsal builds the world the video needs — a team, memories, a skill —
+# so the recording is the last thing it does rather than a fixture of its own.
+	@mkdir -p $(TOUR_DIR)
+	@docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v 2>/dev/null || true
+	@docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml up -d --build
+	@DRYMEM_TOUR=$(TOUR_DIR) uv --directory $(SERVER) run python scripts/rehearsal.py; status=$$?; \
+	  docker compose -p drymem-rehearsal -f docker-compose.rehearsal.yml down -v; \
+	  command -v ffmpeg >/dev/null 2>&1 && [ -f $(TOUR_DIR)/drymem-tour.webm ] && \
+	    ffmpeg -y -loglevel error -i $(TOUR_DIR)/drymem-tour.webm \
+	      -c:v libx264 -pix_fmt yuv420p -movflags +faststart $(TOUR_DIR)/drymem-tour.mp4 && \
+	    echo "mp4: $(TOUR_DIR)/drymem-tour.mp4"; \
 	  exit $$status
 
 backup:             ## Dump both databases (stops the stack for a moment)

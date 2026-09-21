@@ -170,6 +170,14 @@ neither the audit trail nor the server card.
 Tests tell you the code is right; this tells you the product works. Run it
 before a release.
 
+```bash
+make tour
+```
+
+The same run, recorded. It drives the populated stack at a human pace with a
+caption on screen and writes `tour/drymem-tour.mp4` — the product being used,
+for anyone who would rather watch than read.
+
 ## Contributing
 
 Issues and pull requests are welcome. Run `make test` before opening one — it

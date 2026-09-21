@@ -208,6 +208,7 @@ def machine(name: str, token: str, script: str, project: str = PROJECT) -> tuple
 
 
 CONSOLE_CHECK = Path(__file__).resolve().parent / "console_check.mjs"
+TOUR = Path(__file__).resolve().parent / "tour.mjs"
 
 
 def console(owner: Person, member: Person) -> list[tuple[str, bool, str]]:
@@ -560,6 +561,21 @@ def main() -> int:
     # back to whoever is running it.
     for label, ok, detail in console(miguel, ana):
         check(label, ok, detail)
+
+    tour_dir = os.environ.get("DRYMEM_TOUR")
+    if tour_dir:
+        # Optional, and deliberately last: the recording wants a populated
+        # product, and everything above is what populates it.
+        step("15. Recording the tour")
+        done = subprocess.run(
+            ["node", str(TOUR), BASE, miguel.email, ana.email, PASSWORD, PROJECT, tour_dir],
+            cwd=str(TOUR.parents[3]),
+            text=True,
+            timeout=900,
+            check=False,
+        )
+        if done.returncode != 0:
+            print("    (the tour did not finish; the checks above still stand)")
 
     print(f"\n{checks['passed']} checks passed, {checks['failed']} failed")
     return 1 if checks["failed"] else 0

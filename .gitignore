@@ -51,3 +51,6 @@ apps/cli/skills/
 apps/cli/LICENSE
 apps/cli/NOTICE
 apps/cli/*.tgz
+
+# Recordings from `make tour` — regenerate them, do not commit them.
+/tour/
