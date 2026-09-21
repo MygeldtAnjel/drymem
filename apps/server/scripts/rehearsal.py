@@ -207,6 +207,42 @@ def machine(name: str, token: str, script: str, project: str = PROJECT) -> tuple
 
 
 
+CONSOLE_CHECK = Path(__file__).resolve().parent / "console_check.mjs"
+
+
+def console(owner: Person, member: Person) -> list[tuple[str, bool, str]]:
+    """The console, driven by a real browser.
+
+    Playwright lives in the repository's own node_modules, so this runs on the
+    host rather than in a container: the browser only needs to reach the API,
+    and the API is on the host's network already.
+    """
+    command = [
+        "node", str(CONSOLE_CHECK), BASE, owner.email, member.email, PASSWORD, PROJECT,
+    ]
+    shots = os.environ.get("DRYMEM_UI_SHOTS")
+    if shots:
+        command.append(shots)
+    done = subprocess.run(
+        command,
+        cwd=str(CONSOLE_CHECK.parents[3]),
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    results = []
+    for line in done.stdout.splitlines():
+        if line.startswith("PASS:"):
+            results.append((line[5:], True, ""))
+        elif line.startswith("FAIL:"):
+            label, _, detail = line[5:].partition(" :: ")
+            results.append((label, False, detail))
+    if not results:
+        results.append(("the browser check runs at all", False, (done.stdout + done.stderr)[-300:]))
+    return results
+
+
 def check(what: str, condition: bool, detail: str = "") -> None:
     if condition:
         checks["passed"] += 1
@@ -516,6 +552,14 @@ def main() -> int:
         "and Luis, on the other project, cannot read it",
         "retry budget" not in titles_visible_to(luis, OTHER_PROJECT),
     )
+
+    step("14. The console, in a real browser")
+    # Everything else is HTTP or a terminal. This is the only step that proves
+    # the screens a person actually opens are there and correct — and the only
+    # way to check Settings → Server, which exists to report the deployment
+    # back to whoever is running it.
+    for label, ok, detail in console(miguel, ana):
+        check(label, ok, detail)
 
     print(f"\n{checks['passed']} checks passed, {checks['failed']} failed")
     return 1 if checks["failed"] else 0

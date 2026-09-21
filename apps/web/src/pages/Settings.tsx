@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   api,
   auth,
+  isAdmin,
   type ApiToken,
   type Health,
   type Me,
@@ -82,7 +83,9 @@ export function SettingsPage({
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="project">Project</TabsTrigger>
         <TabsTrigger value="memory">How memories are written</TabsTrigger>
-        <TabsTrigger value="server">Server</TabsTrigger>
+        {/* The server card is admin-only on the API, so offering it to a
+            member is offering a tab that can only fail. */}
+        {isAdmin(me) && <TabsTrigger value="server">Server</TabsTrigger>}
       </TabsList>
 
       <TabsContent value="profile" className="flex flex-col gap-4">

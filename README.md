@@ -162,6 +162,11 @@ checkout: one writes a memory from her repository, the other must see neither
 it nor a skill enabled on a project she is not on. Two computers, not two
 directories. `DRYMEM_E2E_VERSION=2.1.0 make rehearsal` pins the version.
 
+The final step opens a real browser against the same stack: the sign-in form,
+the memory list, creating an invitation, Settings → Server reporting both
+stores as connected without showing a secret back, and a member being offered
+neither the audit trail nor the server card.
+
 Tests tell you the code is right; this tells you the product works. Run it
 before a release.
 

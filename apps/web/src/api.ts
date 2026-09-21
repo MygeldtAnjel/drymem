@@ -310,8 +310,14 @@ export interface Me {
   email: string;
   name: string | null;
   org_id: string;
+  /** "owner" | "admin" | "member" — what the server will actually let you do. */
+  role: string;
   created_at: string | null;
 }
+
+/** The two roles the API treats as administrative. Mirrors `isAdmin` there. */
+export const isAdmin = (me: Me | null): boolean =>
+  me?.role === "owner" || me?.role === "admin";
 
 export interface Overview {
   project_key: string;

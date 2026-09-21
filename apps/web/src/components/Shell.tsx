@@ -41,10 +41,16 @@ import {
   SidebarTrigger,
 } from "./ui/sidebar";
 import { Separator } from "./ui/separator";
-import type { Me, Project } from "@/api";
+import { isAdmin, type Me, type Project } from "@/api";
 import { go, type Route } from "@/router";
 
-type Destination = { page: string; label: string; icon: LucideIcon };
+type Destination = {
+  page: string;
+  label: string;
+  icon: LucideIcon;
+  /** Offered only to an owner or an admin — the API refuses everyone else. */
+  adminOnly?: boolean;
+};
 
 export const WORK: Destination[] = [
   { page: "overview", label: "Overview", icon: LayoutDashboard },
@@ -58,9 +64,13 @@ export const WORK: Destination[] = [
 export const ADMIN: Destination[] = [
   { page: "projects", label: "Projects", icon: FolderGit2 },
   { page: "members", label: "Members", icon: Users },
-  { page: "audit", label: "Audit", icon: ScrollText },
+  { page: "audit", label: "Audit", icon: ScrollText, adminOnly: true },
   { page: "settings", label: "Settings", icon: Settings },
 ];
+
+/** What this person is actually allowed to open. */
+export const destinationsFor = (items: Destination[], me: Me | null): Destination[] =>
+  items.filter((item) => !item.adminOnly || isAdmin(me));
 
 export function Shell({
   route,
@@ -123,7 +133,7 @@ export function Shell({
 
         <SidebarContent>
           {group("Workspace", WORK)}
-          {group("Administration", ADMIN)}
+          {group("Administration", destinationsFor(ADMIN, me))}
         </SidebarContent>
 
         <SidebarFooter>
