@@ -142,10 +142,29 @@ you want while working on it.
 Alembic owns the database schema; the TypeScript side reads it through Drizzle
 but never migrates it.
 
+### The rehearsal
+
+```bash
+make rehearsal
+```
+
+A whole team, on a stack built from scratch and thrown away afterwards: the
+first signup creating the organisation, invitations, two projects with
+different people on them, a private memory staying private, a shared one
+crossing to a teammate, a grounded answer, a skill published once and enabled
+per project, and the audit trail. The last step runs `npx drymem@latest` in a
+container with nothing on it, so the package npm serves is checked rather than
+the one in your working tree — which is the only place a packaging mistake
+shows up. `DRYMEM_E2E_VERSION=2.1.0 make rehearsal` pins that to one version.
+
+Tests tell you the code is right; this tells you the product works. Run it
+before a release.
+
 ## Contributing
 
 Issues and pull requests are welcome. Run `make test` before opening one — it
-covers the engine, the control plane, the CLI and the console.
+covers the engine, the control plane, the CLI and the console. `make rehearsal`
+as well, if you touched anything a person passes through.
 
 ## Licence
 
